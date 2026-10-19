@@ -19,7 +19,7 @@ def latest(top=None, max_weight=None, pause=0.2):
     syms = [x for x in u["symbols"] if x in wide["close"].columns]
     close, open_, volume = wide["close"], wide["open"], wide["volume"]
     raw = F.raw_features(close[syms], volume[syms])
-    X = F.feature_matrix(raw)
+    X = F.feature_matrix(raw)[list(F.FEATURES)]
     cal = close.index
     day = cal[-1]
     if day not in X.index.get_level_values(0):

@@ -73,10 +73,17 @@ def stack(wide):
     return s[s.notna()]
 
 
-def feature_matrix(raw):
-    """Long table (date, symbol) of features ranked across stocks on each date."""
-    cols = {k: stack(v).groupby(level=0).rank(pct=True) for k, v in raw.items()}
-    return pd.DataFrame(cols)[list(FEATURES)].dropna(how="all")
+def feature_matrix(raw, mask=None, names=None):
+    """Long table (date, symbol) of features ranked across stocks on each date.
+
+    With a membership mask, only the stocks in the index on that date are ranked (and kept): the cross-section
+    is the index as it was, not as it is today."""
+    names = list(names or FEATURES)
+    cols = {}
+    for k in names:
+        v = raw[k] if mask is None else raw[k].where(mask.reindex(index=raw[k].index, columns=raw[k].columns, fill_value=False))
+        cols[k] = stack(v).groupby(level=0).rank(pct=True)
+    return pd.DataFrame(cols)[names].dropna(how="all")
 
 
 def forward_returns(open_, horizon=HORIZON):
@@ -84,6 +91,10 @@ def forward_returns(open_, horizon=HORIZON):
     return open_.shift(-1 - horizon) / open_.shift(-1) - 1
 
 
-def labels(open_, horizon=HORIZON):
-    """Long series (date, symbol): the forward return's rank across stocks on each date."""
-    return stack(forward_returns(open_, horizon)).groupby(level=0).rank(pct=True)
+def labels(open_, horizon=HORIZON, mask=None):
+    """Long series (date, symbol): the forward return's rank across the stocks (index members, with a mask) on each date.
+    Ranking makes it the return relative to the rest of the universe."""
+    fwd = forward_returns(open_, horizon)
+    if mask is not None:
+        fwd = fwd.where(mask.reindex(index=fwd.index, columns=fwd.columns, fill_value=False))
+    return stack(fwd).groupby(level=0).rank(pct=True)

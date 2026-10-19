@@ -49,7 +49,7 @@ def run_study(wide, universe, skipped, start="2012-01-01", end=None, top=P.TOP_N
         raise InvalidInput("股票池只有 %d 只，太少了" % len(universe))
     close, open_, volume = wide["close"], wide["open"], wide["volume"]
     raw = F.raw_features(close[universe], volume[universe])
-    X = F.feature_matrix(raw)
+    X = F.feature_matrix(raw)[list(F.FEATURES)]
     y = F.labels(open_[universe])
     cal = close.index
     rebal = M.month_ends(cal, start, end)

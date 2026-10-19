@@ -96,3 +96,51 @@ def test_ic():
     scores = pd.Series(range(12), index=pd.MultiIndex.from_product([[cal[0]], syms]), dtype=float)
     fwd = pd.DataFrame([np.arange(12) * 0.01, np.zeros(12)], index=cal, columns=syms)
     assert M.information_coefficients(scores, fwd)[cal[0]] == pytest.approx(1.0)
+
+
+def test_members_at_and_mask():
+    from quantlab.ml import universe as U
+    changes = [{"date": "2024-03-01", "added": "NEW", "removed": "OLD"}, {"date": "2024-02-01", "added": "MID", "removed": ""}]
+    assert U.members_at("2024-03-01", {"A", "NEW", "MID"}, changes) == {"A", "NEW", "MID"}  # effective on its date
+    assert U.members_at("2024-02-29", {"A", "NEW", "MID"}, changes) == {"A", "OLD", "MID"}
+    assert U.members_at("2024-01-31", {"A", "NEW", "MID"}, changes) == {"A", "OLD"}
+    cal = pd.bdate_range("2024-01-29", "2024-03-05")
+    m = U.membership_mask(cal, ["A", "OLD", "NEW", "MID"], {"A", "NEW", "MID"}, changes)
+    assert m.loc["2024-01-31"].to_dict() == {"A": True, "OLD": True, "NEW": False, "MID": False}
+    assert m.loc["2024-02-01"].to_dict() == {"A": True, "OLD": True, "NEW": False, "MID": True}
+    assert m.loc["2024-03-01"].to_dict() == {"A": True, "OLD": False, "NEW": True, "MID": True}
+
+
+def test_ranks_only_among_members():
+    open_, close, volume = market(n_syms=4)
+    raw = F.raw_features(close, volume)
+    mask = pd.DataFrame(True, index=close.index, columns=close.columns)
+    mask.iloc[:, 0] = False  # never a member
+    X = F.feature_matrix(raw, mask)
+    assert "S00" not in X.index.get_level_values(1)
+    day = X.index.get_level_values(0)[-1]
+    assert sorted(X.loc[day, "r21"].round(4)) == [round(1 / 3, 4), round(2 / 3, 4), 1.0]
+    y = F.labels(open_, 3, mask)
+    assert "S00" not in y.index.get_level_values(1)
+
+
+def test_select_with_buffer():
+    scores = pd.Series({s: 100 - i for i, s in enumerate("ABCDEFGHIJ")})
+    assert P.select(scores, top=3) == ["A", "B", "C"]
+    assert P.select(scores, held=["E", "J"], top=3, buffer=5) == ["E", "A", "B"]   # E still in the top 5, J is not
+
+
+def test_ridge_recovers_a_linear_signal():
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame(rng.uniform(0, 1, (20000, 3)), columns=["a", "b", "c"])  # enough samples that alpha barely shrinks
+    y = pd.Series(0.8 * X["a"] - 0.3 * X["b"] + rng.normal(0, 0.01, 20000))
+    m = M.fit_ridge(X, y)
+    assert m.coef == pytest.approx([0.8, -0.3, 0.0], abs=0.02)
+    assert np.isfinite(m.predict(X.to_numpy()[:5] * np.nan)).all()  # missing values become the neutral 0.5
+
+
+def test_position_paid_out_when_data_stops():
+    cal = pd.bdate_range("2024-01-01", periods=5)
+    close = pd.DataFrame({"A": [10, 10, 12, np.nan, np.nan]}, index=cal, dtype=float)
+    r = P.run(close, close, {cal[0]: pd.Series({"A": 1.0})}, start=cal[0], cash=100, slippage_bps=0)
+    assert r.equity[cal[-1]] == pytest.approx(120)  # 10 shares paid out at the last price, 12

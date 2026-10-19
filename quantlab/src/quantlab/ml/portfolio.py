@@ -57,10 +57,15 @@ def run(open_, close, weights_by_signal, start, end=None, cash=10_000.0, slippag
     nxt = {cal[i]: cal[i + 1] for i in range(len(cal) - 1)}
     execs = {nxt[d]: w for d, w in weights_by_signal.items() if d in nxt}
     last_close = close.ffill()
+    ended = close.apply(lambda c: c.last_valid_index())  # a stock whose data stops (acquired, delisted) is paid out
     slip = slippage_bps / 10_000
     shares = pd.Series(0.0, index=close.columns)
     equity, turnover, holdings, costs = {}, {}, {}, 0.0
     for day in days:
+        gone = [s for s in shares.index[shares != 0] if ended[s] is not None and ended[s] < day]
+        if gone:  # paid out at the last price: cash replaces the position
+            cash += float((shares[gone] * last_close.loc[day, gone]).sum())
+            shares[gone] = 0.0
         if day in execs:
             px = open_.loc[day]
             mark = px.fillna(last_close.loc[day])
@@ -88,3 +93,23 @@ def as_backtest_result(res, cash):
     eq = res.equity
     trades = pd.DataFrame({"open": pd.Series(dtype=bool), "pnl": pd.Series(dtype=float), "return": pd.Series(dtype=float)})
     return backtest.Result(eq, pd.Series(np.ones(len(eq)), index=eq.index), trades, cash)
+
+
+def select(scores, held=(), top=TOP_N, buffer=None):
+    """The names to hold: with a buffer, current holdings ranked within the top `buffer` stay, and the free
+    places go to the best-ranked others."""
+    order = scores.dropna().sort_values(ascending=False).index
+    if not buffer:
+        return list(order[:top])
+    rank = {s: i + 1 for i, s in enumerate(order)}
+    keep = [s for s in held if rank.get(s, 10**9) <= buffer][:top]
+    return keep + [s for s in order if s not in keep][: top - len(keep)]
+
+
+def weights_for(names, vol, max_weight=MAX_WEIGHT):
+    """Inverse-volatility weights for chosen names, capped; names without a volatility are dropped."""
+    v = vol.reindex(names)
+    v = v[v.notna() & (v > 0)]
+    if v.empty:
+        return pd.Series(dtype=float)
+    return capped(1 / v.clip(lower=1e-4), max(max_weight, 1 / len(v)))

@@ -34,7 +34,27 @@ def month_ends(calendar, start=None, end=None):
 
 def _fit(X, y):
     import lightgbm as lgb
-    return lgb.train(PARAMS, lgb.Dataset(X[list(FEATURES)].to_numpy(), y.to_numpy(), feature_name=list(FEATURES)), ROUNDS)
+    return lgb.train(PARAMS, lgb.Dataset(X.to_numpy(), y.to_numpy(), feature_name=list(X.columns)), ROUNDS)
+
+
+class Ridge:
+    """Ridge regression on rank features (0 to 1, missing = 0.5, centred), solved in closed form. alpha is fixed."""
+
+    def __init__(self, alpha=10.0):
+        self.alpha = alpha
+
+    def fit(self, X, y):
+        A = np.nan_to_num(X.to_numpy(dtype=float), nan=0.5) - 0.5
+        self.y_mean = float(y.mean())
+        self.coef = np.linalg.solve(A.T @ A + self.alpha * np.eye(A.shape[1]), A.T @ (y.to_numpy() - self.y_mean))
+        return self
+
+    def predict(self, A):
+        return (np.nan_to_num(np.asarray(A, dtype=float), nan=0.5) - 0.5) @ self.coef + self.y_mean
+
+
+def fit_ridge(X, y):
+    return Ridge().fit(X, y)
 
 
 @dataclass
@@ -44,7 +64,7 @@ class WalkForward:
 
 
 def walk_forward(X, y, calendar, rebalance_dates, sample_every=SAMPLE_EVERY, min_train_years=MIN_TRAIN_YEARS,
-                 retrain_months=RETRAIN_MONTHS):
+                 retrain_months=RETRAIN_MONTHS, horizon=HORIZON, fit=None):
     pos = {d: i for i, d in enumerate(calendar)}
     sample_dates = set(calendar[::sample_every])
     train_index = X.index[X.index.get_level_values(0).isin(sample_dates)]
@@ -56,13 +76,13 @@ def walk_forward(X, y, calendar, rebalance_dates, sample_every=SAMPLE_EVERY, min
     model, last_fit, out, fits = None, None, [], []
     for d in rebalance_dates:
         if model is None or (d.year - last_fit.year) * 12 + d.month - last_fit.month >= retrain_months:
-            usable = sample_pos + 1 + HORIZON <= pos[d]  # purge: the label window has closed by d's open
+            usable = sample_pos + 1 + horizon <= pos[d]  # purge: the label window has closed by d's open
             if not usable.any():
                 continue
             first = Xs.index[usable][0][0]
             if (d - first).days < 365 * min_train_years:
                 continue
-            model, last_fit = _fit(Xs[usable], ys[usable]), d
+            model, last_fit = (fit or _fit)(Xs[usable], ys[usable]), d
             last_sample = Xs.index[usable][-1][0]
             fits.append({"at": d.date().isoformat(), "samples": int(usable.sum()), "from": first.date().isoformat(),
                          "to": last_sample.date().isoformat()})
@@ -70,7 +90,7 @@ def walk_forward(X, y, calendar, rebalance_dates, sample_every=SAMPLE_EVERY, min
         if d not in X.index.get_level_values(0):
             continue
         Xd = X.loc[d]
-        out.append(pd.Series(model.predict(Xd[list(FEATURES)].to_numpy()), index=pd.MultiIndex.from_product([[d], Xd.index])))
+        out.append(pd.Series(model.predict(Xd.to_numpy()), index=pd.MultiIndex.from_product([[d], Xd.index])))
     scores = pd.concat(out) if out else pd.Series(dtype=float)
     return WalkForward(scores.rename("score"), fits)
 
@@ -95,7 +115,7 @@ def fit_final(X, y, calendar):
     idx = X.index[X.index.get_level_values(0).isin(sample_dates)]
     Xs, ys = X.loc[idx], y.reindex(idx)
     usable = ys.notna().values & (np.array([pos[d] for d in idx.get_level_values(0)]) + 1 + HORIZON <= len(calendar) - 1)
-    model = _fit(Xs[usable], ys[usable])
+    model = _fit(Xs[usable][list(FEATURES)], ys[usable])
     info = {"samples": int(usable.sum()), "from": idx[usable][0][0].date().isoformat(), "to": idx[usable][-1][0].date().isoformat(),
             "params": PARAMS, "rounds": ROUNDS, "features": list(FEATURES), "horizon": HORIZON}
     return model, info

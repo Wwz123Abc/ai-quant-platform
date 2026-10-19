@@ -329,6 +329,26 @@ def cmd_ml_backtest(a):
     print("\n提示：回测里的每个预测都来自当时之前的数据训练出的模型；但幸存者偏差无法消除，实盘表现通常比回测差。")
 
 
+def cmd_ml_experiment(a):
+    from .ml import experiment as E
+    print("\n预登记实验 %s · %s 阶段。第一次运行要下载约 270 只股票的行情和 SEC 财报，需要十几分钟……" % (E.NAME, "开发期" if a.phase == "dev" else "考试期"))
+    record, _ = E.run_dev() if a.phase == "dev" else E.run_holdout()
+    rows = [("", "说明", "年化", "夏普", "最大回撤", "月均换手", "平均 IC")]
+    for k, r in record["rows"].items():
+        rows.append((k, r["label"], pct(r["cagr"]), "%.2f" % r["sharpe"], pct(r["mdd"]), "%.0f%%" % (r["turnover"] * 100),
+                     "—" if r["ic_mean"] is None else "%.3f" % r["ic_mean"]))
+    print()
+    table(rows)
+    if a.phase == "dev":
+        print("\n按预登记规则选中：%s。成分股价格覆盖率平均 %.0f%%。" % (record["selected"], record["coverage_mean"] * 100))
+        print("考试期只能运行一次：quantlab ml experiment holdout")
+    else:
+        act = record["active_vs_B2"]
+        print("\n相对 B2：月度超额 %+.2f%%，t 值 %.2f（%d 个月）→ %s" % (act["monthly_mean"] * 100, act["t"], act["months"],
+              "满足预登记标准" if record["passed"] else "不满足预登记标准：没有证据表明机器学习优于动量"))
+    print("结果：docs/experiments/%s-results.md" % E.NAME)
+
+
 def cmd_ml_signal(a):
     from .ml import signal
     capital = a.capital or get_settings().trading_capital
@@ -545,6 +565,9 @@ def build_parser():
     mb.add_argument("--refresh-universe", action="store_true", help="重新获取成分股名单")
     mb.add_argument("--no-chart", action="store_true", help="不画图")
     mb.set_defaults(fn=cmd_ml_backtest)
+    me = mlsub.add_parser("experiment", help="预登记实验 v2：开发期比较所有版本并选出一个，考试期只运行一次")
+    me.add_argument("phase", choices=("dev", "holdout"))
+    me.set_defaults(fn=cmd_ml_experiment)
     ms = mlsub.add_parser("signal", help="按最新收盘价给出目标组合")
     ms.add_argument("--capital", type=float, help="按多少资金计算金额（默认交易资金上限）")
     ms.add_argument("--top", type=int, help="持有前几只")
