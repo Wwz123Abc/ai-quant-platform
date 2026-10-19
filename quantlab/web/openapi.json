@@ -3173,6 +3173,26 @@
           "version": {
             "type": "string",
             "title": "Version"
+          },
+          "auth": {
+            "type": "string",
+            "enum": [
+              "token",
+              "proxy"
+            ],
+            "title": "Auth",
+            "default": "token"
+          },
+          "home_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Url"
           }
         },
         "type": "object",

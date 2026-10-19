@@ -19,10 +19,14 @@ export type MlSignal = S["Signal"];
 export type TradingAccount = S["TradingAccount"];
 export type Limits = S["Limits"];
 export type Analysis = S["Analysis"];
+export type Health = S["Health"];
 export type HoldingsReview = S["Review"];
 export type HoldingsPolicy = S["Policy"];
 export type HoldingsStatus = S["HoldingsStatus"];
 export type Proposal = S["Proposal"];
+
+/** Where the app is served: "" at the root, "/lab" under the ledger site (the server sets <base href>). */
+export const BASE = new URL(document.baseURI).pathname.replace(/\/$/, "");
 
 const TOKEN_KEY = "quantlab.token";
 let memoryToken: string | null = null; // fallback when session storage is blocked
@@ -79,9 +83,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(BASE + path, {
       ...init,
       headers: {
+        "X-Requested-With": "quantlab", // behind the ledger site, state-changing calls must carry this
         ...(init.body ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init.headers,

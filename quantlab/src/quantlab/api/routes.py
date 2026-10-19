@@ -54,12 +54,13 @@ def account(acct_summary, with_equity):
 
 @public.get("/health", response_model=s.Health)
 def health():
-    return {"status": "ok", "version": __version__}
+    st = get_settings()
+    return {"status": "ok", "version": __version__, "auth": st.auth_mode, "home_url": st.home_url}
 
 
 @api.get("/session", response_model=s.Health, tags=["system"], summary="检查访问令牌")
 def session():
-    return {"status": "ok", "version": __version__}
+    return health()
 
 
 @api.get("/market/{symbol}/bars", response_model=s.Bars, tags=["market"], summary="复权日线")

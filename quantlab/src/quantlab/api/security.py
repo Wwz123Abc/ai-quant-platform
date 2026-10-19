@@ -7,7 +7,7 @@ import os
 import secrets
 from functools import lru_cache
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 from ..config import get_settings
 
@@ -28,7 +28,16 @@ def api_token():
     return token
 
 
-def require_token(authorization: str | None = Header(default=None)):
+def require_token(request: Request, authorization: str | None = Header(default=None)):
+    """Every API call except /api/health. Token mode checks the bearer token; proxy mode trusts the user header
+    that nginx sets after the ledger confirmed the session, and asks state-changing calls for a same-site header."""
+    s = get_settings()
+    if s.auth_mode == "proxy":
+        if not request.headers.get(s.user_header, "").strip():
+            raise HTTPException(401, "请先登录美股账本")
+        if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get("X-Requested-With") != "quantlab":
+            raise HTTPException(403, "请求来源不对")
+        return
     got = authorization[7:].strip() if authorization and authorization[:7].lower() == "bearer " else ""
     if not hmac.compare_digest(got.encode(), api_token().encode()):
         raise HTTPException(401, "需要有效的访问令牌，请用启动时显示的链接打开", headers={"WWW-Authenticate": "Bearer"})

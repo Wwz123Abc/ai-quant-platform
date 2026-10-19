@@ -913,6 +913,14 @@ export interface components {
             status: "ok";
             /** Version */
             version: string;
+            /**
+             * Auth
+             * @default token
+             * @enum {string}
+             */
+            auth: "token" | "proxy";
+            /** Home Url */
+            home_url?: string | null;
         };
         /** Holding */
         Holding: {

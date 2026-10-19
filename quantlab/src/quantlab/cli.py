@@ -553,6 +553,37 @@ def cmd_holdings_decide(a):
                                   "已确认，请自己去券商下单，成交后在账本记一笔" if o["status"] == "approved" else "已拒绝"))
 
 
+SECRETS = ("DEEPSEEK_API_KEY", "FRED_API_KEY", "SEC_EDGAR_USER_AGENT", "LEDGER_TOKEN")
+
+
+def cmd_secrets_set(a):
+    """Asks for a key without echoing it and writes it into .env in the working directory (owner-only)."""
+    import getpass
+    import os
+    import stat
+    from pathlib import Path
+
+    value = getpass.getpass("%s（输入时不显示）：" % a.name).strip()
+    if not value or any(c in value for c in "\r\n"):
+        raise SystemExit("没有输入，未修改")
+    path = Path(".env")
+    lines = [ln for ln in (path.read_text(encoding="utf-8").splitlines() if path.exists() else [])
+             if not ln.startswith(a.name + "=")]
+    path.write_text("\n".join(lines + ["%s=%s" % (a.name, value)]) + "\n", encoding="utf-8")
+    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+    print("已写入 %s 的 %s，重启服务后生效" % (path.resolve(), a.name))
+
+
+def cmd_secrets_status(a):
+    import os
+    from pathlib import Path
+
+    from dotenv import dotenv_values
+    found = dotenv_values(".env") if Path(".env").exists() else {}
+    for name in SECRETS:
+        print("%-22s %s" % (name, "已配置" if found.get(name) or os.environ.get(name) else "未配置"))
+
+
 def cmd_serve(a):
     import uvicorn
 
@@ -560,14 +591,18 @@ def cmd_serve(a):
     from .api.security import api_token
     s = get_settings()
     host, port = a.host or s.host, a.port or s.port
-    if a.log_file:  # running in the background: keep the token out of the log; `quantlab open` opens the page
+    if s.auth_mode == "proxy":
+        if host not in ("127.0.0.1", "localhost", "::1"):  # anyone who reaches the port could send the user header
+            raise SystemExit("代理模式只能监听本机地址（127.0.0.1），由 nginx 转发")
+        logging.getLogger("quantlab").info("QuantLab %s listening on http://%s:%d behind a proxy at %s/", __version__, host, port, s.base_path)
+    elif a.log_file:  # running in the background: keep the token out of the log; `quantlab open` opens the page
         logging.getLogger("quantlab").info("QuantLab %s listening on http://%s:%d", __version__, host, port)
     else:
         print("QuantLab %s 已启动：http://%s:%d/?token=%s" % (__version__, host, port, api_token()))
         print("接口文档：http://%s:%d/api/docs" % (host, port))
     if host not in ("127.0.0.1", "localhost", "::1"):
         logging.getLogger("quantlab").warning("listening on %s: other devices on the network can reach it; keep the token safe", host)
-    uvicorn.run(create_app(), host=host, port=port, log_config=None)
+    uvicorn.run(create_app(), host=host, port=port, log_config=None, root_path=s.base_path)
 
 
 def cmd_open(a):
@@ -726,6 +761,13 @@ def build_parser():
     sch = sub.add_parser("schedule", help="每日任务")
     schsub = sch.add_subparsers(dest="schedule_cmd", required=True)
     schsub.add_parser("run", help="立即运行一次：到期的 AI 分析 + 记录所有模拟账户").set_defaults(fn=cmd_schedule_run)
+
+    se = sub.add_parser("secrets", help="密钥：只显示是否配置，输入时不回显")
+    sesub = se.add_subparsers(dest="secrets_cmd", required=True)
+    sesub.add_parser("status", help="哪些密钥已配置").set_defaults(fn=cmd_secrets_status)
+    ss = sesub.add_parser("set", help="输入一个密钥，写进当前文件夹的 .env")
+    ss.add_argument("name", choices=SECRETS)
+    ss.set_defaults(fn=cmd_secrets_set)
 
     sv = sub.add_parser("serve", help="启动接口服务和网页工作台")
     sv.add_argument("--host", help="监听地址（默认 127.0.0.1，只允许本机访问）")

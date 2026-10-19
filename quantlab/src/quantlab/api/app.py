@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import __version__
@@ -21,6 +21,14 @@ log = logging.getLogger("quantlab.api")
 WEB = Path(__file__).resolve().parent.parent / "web"  # the built React app (npm run build writes it here)
 CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+
+
+def index_html():
+    """The app page with <base href> set to where the site serves it, so assets, API calls and client-side
+    routes all work under a path such as /lab/ as well as at the root."""
+    base = get_settings().base_path.rstrip("/") + "/"
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(html.replace("<head>", '<head>\n    <base href="%s" />' % base, 1), headers={"Cache-Control": "no-cache"})
 
 
 def create_app(worker=None, scheduler=None):
@@ -88,7 +96,7 @@ def create_app(worker=None, scheduler=None):
             if path.startswith("api/"):
                 return JSONResponse({"detail": "没有这个接口"}, status_code=404)
             f = (WEB / path).resolve()
-            if path and f.is_file() and f.is_relative_to(WEB):
+            if path and f.is_file() and f.is_relative_to(WEB) and f.name != "index.html":
                 return FileResponse(f)
-            return FileResponse(WEB / "index.html")  # client-side routes
+            return index_html()  # client-side routes
     return app

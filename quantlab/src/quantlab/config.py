@@ -1,8 +1,10 @@
 """Settings, read from QUANTLAB_* environment variables and an optional .env file in the working directory."""
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +16,20 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"                # the API listens on this machine only unless changed
     port: int = 8000
     api_token: str | None = None           # when unset, one is generated once and kept in data_dir/api_token
+    # token: one bearer token (local use). proxy: behind nginx, which checks the ledger session first and passes
+    # the signed-in user in user_header; only for a service listening on localhost behind that proxy.
+    auth_mode: Literal["token", "proxy"] = "token"
+    user_header: str = "X-Ledger-User"
+    base_path: str = ""                    # e.g. "/lab" when served under a path of a larger site
+    home_url: str | None = None            # a link back to the main site (the ledger), shown in the navigation
+
+    @field_validator("base_path")
+    @classmethod
+    def _base_path(cls, v):
+        v = v.strip().rstrip("/")
+        if v and not re.fullmatch(r"(/[A-Za-z0-9_-]+)+", v):
+            raise ValueError("base_path 应形如 /lab")
+        return v
     cors_origins: list[str] = []           # e.g. ["http://localhost:5173"] for the web dev server
     log_level: str = "INFO"
     log_format: Literal["text", "json"] = "text"

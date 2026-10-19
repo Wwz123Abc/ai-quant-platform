@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
-import { api, ApiError, setToken } from "./api/client";
+import { api, ApiError, BASE, type Health, setToken } from "./api/client";
 import Account from "./pages/Account";
 import Analyze from "./pages/Analyze";
 import Holdings from "./pages/Holdings";
@@ -18,11 +18,15 @@ export default function App() {
   // A cheap authenticated call decides between the workbench and the token prompt.
   const auth = useQuery({
     queryKey: ["session"],
-    queryFn: () => api<{ status: string; version: string }>("/api/session"),
+    queryFn: () => api<Health>("/api/session"),
     retry: false,
   });
   if (auth.isPending) return <p className="empty">正在连接…</p>;
-  if (auth.error instanceof ApiError && auth.error.status === 401) return <TokenGate onDone={() => auth.refetch()} />;
+  if (auth.error instanceof ApiError && auth.error.status === 401) {
+    // under the ledger site a 401 means the ledger session ended; nginx sends page loads back to its sign-in
+    if (BASE) return <p className="empty">登录已过期，请<a href="/">回到美股账本</a>重新登录。</p>;
+    return <TokenGate onDone={() => auth.refetch()} />;
+  }
 
   return (
     <div className="shell">
@@ -37,7 +41,8 @@ export default function App() {
         <NavLink to="/ai">AI 研报</NavLink>
         <NavLink to="/ml">机器学习选股</NavLink>
         <NavLink to="/trading">自动交易</NavLink>
-        <a href="/api/docs" target="_blank" rel="noreferrer">接口文档 ↗</a>
+        <a href={`${BASE}/api/docs`} target="_blank" rel="noreferrer">接口文档 ↗</a>
+        {auth.data?.home_url ? <a href={auth.data.home_url}>← 美股账本</a> : null}
         <div className="foot">v{auth.data?.version} · 仅用于研究，不构成投资建议</div>
       </nav>
       <main>

@@ -225,6 +225,8 @@ class RecordResult(BaseModel):
 class Health(BaseModel):
     status: Literal["ok"]
     version: str
+    auth: Literal["token", "proxy"] = "token"
+    home_url: str | None = None
 
 
 class AiBudget(BaseModel):
