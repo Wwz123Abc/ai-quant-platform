@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = []           # e.g. ["http://localhost:5173"] for the web dev server
     log_level: str = "INFO"
     log_format: Literal["text", "json"] = "text"
+    price_source: Literal["yahoo", "cn"] = "yahoo"  # cn: Tencent prices + Sina factors, for servers in mainland China
     cache_max_age: int = 6 * 3600          # seconds before a cached symbol is downloaded again
     http_timeout: float = 20.0
 

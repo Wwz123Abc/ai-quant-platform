@@ -51,6 +51,16 @@ def yahoo_symbol(sym):
 
 
 def fetch(sym):
+    """The whole daily history of one symbol, from the configured source."""
+    if get_settings().price_source == "cn":
+        if sym.isdigit():
+            raise NotFound("国内行情源暂不支持港股：%s" % sym)
+        from . import cn_data
+        return cn_data.fetch(sym)
+    return fetch_yahoo(sym)
+
+
+def fetch_yahoo(sym):
     """The whole daily history of one symbol as a DataFrame indexed by date.
 
     Yahoo's close is split-adjusted and its adjclose also folds in dividends. Open, high and low are scaled by
