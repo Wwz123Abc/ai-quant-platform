@@ -37,6 +37,21 @@ class Settings(BaseSettings):
         "deepseek-v4-pro": [0.044, 1.32, 3.96],
     }
 
+    # Automated trading of the machine-learning portfolio. Every limit is enforced on each order, whatever the mode.
+    trading_capital: float = 500.0          # the most money the program may ever put to work, in USD
+    trading_top_n: int = 10
+    trading_max_weight: float = 0.20        # largest share of the capital in one stock
+    trading_max_order_usd: float = 200.0
+    trading_max_daily_usd: float = 1_000.0  # buys plus sells in one day
+    trading_max_orders_per_day: int = 30
+    trading_min_order_usd: float = 1.0      # smaller differences are not traded
+    trading_max_drawdown: float = 0.25      # halt trading if equity falls this far below its peak
+    trading_max_data_age_days: int = 5      # refuse to trade on prices older than this
+    trading_slippage_bps: float = 5.0       # paper fills: open price plus or minus this
+    trading_fee: float = 0.0                # paper fills: fee per order, USD
+    trading_live_enabled: bool = False      # live orders also need a broker connector and 8 weeks of paper trading
+    trading_paper_weeks_before_live: int = 8
+
     # Daily job: AI analyses for AI accounts, then a decision for every paper account. Runs inside `serve`.
     schedule_enabled: bool = True
     schedule_time: str = "07:30"             # Beijing time, Tuesday to Saturday, after the US close

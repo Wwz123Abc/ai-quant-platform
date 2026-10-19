@@ -13,6 +13,7 @@ from .. import __version__
 from ..ai.jobs import Worker
 from ..config import get_settings
 from ..errors import QuantLabError
+from .ml_routes import router as ml_router
 from .routes import api, public
 
 log = logging.getLogger("quantlab.api")
@@ -75,6 +76,7 @@ def create_app(worker=None, scheduler=None):
 
     app.include_router(public)
     app.include_router(api)
+    app.include_router(ml_router)
 
     if (WEB / "index.html").exists():
         app.mount("/assets", StaticFiles(directory=WEB / "assets"), name="assets")

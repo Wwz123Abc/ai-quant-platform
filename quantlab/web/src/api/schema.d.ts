@@ -228,6 +228,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ml/backtests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 机器学习选股：滚动训练 + 组合回测（约一分钟） */
+        post: operations["ml_backtest_api_ml_backtests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ml/signal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 最近一次算出的目标组合 */
+        get: operations["ml_signal_latest_api_ml_signal_get"];
+        put?: never;
+        /** 按最新收盘价重新计算目标组合（约一分钟） */
+        post: operations["ml_signal_compute_api_ml_signal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 风控上限 */
+        get: operations["trading_limits_api_trading_limits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 交易账户 */
+        get: operations["trading_accounts_api_trading_accounts_get"];
+        put?: never;
+        /** 创建交易账户 */
+        post: operations["trading_create_api_trading_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/accounts/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 交易账户详情 */
+        get: operations["trading_account_api_trading_accounts__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/accounts/{name}/halt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 暂停交易 */
+        post: operations["trading_halt_api_trading_accounts__name__halt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/accounts/{name}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 恢复交易 */
+        post: operations["trading_resume_api_trading_accounts__name__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/accounts/{name}/mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 切换模式 */
+        post: operations["trading_mode_api_trading_accounts__name__mode_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trading/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 运行一次交易步骤（后台执行） */
+        post: operations["trading_run_api_trading_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -264,70 +419,12 @@ export interface components {
             /** Days */
             days: number;
             /** Positions */
-            positions: components["schemas"]["Position"][];
+            positions: components["schemas"]["quantlab__api__schemas__Position"][];
             /** Pending */
             pending: components["schemas"]["PendingOrder"][];
             /** Fills */
             fills: components["schemas"]["Fill"][];
             equity?: components["schemas"]["EquitySeries"] | null;
-        };
-        /** AccountCreate */
-        AccountCreate: {
-            /**
-             * Cash
-             * @description 初始资金（美元）
-             * @default 10000
-             */
-            cash: number;
-            /**
-             * Fee
-             * @description 每笔手续费（美元）
-             * @default 0
-             */
-            fee: number;
-            /**
-             * Slippage
-             * @description 滑点（基点）
-             * @default 5
-             */
-            slippage: number;
-            /**
-             * Name
-             * @example 核心
-             */
-            name: string;
-            /**
-             * Symbols
-             * @example [
-             *       "QQQM",
-             *       "VOO"
-             *     ]
-             */
-            symbols: string[];
-            /**
-             * Strategy
-             * @default ma_cross
-             * @enum {string}
-             */
-            strategy: "ma_cross" | "ai_rating";
-            /**
-             * Fast
-             * @description 均线账户：短均线天数
-             * @default 50
-             */
-            fast: number;
-            /**
-             * Slow
-             * @description 均线账户：长均线天数
-             * @default 200
-             */
-            slow: number;
-            /**
-             * Every Days
-             * @description AI 账户：每隔多少天重新分析一次
-             * @default 7
-             */
-            every_days: number;
         };
         /** AiBudget */
         AiBudget: {
@@ -544,6 +641,15 @@ export interface components {
             /** Benchmark */
             benchmark: number[];
         };
+        /** Event */
+        Event: {
+            /** At */
+            at: string;
+            /** Kind */
+            kind: string;
+            /** Message */
+            message: string;
+        };
         /** Fill */
         Fill: {
             /**
@@ -568,6 +674,14 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HaltRequest */
+        HaltRequest: {
+            /**
+             * Reason
+             * @default 手动暂停
+             */
+            reason: string;
+        };
         /** Health */
         Health: {
             /**
@@ -577,6 +691,77 @@ export interface components {
             status: "ok";
             /** Version */
             version: string;
+        };
+        /** Holding */
+        Holding: {
+            /** Symbol */
+            symbol: string;
+            /** Weight */
+            weight: number;
+            /** Score */
+            score: number | null;
+        };
+        /** Limits */
+        Limits: {
+            /** Capital */
+            capital: number;
+            /** Top N */
+            top_n: number;
+            /** Max Weight */
+            max_weight: number;
+            /** Max Order Usd */
+            max_order_usd: number;
+            /** Max Daily Usd */
+            max_daily_usd: number;
+            /** Max Orders Per Day */
+            max_orders_per_day: number;
+            /** Min Order Usd */
+            min_order_usd: number;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Max Data Age Days */
+            max_data_age_days: number;
+            /** Live Enabled */
+            live_enabled: boolean;
+            /** Paper Weeks Before Live */
+            paper_weeks_before_live: number;
+            /** Busy */
+            busy: boolean;
+        };
+        /** ModeRequest */
+        ModeRequest: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "plan" | "paper" | "live";
+        };
+        /** Order */
+        Order: {
+            /** Client Id */
+            client_id: string;
+            /** Signal Date */
+            signal_date: string;
+            /** Symbol */
+            symbol: string;
+            /** Side */
+            side: string;
+            /** Qty */
+            qty: number;
+            /** Est Price */
+            est_price: number;
+            /** Status */
+            status: string;
+            /** Reason */
+            reason: string | null;
+            /** Created */
+            created: string;
+            /** Filled At */
+            filled_at: string | null;
+            /** Fill Price */
+            fill_price: number | null;
+            /** Fee */
+            fee: number;
         };
         /** PendingOrder */
         PendingOrder: {
@@ -610,30 +795,6 @@ export interface components {
             /** Years */
             years: number;
         };
-        /** Position */
-        Position: {
-            /** Symbol */
-            symbol: string;
-            /**
-             * Decision
-             * @description 最新决定：持有、空仓，或还在等待第一个决定（null）
-             */
-            decision: boolean | null;
-            /** Decision Date */
-            decision_date: string | null;
-            /** Held */
-            held: boolean;
-            /** Shares */
-            shares: number;
-            /** Value */
-            value: number;
-            /** Cash */
-            cash: number;
-            /** Return */
-            return: number;
-            /** Benchmark Return */
-            benchmark_return: number;
-        };
         /** RecordResult */
         RecordResult: {
             /** Recorded */
@@ -648,6 +809,15 @@ export interface components {
             title: string;
             /** Text */
             text: string;
+        };
+        /** RunRequest */
+        RunRequest: {
+            /**
+             * Force
+             * @description 不等月末，按最新收盘价立刻调仓
+             * @default false
+             */
+            force: boolean;
         };
         /** ScanRequest */
         ScanRequest: {
@@ -790,6 +960,20 @@ export interface components {
             /** Running */
             running: boolean;
         };
+        /** Signal */
+        Signal: {
+            /**
+             * Signal Date
+             * Format: date
+             */
+            signal_date: string;
+            /** Trained To */
+            trained_to: string;
+            /** Samples */
+            samples: number;
+            /** Holdings */
+            holdings: components["schemas"]["Holding"][];
+        };
         /** SignalItem */
         SignalItem: {
             /** Symbol */
@@ -818,6 +1002,109 @@ export interface components {
             days?: number | null;
             /** Flipped */
             flipped?: boolean | null;
+        };
+        /** StrategyResult */
+        StrategyResult: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            summary: components["schemas"]["Summary"];
+            /** Turnover */
+            turnover: number | null;
+            /** Costs */
+            costs: number;
+        };
+        /** Study */
+        Study: {
+            /** Universe */
+            universe: string;
+            /** Universe As Of */
+            universe_as_of: string;
+            /** Size */
+            size: number;
+            /** Skipped */
+            skipped: string[];
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Strategies */
+            strategies: components["schemas"]["StrategyResult"][];
+            /** Dates */
+            dates: string[];
+            /** Equity */
+            equity: {
+                [key: string]: (number | null)[];
+            };
+            /** Ic Mean */
+            ic_mean: number | null;
+            /** Ic Std */
+            ic_std: number | null;
+            /** Ic Positive */
+            ic_positive: number | null;
+            /** Ic Months */
+            ic_months: number;
+            /** Ic By Year */
+            ic_by_year: {
+                [key: string]: number | null;
+            };
+            /** Deciles */
+            deciles: {
+                [key: string]: number | null;
+            };
+            /** Importance */
+            importance: {
+                [key: string]: number;
+            };
+            /** Feature Names */
+            feature_names: {
+                [key: string]: string;
+            };
+            /** Fits */
+            fits: number;
+        };
+        /** StudyRequest */
+        StudyRequest: {
+            /**
+             * Start
+             * Format: date
+             * @default 2012-01-01
+             */
+            start: string;
+            /** End */
+            end?: string | null;
+            /**
+             * Top
+             * @default 10
+             */
+            top: number;
+            /**
+             * Max Weight
+             * @default 0.2
+             */
+            max_weight: number;
+            /**
+             * Cash
+             * @default 10000
+             */
+            cash: number;
+            /**
+             * Slippage
+             * @default 5
+             */
+            slippage: number;
+            /**
+             * Fee
+             * @default 0
+             */
+            fee: number;
         };
         /** Summary */
         Summary: {
@@ -889,6 +1176,39 @@ export interface components {
             /** Open */
             open: boolean;
         };
+        /** TradingAccount */
+        TradingAccount: {
+            /** Name */
+            name: string;
+            /** Broker */
+            broker: string;
+            /** Mode */
+            mode: string;
+            /** Capital */
+            capital: number;
+            /** Cash */
+            cash: number;
+            /** Value */
+            value: number;
+            /** Peak Equity */
+            peak_equity: number;
+            /** Drawdown */
+            drawdown: number;
+            /** Halted */
+            halted: string | null;
+            /** Created */
+            created: string;
+            /** Positions */
+            positions: components["schemas"]["quantlab__api__ml_routes__Position"][];
+            /** Orders */
+            orders?: components["schemas"]["Order"][] | null;
+            /** Events */
+            events?: components["schemas"]["Event"][] | null;
+            /** Equity */
+            equity?: {
+                [key: string]: unknown[];
+            } | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -901,6 +1221,114 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** AccountCreate */
+        quantlab__api__ml_routes__AccountCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Mode
+             * @default paper
+             * @enum {string}
+             */
+            mode: "plan" | "paper";
+            /** Capital */
+            capital?: number | null;
+        };
+        /** Position */
+        quantlab__api__ml_routes__Position: {
+            /** Symbol */
+            symbol: string;
+            /** Qty */
+            qty: number;
+            /** Price */
+            price: number | null;
+            /** Value */
+            value: number | null;
+            /** Weight */
+            weight: number | null;
+        };
+        /** AccountCreate */
+        quantlab__api__schemas__AccountCreate: {
+            /**
+             * Cash
+             * @description 初始资金（美元）
+             * @default 10000
+             */
+            cash: number;
+            /**
+             * Fee
+             * @description 每笔手续费（美元）
+             * @default 0
+             */
+            fee: number;
+            /**
+             * Slippage
+             * @description 滑点（基点）
+             * @default 5
+             */
+            slippage: number;
+            /**
+             * Name
+             * @example 核心
+             */
+            name: string;
+            /**
+             * Symbols
+             * @example [
+             *       "QQQM",
+             *       "VOO"
+             *     ]
+             */
+            symbols: string[];
+            /**
+             * Strategy
+             * @default ma_cross
+             * @enum {string}
+             */
+            strategy: "ma_cross" | "ai_rating";
+            /**
+             * Fast
+             * @description 均线账户：短均线天数
+             * @default 50
+             */
+            fast: number;
+            /**
+             * Slow
+             * @description 均线账户：长均线天数
+             * @default 200
+             */
+            slow: number;
+            /**
+             * Every Days
+             * @description AI 账户：每隔多少天重新分析一次
+             * @default 7
+             */
+            every_days: number;
+        };
+        /** Position */
+        quantlab__api__schemas__Position: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Decision
+             * @description 最新决定：持有、空仓，或还在等待第一个决定（null）
+             */
+            decision: boolean | null;
+            /** Decision Date */
+            decision_date: string | null;
+            /** Held */
+            held: boolean;
+            /** Shares */
+            shares: number;
+            /** Value */
+            value: number;
+            /** Cash */
+            cash: number;
+            /** Return */
+            return: number;
+            /** Benchmark Return */
+            benchmark_return: number;
         };
     };
     responses: never;
@@ -1145,7 +1573,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AccountCreate"];
+                "application/json": components["schemas"]["quantlab__api__schemas__AccountCreate"];
             };
         };
         responses: {
@@ -1409,6 +1837,375 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ml_backtest_api_ml_backtests_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Study"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ml_signal_latest_api_ml_signal_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Signal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ml_signal_compute_api_ml_signal_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Signal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_limits_api_trading_limits_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Limits"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_accounts_api_trading_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingAccount"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_create_api_trading_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["quantlab__api__ml_routes__AccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingAccount"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_account_api_trading_accounts__name__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingAccount"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_halt_api_trading_accounts__name__halt_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HaltRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingAccount"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_resume_api_trading_accounts__name__resume_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingAccount"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_mode_api_trading_accounts__name__mode_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradingAccount"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trading_run_api_trading_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {

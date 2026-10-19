@@ -292,6 +292,141 @@ def cmd_schedule_run(a):
     print(json.dumps(Scheduler(worker).run_daily(), ensure_ascii=False, indent=2))
 
 
+def cmd_ml_backtest(a):
+    from .ml import features, research, universe
+    u = universe.load(a.refresh_universe)
+    print("\n正在读取 %d 只股票的行情（第一次需要几分钟）……" % len(u["symbols"]))
+    wide, skipped = features.load_panel(u["symbols"])
+    print("正在滚动训练模型并回测……")
+    st = research.run_study(wide, u["symbols"], skipped, a.start, a.end, a.top, a.max_weight, a.cash, a.slippage, a.fee, a.rf)
+    years = (st.end - st.start).days / 365.25
+    print("\n纳斯达克 100（%d 只，名单截至 %s）· %s → %s（%.1f 年）· 每月调仓 · 持有前 %d 只 · 单只上限 %.0f%% · 滑点 %g bp" % (
+        len(st.universe), u["as_of"], st.start.date(), st.end.date(), years, a.top, a.max_weight * 100, a.slippage))
+    if st.skipped:
+        print("没有取到数据：%s" % "、".join(st.skipped))
+    print("注意：用的是现在的成分股（幸存者偏差），所有策略的历史收益都偏高；请主要和“股票池等权”比较。\n")
+    rows = [("", "年化", "波动率", "夏普", "最大回撤", "月均换手", "交易成本")]
+    for key, v in st.strategies.items():
+        m, r = v["summary"], v["result"]
+        rows.append((research.NAMES[key], pct(m["cagr"]), pct(m["vol"]).lstrip("+"), "%.2f" % m["sharpe"], pct(m["mdd"]),
+                     "%.0f%%" % (r.turnover.mean() * 100), money(r.costs)))
+    table(rows)
+    ic = st.ic
+    print("\n预测能力（IC：每月预测排名和之后 21 个交易日实际收益排名的相关系数）")
+    print("  平均 %.3f · 标准差 %.3f · 平均/标准差 %.2f · 为正的月份 %.0f%%（共 %d 个月）" % (
+        ic.mean(), ic.std(), ic.mean() / ic.std(), (ic > 0).mean() * 100, len(ic)))
+    print("  按预测分成 10 组，之后 21 天的平均收益：" + "  ".join("%d组 %+.2f%%" % (k, v * 100) for k, v in st.deciles.items()))
+    print("  最重要的特征：" + "、".join("%s %.0f%%" % (features.FEATURES[k], v * 100) for k, v in st.importance.head(5).items()))
+    out = reports_dir()
+    eq = {research.NAMES[k]: v["result"].equity for k, v in st.strategies.items()}
+    import pandas as pd
+    pd.DataFrame(eq).to_csv(out / "ml_backtest.csv", index_label="date", float_format="%.2f", encoding="utf-8-sig")
+    print("\n每日净值：%s" % (out / "ml_backtest.csv"))
+    if not a.no_chart:
+        from .core import charts
+        charts.ml_chart(out / "ml_backtest.png", eq, ic)
+        print("图表：%s" % (out / "ml_backtest.png"))
+    print("\n提示：回测里的每个预测都来自当时之前的数据训练出的模型；但幸存者偏差无法消除，实盘表现通常比回测差。")
+
+
+def cmd_ml_signal(a):
+    from .ml import signal
+    capital = a.capital or get_settings().trading_capital
+    print("\n正在读取行情、训练模型（需要一两分钟）……")
+    sig = signal.latest(a.top, a.max_weight)
+    w, sc, px = sig["weights"], sig["scores"], sig["prices"]
+    print("\n%s 收盘后的目标组合（模型用到 %s 为止已知结果的 %s 个样本训练）" % (sig["signal_date"], sig["card"]["to"], format(sig["card"]["samples"], ",")))
+    rows = [("排名", "代码", "预测分", "权重", "金额", "约合股数")]
+    for i, sym in enumerate(sc.reindex(w.index).sort_values(ascending=False).index, 1):
+        rows.append(("%d" % i, sym, "%.3f" % sc[sym], "%.1f%%" % (w[sym] * 100), money(w[sym] * capital), "%.4f" % (w[sym] * capital / px[sym])))
+    table(rows)
+    print("\n按资金 %s 计算；股数按收盘价估算，实际按下一个开盘价成交，需要券商支持碎股。" % money(capital))
+    print("这是模型的计算结果，不构成投资建议。")
+
+
+def _trade_con():
+    from .trading.broker import connect
+    return connect()
+
+
+def cmd_trade_new(a):
+    from .trading import engine
+    con = _trade_con()
+    try:
+        engine.create_account(con, a.name, a.mode, a.capital)
+    finally:
+        con.close()
+    print("已创建交易账户 %s（%s 模式）。每月最后一个交易日收盘后，每日任务会自动调仓；想立刻建仓可以运行：quantlab trade run --force" % (
+        a.name, {"plan": "只出计划", "paper": "模拟券商"}[a.mode]))
+
+
+def cmd_trade_status(a):
+    from .trading import engine
+    from .trading.broker import PaperBroker
+    con = _trade_con()
+    try:
+        accts = [engine.get_account(con, a.name)] if a.name else engine.accounts(con)
+        if not accts:
+            print("还没有交易账户。创建一个：quantlab trade new 模拟 --mode paper")
+            return
+        for acct in accts:
+            st = PaperBroker(con, acct["name"]).account()
+            curve = engine.equity_curve(con, acct["name"])
+            value = curve.iloc[-1] if len(curve) else acct["cash"]
+            print("\n交易账户 %s · %s 模式 · 资金上限 %s · 最近净值 %s（%s）· 最高 %s%s" % (
+                acct["name"], acct["mode"], money(acct["capital"]), money(value), curve.index[-1].date() if len(curve) else "—",
+                money(acct["peak_equity"]), " · ⚠ 已暂停：%s" % acct["halted"] if acct["halted"] else ""))
+            print("  现金 %s；持仓：%s" % (money(st["cash"]), "、".join("%s %.4f 股" % kv for kv in sorted(st["positions"].items())) or "无"))
+            recent = engine.orders(con, acct["name"], 12)
+            if recent:
+                rows = [("信号日", "代码", "方向", "数量", "状态", "成交价", "说明")]
+                names = {"pending": "待成交", "filled": "已成交", "rejected": "已拒绝", "planned": "计划"}
+                for o in recent:
+                    rows.append((o["signal_date"], o["symbol"], "买" if o["side"] == "buy" else "卖", "%.4f" % o["qty"], names.get(o["status"], o["status"]),
+                                 "%.2f" % o["fill_price"] if o["fill_price"] else "—", o["reason"] or ""))
+                table(rows)
+    finally:
+        con.close()
+
+
+def cmd_trade_run(a):
+    import json
+
+    from .trading import daily
+    print(json.dumps(daily.run(force=a.force), ensure_ascii=False, indent=2, default=str))
+
+
+def cmd_trade_halt(a):
+    from .trading import engine
+    con = _trade_con()
+    try:
+        engine.get_account(con, a.name)
+        engine.halt(con, a.name, a.reason or "手动暂停")
+    finally:
+        con.close()
+    print("已暂停 %s：不会再生成或发送订单（已发送、待成交的订单仍会成交）。" % a.name)
+
+
+def cmd_trade_resume(a):
+    from .trading import engine
+    con = _trade_con()
+    try:
+        engine.resume(con, a.name)
+    finally:
+        con.close()
+    print("已恢复 %s。" % a.name)
+
+
+def cmd_trade_mode(a):
+    from .trading import engine
+    con = _trade_con()
+    try:
+        engine.set_mode(con, a.name, a.mode)
+    finally:
+        con.close()
+    print("%s 已切换为 %s 模式。" % (a.name, a.mode))
+
+
 def cmd_serve(a):
     import uvicorn
 
@@ -395,6 +530,51 @@ def build_parser():
     ar.add_argument("--symbol")
     ar.add_argument("--limit", type=int, default=20)
     ar.set_defaults(fn=cmd_ai_runs)
+
+    ml = sub.add_parser("ml", help="机器学习选股（纳斯达克 100）")
+    mlsub = ml.add_subparsers(dest="ml_cmd", required=True)
+    mb = mlsub.add_parser("backtest", help="滚动训练 + 组合回测，并和动量、等权、QQQ 比较")
+    mb.add_argument("--start", default="2012-01-01", help="回测开始（默认 2012-01-01）")
+    mb.add_argument("--end", help="回测结束")
+    mb.add_argument("--top", type=int, default=10, help="持有前几只（默认 10）")
+    mb.add_argument("--max-weight", type=float, default=0.2, help="单只上限（默认 0.2）")
+    mb.add_argument("--cash", type=float, default=10_000, help="初始资金（默认 10000）")
+    mb.add_argument("--slippage", type=float, default=5, help="滑点，基点（默认 5）")
+    mb.add_argument("--fee", type=float, default=0, help="每笔手续费（默认 0）")
+    mb.add_argument("--rf", type=float, default=0, help="无风险年利率（默认 0）")
+    mb.add_argument("--refresh-universe", action="store_true", help="重新获取成分股名单")
+    mb.add_argument("--no-chart", action="store_true", help="不画图")
+    mb.set_defaults(fn=cmd_ml_backtest)
+    ms = mlsub.add_parser("signal", help="按最新收盘价给出目标组合")
+    ms.add_argument("--capital", type=float, help="按多少资金计算金额（默认交易资金上限）")
+    ms.add_argument("--top", type=int, help="持有前几只")
+    ms.add_argument("--max-weight", type=float, help="单只上限")
+    ms.set_defaults(fn=cmd_ml_signal)
+
+    tr = sub.add_parser("trade", help="自动交易：按机器学习组合每月调仓（模拟券商；实盘需要券商连接器）")
+    trsub = tr.add_subparsers(dest="trade_cmd", required=True)
+    tn = trsub.add_parser("new", help="创建交易账户")
+    tn.add_argument("name")
+    tn.add_argument("--mode", choices=("plan", "paper"), default="paper", help="plan：只出计划；paper：模拟券商（默认）")
+    tn.add_argument("--capital", type=float, help="资金（默认并且最多为设置的上限）")
+    tn.set_defaults(fn=cmd_trade_new)
+    ts = trsub.add_parser("status", help="账户、持仓和最近的订单")
+    ts.add_argument("name", nargs="?")
+    ts.set_defaults(fn=cmd_trade_status)
+    tru = trsub.add_parser("run", help="运行一次交易步骤：结算、估值、（到期时）调仓")
+    tru.add_argument("--force", action="store_true", help="不等月末，按最新收盘价立刻调仓")
+    tru.set_defaults(fn=cmd_trade_run)
+    th = trsub.add_parser("halt", help="暂停一个账户")
+    th.add_argument("name")
+    th.add_argument("--reason")
+    th.set_defaults(fn=cmd_trade_halt)
+    trs = trsub.add_parser("resume", help="恢复一个账户")
+    trs.add_argument("name")
+    trs.set_defaults(fn=cmd_trade_resume)
+    tm = trsub.add_parser("mode", help="切换模式（plan / paper / live）")
+    tm.add_argument("name")
+    tm.add_argument("mode", choices=("plan", "paper", "live"))
+    tm.set_defaults(fn=cmd_trade_mode)
 
     sch = sub.add_parser("schedule", help="每日任务")
     schsub = sch.add_subparsers(dest="schedule_cmd", required=True)

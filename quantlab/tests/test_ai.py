@@ -209,6 +209,7 @@ def test_scheduler_queues_due_analyses_then_records(monkeypatch):
     worker.wait_idle = lambda timeout=None: (worker.run_next(), True)[1]  # run the queue synchronously
     result = Scheduler(worker, load=load).run_daily(NOW)
     assert len(result["queued"]) == 1 and result["recorded"] == {"AI": 1, "MA": 1}
+    assert result["trading"] == {}  # no trading accounts
 
     ac, pc = ledger.connect(), paper.connect()
     assert ledger.get_meta(ac, "daily_last") == "2026-10-20"

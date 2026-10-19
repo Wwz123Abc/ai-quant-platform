@@ -74,3 +74,34 @@ def heatmap(path, sym, df, by, best, spans):
     fig.suptitle("%s 均线参数扫描：黑框 = 样本内第 1 名 %d/%d" % (sym, best[0], best[1]), x=0.01, ha="left")
     fig.savefig(path, dpi=120)
     plt.close(fig)
+
+
+SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]  # validated categorical order
+
+
+def ml_chart(path, equity, ic):
+    """Equity curves of the strategies (log scale), their drawdowns, and the model's IC by year."""
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(11, 10), gridspec_kw={"height_ratios": [3, 1.3, 1.3]})
+    for (name, eq), color in zip(equity.items(), SERIES, strict=False):
+        ax1.plot(eq.index, eq, color=color, lw=1.3, label=name)
+        ax2.plot(eq.index, (eq / eq.cummax() - 1) * 100, color=color, lw=1, label=name)
+    ax1.set_yscale("log")
+    label = matplotlib.ticker.FuncFormatter(lambda v, _: format(v, ",.0f") if v >= 10 else format(v, ".3g"))
+    ax1.yaxis.set_major_locator(matplotlib.ticker.LogLocator(subs=(1, 2, 5)))
+    ax1.yaxis.set_major_formatter(label)
+    ax1.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax1.set_title("纳斯达克 100 选股：机器学习模型 vs 基准（对数坐标，现成分股有幸存者偏差）", loc="left")
+    ax1.set_ylabel("账户价值（美元）")
+    ax1.legend(loc="upper left", fontsize=9, frameon=False)
+    ax2.set_ylabel("回撤 %")
+    by_year = ic.groupby(ic.index.year).mean()
+    ax3.bar(by_year.index.astype(str), by_year.values, color=[UP if v > 0 else DOWN for v in by_year.values])
+    ax3.axhline(0, color=INK, lw=0.8)
+    ax3.set_ylabel("年均 IC")
+    ax3.set_title("模型预测能力（每年平均 IC，绿正红负）", loc="left", fontsize=10)
+    for ax in (ax1, ax2, ax3):
+        ax.grid(alpha=0.25)
+        ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
