@@ -2,7 +2,10 @@
 data/
 reports/
 *.log
+# secrets: any .env variant, except the documented example
 .env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
