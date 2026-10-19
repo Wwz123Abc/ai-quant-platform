@@ -3,7 +3,7 @@ import { type FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { type Analysis, api, type AiRun, post } from "../api/client";
 import { ErrorBox, Field, PageHead, Signed, Stat } from "../components/ui";
-import { big, money, num, pctPlain } from "../lib/format";
+import { big, money, num, pct, pctPlain } from "../lib/format";
 
 export default function Analyze() {
   const [symbol, setSymbol] = useState("");
@@ -43,9 +43,9 @@ export default function Analyze() {
               <h2>趋势和风险（{r.technical.date} 收盘 {num(r.technical.close)}）</h2>
               <div className="stats">
                 <Stat k="1 个月" v={<Signed v={r.technical.r1m} />} />
-                <Stat k="1 年" v={<Signed v={r.technical.r1y} />} s={`12-1 月动量 ${r.technical.mom_12_1 == null ? "—" : pctPlain(r.technical.mom_12_1)}`} />
+                <Stat k="1 年" v={<Signed v={r.technical.r1y} />} s={`12-1 月动量 ${pct(r.technical.mom_12_1)}`} />
                 <Stat k="年化波动率" v={pctPlain(r.technical.vol, 0)} s={`相对 QQQ 的 β ${num(r.technical.beta)}`} />
-                <Stat k="距一年最高点" v={<Signed v={r.technical.from_high} digits={0} />} s={`一年最大回撤 ${pctPlain(r.technical.max_dd_1y, 0)}`} />
+                <Stat k="距一年最高点" v={<Signed v={r.technical.from_high} digits={0} />} s={`一年最大回撤 ${pct(r.technical.max_dd_1y, 0)}`} />
               </div>
               <p className="hint" style={{ marginTop: 10 }}>
                 {r.technical.uptrend == null ? "均线数据不足" : r.technical.uptrend ? "50 日线在 200 日线上方（多头排列）" : "50 日线在 200 日线下方（空头排列）"}
@@ -56,7 +56,7 @@ export default function Analyze() {
               <h2>基本面（SEC 财报，按公告日）</h2>
               {r.fundamentals ? (
                 <div className="stats">
-                  <Stat k="最近 12 个月收入" v={big(r.fundamentals.revenue_ttm)} s={`同比 ${r.fundamentals.rev_growth == null ? "—" : pctPlain(r.fundamentals.rev_growth, 0)}`} />
+                  <Stat k="最近 12 个月收入" v={big(r.fundamentals.revenue_ttm)} s={`同比 ${pct(r.fundamentals.rev_growth, 0)}`} />
                   <Stat k="净利润" v={big(r.fundamentals.net_income_ttm)} s={`营业利润率 ${pctPlain(r.fundamentals.op_margin, 0)}`} />
                   <Stat k="市盈率" v={r.fundamentals.pe ? r.fundamentals.pe.toFixed(0) : "—"} s={`市净率 ${r.fundamentals.pb ? r.fundamentals.pb.toFixed(1) : "—"} · 市值 ${big(r.fundamentals.market_cap)}`} />
                   <Stat k="SUE" v={num(r.fundamentals.sue, 1)} s="最近一季相对去年同季的盈利变化（标准化）" />
