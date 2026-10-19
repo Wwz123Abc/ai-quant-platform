@@ -19,27 +19,27 @@ def run(bars, target, cash=10_000.0, fee=0.0, slippage_bps=5.0):
     target[t] is decided on day t's close and traded at day t+1's open, so no day trades on prices it could not
     have seen. target may start before bars (indicator warm-up), so the first day acts on the day before it.
     Buys pay the open plus slippage, sells get the open minus slippage, and each order costs fee dollars."""
-    want = target.shift(1).reindex(bars.index).fillna(0)
+    want = target.shift(1).reindex(bars.index).fillna(0).to_numpy()
+    opens, closes, dates = bars["open"].to_numpy(), bars["close"].to_numpy(), bars.index
     slip = slippage_bps / 10_000
     start, shares, entry = cash, 0, None
     equity, held, trades = [], [], []
-    for date, bar in bars.iterrows():
-        if want[date] == 1 and shares == 0:
-            px = bar.open * (1 + slip)
+    for i in range(len(dates)):  # plain arrays: a parameter scan runs this loop many times
+        if want[i] == 1 and shares == 0:
+            px = opens[i] * (1 + slip)
             n = math.floor((cash - fee) / px)
             if n > 0:
                 cash -= n * px + fee
-                shares, entry = n, (date, px, n * px + fee)
-        elif want[date] == 0 and shares > 0:
-            px = bar.open * (1 - slip)
+                shares, entry = n, (dates[i], px, n * px + fee)
+        elif want[i] == 0 and shares > 0:
+            px = opens[i] * (1 - slip)
             cash += shares * px - fee
-            trades.append(_trade(entry, date, px, shares * px - fee, shares, False))
+            trades.append(_trade(entry, dates[i], px, shares * px - fee, shares, False))
             shares, entry = 0, None
-        equity.append(cash + shares * bar.close)
+        equity.append(cash + shares * closes[i])
         held.append(1 if shares else 0)
     if shares:
-        last = bars.iloc[-1]
-        trades.append(_trade(entry, bars.index[-1], last.close, shares * last.close, shares, True))
+        trades.append(_trade(entry, dates[-1], closes[-1], shares * closes[-1], shares, True))
     cols = ["entry_date", "entry_price", "exit_date", "exit_price", "shares", "pnl", "return", "open"]
     return Result(pd.Series(equity, bars.index), pd.Series(held, bars.index), pd.DataFrame(trades, columns=cols), start)
 

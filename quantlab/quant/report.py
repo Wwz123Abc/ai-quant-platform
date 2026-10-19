@@ -1,5 +1,6 @@
 """Chart of a backtest: price with the moving averages and trades, account value, and drawdown."""
 import matplotlib
+import matplotlib.patches
 import matplotlib.ticker
 
 matplotlib.use("Agg")
@@ -44,5 +45,32 @@ def chart(path, sym, sig, strat, bench, fast, slow):
         ax.grid(alpha=0.25)
         ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
+def heatmap(path, sym, df, by, best, spans):
+    """In-sample and out-of-sample results of every parameter pair side by side, on one colour scale."""
+    fasts, slows = sorted(df["fast"].unique()), sorted(df["slow"].unique())
+    grids = [df.pivot(index="fast", columns="slow", values=p + by).reindex(index=fasts, columns=slows) for p in ("is_", "oos_")]
+    lo, hi = min(g.min().min() for g in grids), max(g.max().max() for g in grids)
+    name = {"sharpe": "夏普比率", "cagr": "年化收益"}[by]
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.6), constrained_layout=True)
+    for ax, g, label, span in zip(axes, grids, ("样本内（挑参数）", "样本外（检验）"), spans):
+        im = ax.imshow(g.to_numpy(dtype=float), cmap="RdYlGn", vmin=lo, vmax=hi, aspect="auto")
+        for i, f in enumerate(fasts):
+            for j, s in enumerate(slows):
+                v = g.loc[f, s]
+                if v == v:  # not NaN
+                    ax.text(j, i, "%.2f" % v if by == "sharpe" else "%.0f%%" % (v * 100), ha="center", va="center", fontsize=8)
+        i, j = fasts.index(best[0]), slows.index(best[1])
+        ax.add_patch(matplotlib.patches.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, ec=INK, lw=2.2))
+        ax.set_xticks(range(len(slows)), slows)
+        ax.set_yticks(range(len(fasts)), fasts)
+        ax.set_xlabel("长均线（天）")
+        ax.set_ylabel("短均线（天）")
+        ax.set_title("%s %s\n%s" % (label, name, span), loc="left", fontsize=10)
+    fig.colorbar(im, ax=axes, shrink=0.85, label=name)
+    fig.suptitle("%s 均线参数扫描：黑框 = 样本内第 1 名 %d/%d" % (sym, best[0], best[1]), x=0.01, ha="left")
     fig.savefig(path, dpi=120)
     plt.close(fig)
