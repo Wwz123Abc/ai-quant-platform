@@ -7,7 +7,7 @@
 - **分析端**：想买一只股票时，`个股分析` 给出趋势和风险、时点基本面、AI 评级、和你现有持仓的相关性，以及**按你的规则**能不能买、最多买多少。
 - **执行端**：`我的持仓` 每天从账本同步你的真实持仓，按你设定的规则（目标仓位和再平衡区间、单只上限、现金储备）给出建议订单；你逐条确认，自己去券商下单。趋势、基本面和 AI 评级只作为提醒，不会生成订单。
 
-- **数据**：Yahoo Finance 日线，按拆股和分红复权，缓存在本地 SQLite。
+- **数据**：Yahoo Finance 日线，按拆股和分红复权，缓存在本地 SQLite；国内服务器上改用腾讯 K 线 + 新浪复权因子（`QUANTLAB_PRICE_SOURCE=cn`）。
 - **回测**：按收盘价算信号，**下一个交易日开盘成交**，计入滑点和手续费、按整股成交，并和同期“买入持有”对比。
 - **样本外检验**：在前一段历史上挑参数，在后一段历史上检验，判断“最优参数”是不是过拟合。
 - **模拟盘**：每个交易日收盘后记录策略的决定，写入后不可修改，是真正的前向测试。
@@ -256,6 +256,10 @@ python -m quantlab paper new AI --symbols QQQM,VOO --strategy ai --every 7
 | `QUANTLAB_HOST` / `QUANTLAB_PORT` | `127.0.0.1` / `8000` | 监听地址和端口 |
 | `QUANTLAB_API_TOKEN` | 自动生成 | 访问令牌 |
 | `QUANTLAB_LOG_FORMAT` | `text` | 设为 `json` 时每行输出一个 JSON，便于日志系统收集 |
+| `QUANTLAB_PRICE_SOURCE` | `yahoo` | `cn`：腾讯 K 线 + 新浪复权因子，用于连不上 Yahoo 的服务器 |
+| `QUANTLAB_AUTH_MODE` | `token` | `proxy`：放在账本网站后面，由 nginx 先检查账本登录（见[部署文档](docs/deploy.md)） |
+| `QUANTLAB_BASE_PATH` | 空 | 挂在子路径下时填，例如 `/lab` |
+| `QUANTLAB_HOME_URL` | 空 | 导航栏里“← 美股账本”的链接 |
 
 ## 开发
 
@@ -278,6 +282,12 @@ cd web && npm run typecheck && npm run lint && npm test
 ```bash
 python scripts/export_openapi.py && cd web && npm run gen:api
 ```
+
+## 部署到服务器（账本网站的 /lab/）
+
+线上版本和美股账本在同一个域名下：账本是首页，量化平台在 `/lab/`，用账本的登录，只有指定的一个账号能进。nginx 先问账本“这是平台所有者吗”，通过后才转发给 QuantLab。步骤和原理见 [docs/deploy.md](docs/deploy.md)。
+
+密钥在服务器上自己输入，输入时不显示：`quantlab secrets set SEC_EDGAR_USER_AGENT`；`quantlab secrets status` 只显示是否已配置。
 
 ## 部署（Docker）
 
@@ -316,6 +326,7 @@ docs/          架构说明和图片
 - [x] 服务内置定时任务（每个交易日自动分析和记录）
 - [x] 机器学习选股、仓位管理、自动交易（模拟券商）
 - [x] 历史成分股、时点财务因子、预登记实验（结论：没有证据表明模型优于动量）
+- [x] 部署到服务器：和美股账本统一入口和登录（`/lab/`），国内行情源
 - [ ] 券商连接器（开户后接入）
 - [ ] 滚动检验（walk-forward）、更多策略、组合回测
 

@@ -1,0 +1,32 @@
+[Unit]
+Description=QuantLab quant platform (served at stock.wwz.cool/lab/ behind the ledger sign-in)
+After=network-online.target stock-ledger.service
+Wants=network-online.target
+
+[Service]
+User=quantlab
+Group=quantlab
+WorkingDirectory=/opt/quantlab
+Environment=QUANTLAB_DATA_DIR=/opt/quantlab/data
+Environment=QUANTLAB_REPORTS_DIR=/opt/quantlab/reports
+Environment=QUANTLAB_HOST=127.0.0.1
+Environment=QUANTLAB_PORT=8010
+Environment=QUANTLAB_PRICE_SOURCE=cn
+Environment=QUANTLAB_AUTH_MODE=proxy
+Environment=QUANTLAB_BASE_PATH=/lab
+Environment=QUANTLAB_HOME_URL=/
+Environment=QUANTLAB_LEDGER_URL=http://127.0.0.1:5090
+Environment=QUANTLAB_SCHEDULE_ENABLED=false
+Environment=MPLCONFIGDIR=/opt/quantlab/data/.matplotlib
+ExecStart=/opt/quantlab/venv/bin/quantlab serve --log-file /opt/quantlab/data/logs/serve.log
+Restart=on-failure
+RestartSec=5
+MemoryMax=1200M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/quantlab
+
+[Install]
+WantedBy=multi-user.target

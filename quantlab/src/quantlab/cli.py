@@ -578,8 +578,8 @@ def cmd_secrets_status(a):
     import os
     from pathlib import Path
 
-    from dotenv import dotenv_values
-    found = dotenv_values(".env") if Path(".env").exists() else {}
+    env = Path(".env")
+    found = dict(ln.split("=", 1) for ln in env.read_text(encoding="utf-8").splitlines() if "=" in ln) if env.exists() else {}
     for name in SECRETS:
         print("%-22s %s" % (name, "已配置" if found.get(name) or os.environ.get(name) else "未配置"))
 
