@@ -1,2 +1,0 @@
-[console_scripts]
-quantlab = quantlab.cli:main

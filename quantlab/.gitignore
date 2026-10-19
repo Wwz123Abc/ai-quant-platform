@@ -1,4 +1,19 @@
+# runtime data and outputs
 data/
 reports/
+*.log
+.env
+
+# Python
 __pycache__/
+*.egg-info/
+build/
+dist/
 .pytest_cache/
+.ruff_cache/
+.venv/
+
+# web workbench: dependencies and the build copied into the package
+web/node_modules/
+web/dist/
+src/quantlab/web/
