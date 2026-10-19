@@ -14,6 +14,7 @@
   --series-1: #2a78d6; /* strategy */
   --series-2: #eb6834; /* buy and hold */
   --series-3: #1baf7a; /* third line (price) */
+  --series-4: #eda100;
   --up: #006300; /* gains are green */
   --down: #d03b3b; /* losses are red */
   --warn: #9a6400;
@@ -45,6 +46,7 @@
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
+    --series-4: #c98500;
     --up: #0ca30c;
     --down: #e66767;
     --warn: #fab219;
@@ -459,4 +461,31 @@ details.report-section {
 details.report-section summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+/* ---------- bars ---------- */
+.bars {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.bars .track {
+  position: relative;
+  height: 14px;
+}
+.bars .bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+}
+.bars .axis {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--axis);
 }

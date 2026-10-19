@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.5.1"
+    "version": "0.6.0"
   },
   "paths": {
     "/api/health": {
@@ -448,7 +448,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/quantlab__api__schemas__AccountCreate"
+                "$ref": "#/components/schemas/AccountCreate"
               }
             }
           }
@@ -1219,7 +1219,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/quantlab__api__ml_routes__AccountCreate"
+                "$ref": "#/components/schemas/TradingAccountCreate"
               }
             }
           }
@@ -1617,7 +1617,7 @@
           },
           "positions": {
             "items": {
-              "$ref": "#/components/schemas/quantlab__api__schemas__Position"
+              "$ref": "#/components/schemas/Position"
             },
             "type": "array",
             "title": "Positions"
@@ -1666,6 +1666,97 @@
           "fills"
         ],
         "title": "Account"
+      },
+      "AccountCreate": {
+        "properties": {
+          "cash": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cash",
+            "description": "初始资金（美元）",
+            "default": 10000
+          },
+          "fee": {
+            "type": "number",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Fee",
+            "description": "每笔手续费（美元）",
+            "default": 0
+          },
+          "slippage": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Slippage",
+            "description": "滑点（基点）",
+            "default": 5
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "examples": [
+              "核心"
+            ]
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Symbols",
+            "examples": [
+              [
+                "QQQM",
+                "VOO"
+              ]
+            ]
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "ma_cross",
+              "ai_rating"
+            ],
+            "title": "Strategy",
+            "default": "ma_cross"
+          },
+          "fast": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 2.0,
+            "title": "Fast",
+            "description": "均线账户：短均线天数",
+            "default": 50
+          },
+          "slow": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 3.0,
+            "title": "Slow",
+            "description": "均线账户：长均线天数",
+            "default": 200
+          },
+          "every_days": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Every Days",
+            "description": "AI 账户：每隔多少天重新分析一次",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "symbols"
+        ],
+        "title": "AccountCreate"
       },
       "AiBudget": {
         "properties": {
@@ -2261,29 +2352,6 @@
         ],
         "title": "EquitySeries"
       },
-      "Event": {
-        "properties": {
-          "at": {
-            "type": "string",
-            "title": "At"
-          },
-          "kind": {
-            "type": "string",
-            "title": "Kind"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "at",
-          "kind",
-          "message"
-        ],
-        "title": "Event"
-      },
       "Fill": {
         "properties": {
           "date": {
@@ -2482,95 +2550,6 @@
         ],
         "title": "ModeRequest"
       },
-      "Order": {
-        "properties": {
-          "client_id": {
-            "type": "string",
-            "title": "Client Id"
-          },
-          "signal_date": {
-            "type": "string",
-            "title": "Signal Date"
-          },
-          "symbol": {
-            "type": "string",
-            "title": "Symbol"
-          },
-          "side": {
-            "type": "string",
-            "title": "Side"
-          },
-          "qty": {
-            "type": "number",
-            "title": "Qty"
-          },
-          "est_price": {
-            "type": "number",
-            "title": "Est Price"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          },
-          "created": {
-            "type": "string",
-            "title": "Created"
-          },
-          "filled_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Filled At"
-          },
-          "fill_price": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fill Price"
-          },
-          "fee": {
-            "type": "number",
-            "title": "Fee"
-          }
-        },
-        "type": "object",
-        "required": [
-          "client_id",
-          "signal_date",
-          "symbol",
-          "side",
-          "qty",
-          "est_price",
-          "status",
-          "reason",
-          "created",
-          "filled_at",
-          "fill_price",
-          "fee"
-        ],
-        "title": "Order"
-      },
       "PendingOrder": {
         "properties": {
           "symbol": {
@@ -2628,6 +2607,75 @@
           "years"
         ],
         "title": "Period"
+      },
+      "Position": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision",
+            "description": "最新决定：持有、空仓，或还在等待第一个决定（null）"
+          },
+          "decision_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Date"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "shares": {
+            "type": "integer",
+            "title": "Shares"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "return": {
+            "type": "number",
+            "title": "Return"
+          },
+          "benchmark_return": {
+            "type": "number",
+            "title": "Benchmark Return"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "decision",
+          "decision_date",
+          "held",
+          "shares",
+          "value",
+          "cash",
+          "return",
+          "benchmark_return"
+        ],
+        "title": "Position"
       },
       "RecordResult": {
         "properties": {
@@ -3684,7 +3732,7 @@
           },
           "positions": {
             "items": {
-              "$ref": "#/components/schemas/quantlab__api__ml_routes__Position"
+              "$ref": "#/components/schemas/TradingPosition"
             },
             "type": "array",
             "title": "Positions"
@@ -3693,7 +3741,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/Order"
+                  "$ref": "#/components/schemas/TradingOrder"
                 },
                 "type": "array"
               },
@@ -3707,7 +3755,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/Event"
+                  "$ref": "#/components/schemas/TradingEvent"
                 },
                 "type": "array"
               },
@@ -3749,47 +3797,7 @@
         ],
         "title": "TradingAccount"
       },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
-      },
-      "quantlab__api__ml_routes__AccountCreate": {
+      "TradingAccountCreate": {
         "properties": {
           "name": {
             "type": "string",
@@ -3823,9 +3831,121 @@
         "required": [
           "name"
         ],
-        "title": "AccountCreate"
+        "title": "TradingAccountCreate"
       },
-      "quantlab__api__ml_routes__Position": {
+      "TradingEvent": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "kind",
+          "message"
+        ],
+        "title": "TradingEvent"
+      },
+      "TradingOrder": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "signal_date": {
+            "type": "string",
+            "title": "Signal Date"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "qty": {
+            "type": "number",
+            "title": "Qty"
+          },
+          "est_price": {
+            "type": "number",
+            "title": "Est Price"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          },
+          "filled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled At"
+          },
+          "fill_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Price"
+          },
+          "fee": {
+            "type": "number",
+            "title": "Fee"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_id",
+          "signal_date",
+          "symbol",
+          "side",
+          "qty",
+          "est_price",
+          "status",
+          "reason",
+          "created",
+          "filled_at",
+          "fill_price",
+          "fee"
+        ],
+        "title": "TradingOrder"
+      },
+      "TradingPosition": {
         "properties": {
           "symbol": {
             "type": "string",
@@ -3877,167 +3997,47 @@
           "value",
           "weight"
         ],
-        "title": "Position"
+        "title": "TradingPosition"
       },
-      "quantlab__api__schemas__AccountCreate": {
+      "ValidationError": {
         "properties": {
-          "cash": {
-            "type": "number",
-            "maximum": 1000000000.0,
-            "exclusiveMinimum": 0.0,
-            "title": "Cash",
-            "description": "初始资金（美元）",
-            "default": 10000
-          },
-          "fee": {
-            "type": "number",
-            "maximum": 1000.0,
-            "minimum": 0.0,
-            "title": "Fee",
-            "description": "每笔手续费（美元）",
-            "default": 0
-          },
-          "slippage": {
-            "type": "number",
-            "maximum": 500.0,
-            "minimum": 0.0,
-            "title": "Slippage",
-            "description": "滑点（基点）",
-            "default": 5
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 40,
-            "minLength": 1,
-            "title": "Name",
-            "examples": [
-              "核心"
-            ]
-          },
-          "symbols": {
+          "loc": {
             "items": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
             },
             "type": "array",
-            "maxItems": 20,
-            "minItems": 1,
-            "title": "Symbols",
-            "examples": [
-              [
-                "QQQM",
-                "VOO"
-              ]
-            ]
+            "title": "Location"
           },
-          "strategy": {
+          "msg": {
             "type": "string",
-            "enum": [
-              "ma_cross",
-              "ai_rating"
-            ],
-            "title": "Strategy",
-            "default": "ma_cross"
+            "title": "Message"
           },
-          "fast": {
-            "type": "integer",
-            "maximum": 400.0,
-            "minimum": 2.0,
-            "title": "Fast",
-            "description": "均线账户：短均线天数",
-            "default": 50
+          "type": {
+            "type": "string",
+            "title": "Error Type"
           },
-          "slow": {
-            "type": "integer",
-            "maximum": 500.0,
-            "minimum": 3.0,
-            "title": "Slow",
-            "description": "均线账户：长均线天数",
-            "default": 200
+          "input": {
+            "title": "Input"
           },
-          "every_days": {
-            "type": "integer",
-            "maximum": 60.0,
-            "minimum": 1.0,
-            "title": "Every Days",
-            "description": "AI 账户：每隔多少天重新分析一次",
-            "default": 7
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "symbols"
+          "loc",
+          "msg",
+          "type"
         ],
-        "title": "AccountCreate"
-      },
-      "quantlab__api__schemas__Position": {
-        "properties": {
-          "symbol": {
-            "type": "string",
-            "title": "Symbol"
-          },
-          "decision": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decision",
-            "description": "最新决定：持有、空仓，或还在等待第一个决定（null）"
-          },
-          "decision_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decision Date"
-          },
-          "held": {
-            "type": "boolean",
-            "title": "Held"
-          },
-          "shares": {
-            "type": "integer",
-            "title": "Shares"
-          },
-          "value": {
-            "type": "number",
-            "title": "Value"
-          },
-          "cash": {
-            "type": "number",
-            "title": "Cash"
-          },
-          "return": {
-            "type": "number",
-            "title": "Return"
-          },
-          "benchmark_return": {
-            "type": "number",
-            "title": "Benchmark Return"
-          }
-        },
-        "type": "object",
-        "required": [
-          "symbol",
-          "decision",
-          "decision_date",
-          "held",
-          "shares",
-          "value",
-          "cash",
-          "return",
-          "benchmark_return"
-        ],
-        "title": "Position"
+        "title": "ValidationError"
       }
     }
   }

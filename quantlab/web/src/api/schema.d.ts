@@ -419,12 +419,70 @@ export interface components {
             /** Days */
             days: number;
             /** Positions */
-            positions: components["schemas"]["quantlab__api__schemas__Position"][];
+            positions: components["schemas"]["Position"][];
             /** Pending */
             pending: components["schemas"]["PendingOrder"][];
             /** Fills */
             fills: components["schemas"]["Fill"][];
             equity?: components["schemas"]["EquitySeries"] | null;
+        };
+        /** AccountCreate */
+        AccountCreate: {
+            /**
+             * Cash
+             * @description 初始资金（美元）
+             * @default 10000
+             */
+            cash: number;
+            /**
+             * Fee
+             * @description 每笔手续费（美元）
+             * @default 0
+             */
+            fee: number;
+            /**
+             * Slippage
+             * @description 滑点（基点）
+             * @default 5
+             */
+            slippage: number;
+            /**
+             * Name
+             * @example 核心
+             */
+            name: string;
+            /**
+             * Symbols
+             * @example [
+             *       "QQQM",
+             *       "VOO"
+             *     ]
+             */
+            symbols: string[];
+            /**
+             * Strategy
+             * @default ma_cross
+             * @enum {string}
+             */
+            strategy: "ma_cross" | "ai_rating";
+            /**
+             * Fast
+             * @description 均线账户：短均线天数
+             * @default 50
+             */
+            fast: number;
+            /**
+             * Slow
+             * @description 均线账户：长均线天数
+             * @default 200
+             */
+            slow: number;
+            /**
+             * Every Days
+             * @description AI 账户：每隔多少天重新分析一次
+             * @default 7
+             */
+            every_days: number;
         };
         /** AiBudget */
         AiBudget: {
@@ -641,15 +699,6 @@ export interface components {
             /** Benchmark */
             benchmark: number[];
         };
-        /** Event */
-        Event: {
-            /** At */
-            at: string;
-            /** Kind */
-            kind: string;
-            /** Message */
-            message: string;
-        };
         /** Fill */
         Fill: {
             /**
@@ -736,33 +785,6 @@ export interface components {
              */
             mode: "plan" | "paper" | "live";
         };
-        /** Order */
-        Order: {
-            /** Client Id */
-            client_id: string;
-            /** Signal Date */
-            signal_date: string;
-            /** Symbol */
-            symbol: string;
-            /** Side */
-            side: string;
-            /** Qty */
-            qty: number;
-            /** Est Price */
-            est_price: number;
-            /** Status */
-            status: string;
-            /** Reason */
-            reason: string | null;
-            /** Created */
-            created: string;
-            /** Filled At */
-            filled_at: string | null;
-            /** Fill Price */
-            fill_price: number | null;
-            /** Fee */
-            fee: number;
-        };
         /** PendingOrder */
         PendingOrder: {
             /** Symbol */
@@ -794,6 +816,30 @@ export interface components {
             end: string;
             /** Years */
             years: number;
+        };
+        /** Position */
+        Position: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Decision
+             * @description 最新决定：持有、空仓，或还在等待第一个决定（null）
+             */
+            decision: boolean | null;
+            /** Decision Date */
+            decision_date: string | null;
+            /** Held */
+            held: boolean;
+            /** Shares */
+            shares: number;
+            /** Value */
+            value: number;
+            /** Cash */
+            cash: number;
+            /** Return */
+            return: number;
+            /** Benchmark Return */
+            benchmark_return: number;
         };
         /** RecordResult */
         RecordResult: {
@@ -1199,15 +1245,77 @@ export interface components {
             /** Created */
             created: string;
             /** Positions */
-            positions: components["schemas"]["quantlab__api__ml_routes__Position"][];
+            positions: components["schemas"]["TradingPosition"][];
             /** Orders */
-            orders?: components["schemas"]["Order"][] | null;
+            orders?: components["schemas"]["TradingOrder"][] | null;
             /** Events */
-            events?: components["schemas"]["Event"][] | null;
+            events?: components["schemas"]["TradingEvent"][] | null;
             /** Equity */
             equity?: {
                 [key: string]: unknown[];
             } | null;
+        };
+        /** TradingAccountCreate */
+        TradingAccountCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Mode
+             * @default paper
+             * @enum {string}
+             */
+            mode: "plan" | "paper";
+            /** Capital */
+            capital?: number | null;
+        };
+        /** TradingEvent */
+        TradingEvent: {
+            /** At */
+            at: string;
+            /** Kind */
+            kind: string;
+            /** Message */
+            message: string;
+        };
+        /** TradingOrder */
+        TradingOrder: {
+            /** Client Id */
+            client_id: string;
+            /** Signal Date */
+            signal_date: string;
+            /** Symbol */
+            symbol: string;
+            /** Side */
+            side: string;
+            /** Qty */
+            qty: number;
+            /** Est Price */
+            est_price: number;
+            /** Status */
+            status: string;
+            /** Reason */
+            reason: string | null;
+            /** Created */
+            created: string;
+            /** Filled At */
+            filled_at: string | null;
+            /** Fill Price */
+            fill_price: number | null;
+            /** Fee */
+            fee: number;
+        };
+        /** TradingPosition */
+        TradingPosition: {
+            /** Symbol */
+            symbol: string;
+            /** Qty */
+            qty: number;
+            /** Price */
+            price: number | null;
+            /** Value */
+            value: number | null;
+            /** Weight */
+            weight: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1221,114 +1329,6 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
-        };
-        /** AccountCreate */
-        quantlab__api__ml_routes__AccountCreate: {
-            /** Name */
-            name: string;
-            /**
-             * Mode
-             * @default paper
-             * @enum {string}
-             */
-            mode: "plan" | "paper";
-            /** Capital */
-            capital?: number | null;
-        };
-        /** Position */
-        quantlab__api__ml_routes__Position: {
-            /** Symbol */
-            symbol: string;
-            /** Qty */
-            qty: number;
-            /** Price */
-            price: number | null;
-            /** Value */
-            value: number | null;
-            /** Weight */
-            weight: number | null;
-        };
-        /** AccountCreate */
-        quantlab__api__schemas__AccountCreate: {
-            /**
-             * Cash
-             * @description 初始资金（美元）
-             * @default 10000
-             */
-            cash: number;
-            /**
-             * Fee
-             * @description 每笔手续费（美元）
-             * @default 0
-             */
-            fee: number;
-            /**
-             * Slippage
-             * @description 滑点（基点）
-             * @default 5
-             */
-            slippage: number;
-            /**
-             * Name
-             * @example 核心
-             */
-            name: string;
-            /**
-             * Symbols
-             * @example [
-             *       "QQQM",
-             *       "VOO"
-             *     ]
-             */
-            symbols: string[];
-            /**
-             * Strategy
-             * @default ma_cross
-             * @enum {string}
-             */
-            strategy: "ma_cross" | "ai_rating";
-            /**
-             * Fast
-             * @description 均线账户：短均线天数
-             * @default 50
-             */
-            fast: number;
-            /**
-             * Slow
-             * @description 均线账户：长均线天数
-             * @default 200
-             */
-            slow: number;
-            /**
-             * Every Days
-             * @description AI 账户：每隔多少天重新分析一次
-             * @default 7
-             */
-            every_days: number;
-        };
-        /** Position */
-        quantlab__api__schemas__Position: {
-            /** Symbol */
-            symbol: string;
-            /**
-             * Decision
-             * @description 最新决定：持有、空仓，或还在等待第一个决定（null）
-             */
-            decision: boolean | null;
-            /** Decision Date */
-            decision_date: string | null;
-            /** Held */
-            held: boolean;
-            /** Shares */
-            shares: number;
-            /** Value */
-            value: number;
-            /** Cash */
-            cash: number;
-            /** Return */
-            return: number;
-            /** Benchmark Return */
-            benchmark_return: number;
         };
     };
     responses: never;
@@ -1573,7 +1573,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["quantlab__api__schemas__AccountCreate"];
+                "application/json": components["schemas"]["AccountCreate"];
             };
         };
         responses: {
@@ -2028,7 +2028,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["quantlab__api__ml_routes__AccountCreate"];
+                "application/json": components["schemas"]["TradingAccountCreate"];
             };
         };
         responses: {

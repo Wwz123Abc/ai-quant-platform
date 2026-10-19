@@ -23,7 +23,18 @@ src/quantlab/ai/                   AI 研究（可选依赖 quantlab[ai]）
   engine.py     TradingAgents 适配器：配置转换、按模型统计 token、计算费用
   ledger.py     分析记录、每月预算、准入检查（SQLite：ai.db）
   jobs.py       后台单线程任务：一次一个，运行前再查一次预算
-src/quantlab/scheduler.py          每日任务：到期的 AI 分析 → 记录所有模拟账户
+src/quantlab/ml/                   机器学习选股（可选依赖 quantlab[ml]）
+  universe.py   纳斯达克 100 成分股（带日期保存）
+  features.py   时点特征（横截面排名）和标签（下一开盘到 21 天后开盘的收益排名）
+  model.py      滚动训练：只用标签窗口已结束的样本（purge），超参数固定
+  portfolio.py  仓位：前 N 名、波动率倒数加权、单只上限；多股票组合回测
+  research.py   模型 vs 动量 / 等权 / QQQ；IC、分组收益、特征重要性
+  signal.py     最新目标组合，模型和训练说明卡一起保存
+src/quantlab/trading/              自动交易
+  broker.py     券商接口 + 内置模拟券商；订单、持仓、净值、审计日志（trading.db）
+  engine.py     订单生成、逐笔风控、数据检查、回撤熔断、模式和实盘门槛
+  daily.py      每日交易步骤：结算 → 估值 → 月末调仓
+src/quantlab/scheduler.py          每日任务：到期的 AI 分析 → 记录所有模拟账户 → 交易步骤
         │
         ▼
 src/quantlab/storage.py            SQLite 连接 + 版本化迁移（PRAGMA user_version）
@@ -49,6 +60,12 @@ src/quantlab/errors.py             领域错误 → HTTP 状态码
 | AI 只分析最近一个收盘日，不回溯 | 模型训练数据可能包含“未来” | 接口按最新收盘日提交 |
 | 之后的 AI 评级不能改变已经记录的决定 | 前向测试 | `test_ai_account_waits_for_pending_analysis_and_never_looks_ahead` |
 | 超出预算的分析不提交、不运行 | 费用可控 | `test_budget_counts_spending_and_queued_runs`、`test_worker_rechecks_budget_before_running` |
+| 特征只用当天及以前的数据 | 防止偷看未来 | `test_features_use_only_the_past` |
+| 训练样本的标签窗口在调仓日之前结束 | 防止标签泄漏 | `test_walk_forward_never_trains_on_unfinished_labels` |
+| 组合按信号后的下一个开盘价成交并计成本 | 回测不能比现实便宜 | `test_portfolio_trades_next_open_with_costs` |
+| 模拟成交：下一开盘、先卖后买、不透支、不重复 | 交易正确性 | `test_paper_fills_at_next_open_sells_first_and_never_overdraws` |
+| 每笔订单过风控；数据异常时暂停而不是交易 | 资金安全 | `test_risk_limits`、`test_bad_data_halts_instead_of_trading`、`test_drawdown_breaker` |
+| 实盘需要开启 + 连接器 + 模拟满 8 周 | 资金安全 | `test_live_needs_weeks_of_paper_trading` |
 
 ## 安全模型
 

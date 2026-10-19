@@ -13,6 +13,11 @@ export type AccountCreate = S["AccountCreate"];
 export type RecordResult = S["RecordResult"];
 export type AiStatus = S["AiStatus"];
 export type AiRun = S["AiRun"];
+export type Study = S["Study"];
+export type StudyRequest = S["StudyRequest"];
+export type MlSignal = S["Signal"];
+export type TradingAccount = S["TradingAccount"];
+export type Limits = S["Limits"];
 
 const TOKEN_KEY = "quantlab.token";
 let memoryToken: string | null = null; // fallback when session storage is blocked

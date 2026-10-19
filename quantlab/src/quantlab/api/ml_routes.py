@@ -78,13 +78,13 @@ class Signal(BaseModel):
     holdings: list[Holding]
 
 
-class AccountCreate(BaseModel):
+class TradingAccountCreate(BaseModel):
     name: str = Field(min_length=1, max_length=40)
     mode: Literal["plan", "paper"] = "paper"
     capital: float | None = Field(None, gt=0)
 
 
-class Position(BaseModel):
+class TradingPosition(BaseModel):
     symbol: str
     qty: float
     price: float | None
@@ -92,7 +92,7 @@ class Position(BaseModel):
     weight: float | None
 
 
-class Order(BaseModel):
+class TradingOrder(BaseModel):
     client_id: str
     signal_date: str
     symbol: str
@@ -107,7 +107,7 @@ class Order(BaseModel):
     fee: float
 
 
-class Event(BaseModel):
+class TradingEvent(BaseModel):
     at: str
     kind: str
     message: str
@@ -124,9 +124,9 @@ class TradingAccount(BaseModel):
     drawdown: float
     halted: str | None
     created: str
-    positions: list[Position]
-    orders: list[Order] | None = None
-    events: list[Event] | None = None
+    positions: list[TradingPosition]
+    orders: list[TradingOrder] | None = None
+    events: list[TradingEvent] | None = None
     equity: dict[str, list] | None = None
 
 
@@ -230,7 +230,7 @@ def trading_accounts():
 
 
 @router.post("/trading/accounts", response_model=TradingAccount, status_code=201, tags=["trading"], summary="创建交易账户")
-def trading_create(req: AccountCreate):
+def trading_create(req: TradingAccountCreate):
     def go(con):
         engine.create_account(con, req.name.strip(), req.mode, req.capital)
         return _account(con, req.name.strip(), True)

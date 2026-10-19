@@ -5,6 +5,8 @@ import { api, ApiError, setToken } from "./api/client";
 import Account from "./pages/Account";
 import Ai from "./pages/Ai";
 import AiRun from "./pages/AiRun";
+import Ml from "./pages/Ml";
+import Trading, { TradingAccountPage } from "./pages/Trading";
 import Backtest from "./pages/Backtest";
 import Dashboard from "./pages/Dashboard";
 import Paper from "./pages/Paper";
@@ -29,6 +31,8 @@ export default function App() {
         <NavLink to="/scan">参数扫描</NavLink>
         <NavLink to="/paper">模拟盘</NavLink>
         <NavLink to="/ai">AI 研报</NavLink>
+        <NavLink to="/ml">机器学习选股</NavLink>
+        <NavLink to="/trading">自动交易</NavLink>
         <a href="/api/docs" target="_blank" rel="noreferrer">接口文档 ↗</a>
         <div className="foot">v{auth.data?.version} · 仅用于研究，不构成投资建议</div>
       </nav>
@@ -41,6 +45,9 @@ export default function App() {
           <Route path="/paper/:name" element={<Account />} />
           <Route path="/ai" element={<Ai />} />
           <Route path="/ai/runs/:id" element={<AiRun />} />
+          <Route path="/ml" element={<Ml />} />
+          <Route path="/trading" element={<Trading />} />
+          <Route path="/trading/:name" element={<TradingAccountPage />} />
           <Route path="*" element={<p className="empty">没有这个页面。<NavLink to="/">回到总览</NavLink></p>} />
         </Routes>
       </main>
