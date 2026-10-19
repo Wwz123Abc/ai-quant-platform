@@ -1,0 +1,14 @@
+services:
+  quantlab:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"   # reachable from this computer only
+    volumes:
+      - quantlab-data:/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  quantlab-data:
