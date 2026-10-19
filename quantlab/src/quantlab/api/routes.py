@@ -54,6 +54,11 @@ def health():
     return {"status": "ok", "version": __version__}
 
 
+@api.get("/session", response_model=s.Health, tags=["system"], summary="检查访问令牌")
+def session():
+    return {"status": "ok", "version": __version__}
+
+
 @api.get("/market/{symbol}/bars", response_model=s.Bars, tags=["market"], summary="复权日线")
 def bars(symbol: str, start: str | None = None, refresh: bool = False):
     sym = data.normalize(symbol)

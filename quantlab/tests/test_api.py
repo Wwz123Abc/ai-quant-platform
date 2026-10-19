@@ -44,6 +44,11 @@ def test_token_required(client, headers):
     assert r.status_code == 401 and r.headers["WWW-Authenticate"] == "Bearer"
 
 
+def test_session_checks_the_token(client):
+    assert client.get("/api/session", headers=AUTH).json()["status"] == "ok"
+    assert client.get("/api/session").status_code == 401
+
+
 def test_security_headers(client):
     r = client.get("/api/health")
     assert r.headers["X-Content-Type-Options"] == "nosniff"

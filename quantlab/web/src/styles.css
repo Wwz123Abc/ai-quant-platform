@@ -1,0 +1,403 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --wash: rgba(11, 11, 11, 0.04);
+  --accent: #2a78d6;
+  --accent-ink: #ffffff;
+  --series-1: #2a78d6; /* strategy */
+  --series-2: #eb6834; /* buy and hold */
+  --series-3: #1baf7a; /* third line (price) */
+  --up: #006300; /* gains are green */
+  --down: #d03b3b; /* losses are red */
+  --warn: #9a6400;
+  --seq-0: #cde2fb; /* sequential blue, low -> high */
+  --seq-1: #0d366b;
+  --seq-ink-lo: #0b0b0b; /* text on the light end of the ramp */
+  --seq-ink-hi: #ffffff; /* text on the dark end */
+  --radius: 8px;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--page);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --wash: rgba(255, 255, 255, 0.05);
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --up: #0ca30c;
+    --down: #e66767;
+    --warn: #fab219;
+    --seq-0: #184f95;
+    --seq-1: #cde2fb;
+    --seq-ink-lo: #f0efec;
+    --seq-ink-hi: #0b0b0b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--page);
+}
+a {
+  color: var(--accent);
+}
+h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+h2 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+p {
+  margin: 0 0 8px;
+}
+
+/* ---------- layout ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 100vh;
+}
+.nav {
+  border-right: 1px solid var(--border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.brand {
+  font-weight: 700;
+  font-size: 16px;
+  padding: 0 10px 16px;
+}
+.brand small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}
+.nav a {
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+.nav a:hover {
+  background: var(--wash);
+}
+.nav a.active {
+  background: var(--wash);
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav .foot {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0 10px;
+}
+main {
+  padding: 24px 28px 48px;
+  max-width: 1200px;
+  width: 100%;
+}
+.page-head {
+  margin-bottom: 20px;
+}
+.page-head p {
+  color: var(--ink-2);
+}
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .nav {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+  }
+  .brand {
+    width: 100%;
+    padding: 0 0 6px;
+  }
+  .nav .foot {
+    display: none;
+  }
+  main {
+    padding: 16px 16px 40px;
+  }
+}
+
+/* ---------- surfaces ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.empty {
+  color: var(--muted);
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* ---------- forms ---------- */
+form.params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  align-items: flex-end;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.field label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.field input,
+.field select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--axis);
+  border-radius: 6px;
+  padding: 6px 8px;
+  width: 120px;
+  font-size: 14px;
+}
+.field.wide input {
+  width: 220px;
+}
+.field input:focus-visible,
+.field select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+button {
+  font: inherit;
+  border-radius: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--axis);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+button.danger {
+  border-color: var(--down);
+  color: var(--down);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.error {
+  border: 1px solid var(--down);
+  color: var(--down);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 12px 0;
+}
+.notice {
+  border-left: 3px solid var(--accent);
+  padding: 8px 12px;
+  background: var(--wash);
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 16px;
+}
+
+/* ---------- figures ---------- */
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+.flat {
+  color: var(--ink-2);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.stat .k {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.stat .v {
+  font-size: 22px;
+  font-weight: 600;
+}
+.stat .s {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- tables ---------- */
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th,
+td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+}
+th {
+  font-weight: 500;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+tr.ref td {
+  color: var(--ink-2);
+  background: var(--wash);
+}
+
+/* ---------- charts ---------- */
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.legend .sw {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  vertical-align: middle;
+  margin-right: 5px;
+  border-radius: 1px;
+}
+.legend b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.chart {
+  height: 300px;
+  width: 100%;
+}
+.chart.tall {
+  height: 380px;
+}
+.chart.short {
+  height: 200px;
+}
+
+/* ---------- heatmap ---------- */
+.heat {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.heat .lab {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.heat .cell {
+  border-radius: 3px;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+.heat .cell.none {
+  background: transparent;
+}
+.heat .cell.best {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
