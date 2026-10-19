@@ -72,3 +72,11 @@ def test_unfinished_session_bar_dropped():
 
 def test_yahoo_symbols():
     assert data.yahoo_symbol("700") == "0700.HK" and data.yahoo_symbol("brk.b") == "BRK-B"
+
+
+def test_no_trades():
+    b = bars([10, 11, 12])
+    r = backtest.run(b, pd.Series(0, b.index), cash=100)
+    assert r.trades.empty and r.trades[r.trades["open"]].empty
+    s = metrics.summary(r)
+    assert s["trades"] == 0 and s["total"] == 0

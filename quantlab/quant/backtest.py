@@ -41,7 +41,8 @@ def run(bars, target, cash=10_000.0, fee=0.0, slippage_bps=5.0):
     if shares:
         trades.append(_trade(entry, dates[-1], closes[-1], shares * closes[-1], shares, True))
     cols = ["entry_date", "entry_price", "exit_date", "exit_price", "shares", "pnl", "return", "open"]
-    return Result(pd.Series(equity, bars.index), pd.Series(held, bars.index), pd.DataFrame(trades, columns=cols), start)
+    trades = pd.DataFrame(trades, columns=cols).astype({"open": bool})  # bool even with no trades, for filtering
+    return Result(pd.Series(equity, bars.index), pd.Series(held, bars.index), trades, start)
 
 
 def _trade(entry, exit_date, exit_px, proceeds, shares, still_open):

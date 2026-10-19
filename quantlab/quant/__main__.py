@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import backtest, data, metrics, scan, strategy
+from . import backtest, data, metrics, paper, scan, strategy
 
 REPORTS = Path(__file__).resolve().parent.parent / "reports"
 
@@ -158,6 +158,94 @@ def cmd_signal(a):
     print("\n信号只是策略的计算结果，是否下单由你自己决定。")
 
 
+def cmd_paper_new(a):
+    con = paper.connect()
+    try:
+        start = paper.create(con, a.name, a.symbols.split(","), {"fast": a.fast, "slow": a.slow}, a.cash, a.fee, a.slippage)
+    except ValueError as e:
+        sys.exit(str(e))
+    acct = next(x for x in paper.accounts(con) if x["name"] == a.name)
+    paper.record(con, acct)
+    print("\n已创建模拟账户 %s：%s，均线 %d/%d，初始资金 %s。" % (a.name, "、".join(acct["symbols"]), a.fast, a.slow, money(a.cash)))
+    print("第一批决定按 %s 的收盘价做出，下一个交易日开盘开始模拟成交。" % start)
+    print("以后每个交易日收盘后运行：python -m quant paper run")
+
+
+def cmd_paper_delete(a):
+    con = paper.connect()
+    if not paper.delete(con, a.name):
+        sys.exit("没有叫 %s 的模拟账户。" % a.name)
+    print("已删除模拟账户 %s 和它的全部决定记录。" % a.name)
+
+
+def cmd_paper_run(a):
+    con = paper.connect()
+    accts = [x for x in paper.accounts(con) if not a.name or x["name"] == a.name]
+    if not accts:
+        sys.exit("还没有模拟账户。先创建一个，例如：python -m quant paper new 核心 --symbols QQQM,VOO,MCD,PEP")
+    REPORTS.mkdir(exist_ok=True)
+    for acct in accts:
+        new = paper.record(con, acct)
+        report_paper(acct, new, paper.replay(con, acct))
+
+
+def report_paper(acct, new, rep):
+    n, p = len(acct["symbols"]), acct["params"]
+    print("\n模拟账户 %s · 均线 %d/%d · %s 收盘时开始 · 初始资金 %s（%d 只，每只 %s）" % (
+        acct["name"], p["fast"], p["slow"], acct["start"], money(acct["cash"]), n, money(acct["cash"] / n)))
+    if new:
+        print("本次记录了 %d 条新的决定（到 %s）。" % (len(new), max(x["date"] for x in new)))
+    rows = [("代码", "最新决定", "当前", "股数", "资产", "收益", "同期买入持有")]
+    total = bench_total = 0.0
+    pending, fills, curves = [], [], []
+    for sym, r in rep.items():
+        sig, res, bench, cash = r["signals"], r["result"], r["bench"], r["cash"]
+        last = sig.iloc[-1]
+        held = int(res.in_market.iloc[-1]) if res else 0
+        shares = int(res.trades[res.trades["open"]]["shares"].sum()) if res else 0
+        value = res.equity.iloc[-1] if res else cash
+        bvalue = bench.equity.iloc[-1] if bench else cash
+        total, bench_total = total + value, bench_total + bvalue
+        rows.append((sym, "%s（%s）" % ("持有" if last["target"] else "空仓", sig.index[-1].strftime("%m-%d")),
+                     "持有" if held else "空仓", "%d" % shares, money(value), pct(value / cash - 1), pct(bvalue / cash - 1)))
+        if last["target"] != held:
+            note = ""
+            if last["target"] and cash < r["bars"]["close"].iloc[-1]:
+                note = "，但这一份资金不够买 1 股，不会成交"
+            pending.append("  %s：下一个交易日开盘%s（%s 收盘后的决定%s）" % (
+                sym, "买入" if last["target"] else "卖出", sig.index[-1].date(), note))
+        if res:
+            for _, t in res.trades.iterrows():
+                fills.append((t["entry_date"], "买入", sym, t["shares"], t["entry_price"]))
+                if not t["open"]:
+                    fills.append((t["exit_date"], "卖出", sym, t["shares"], t["exit_price"]))
+            curves.append(pd.DataFrame({sym + "_策略": res.equity, sym + "_买入持有": bench.equity}))
+    rows.append(("合计", "", "", "", money(total), pct(total / acct["cash"] - 1), pct(bench_total / acct["cash"] - 1)))
+    table(rows)
+    if not curves:
+        print("\n还没有成交日：下一个交易日开盘后开始模拟。")
+    if pending:
+        print("\n待执行：")
+        print("\n".join(pending))
+    if fills:
+        print("\n最近成交（价格为复权价）：")
+        for d, side, sym, sh, px in sorted(fills, key=lambda f: f[0], reverse=True)[:5]:
+            print("  %s %s %s %d 股 @ %.2f" % (d.date(), side, sym, sh, px))
+    if curves:
+        # US and Hong Kong trade on different days: carry each value forward, before the first open it is cash
+        df = pd.concat(curves, axis=1).sort_index().ffill()
+        for sym, r in rep.items():
+            for col in (sym + "_策略", sym + "_买入持有"):
+                if col not in df:
+                    df[col] = r["cash"]
+        df = df.fillna({c: rep[c.rsplit("_", 1)[0]]["cash"] for c in df.columns})
+        df["策略合计"] = df[[c for c in df.columns if c.endswith("_策略")]].sum(axis=1)
+        df["买入持有合计"] = df[[c for c in df.columns if c.endswith("_买入持有")]].sum(axis=1)
+        path = REPORTS / ("paper_%s.csv" % acct["name"])
+        df.to_csv(path, index_label="date", float_format="%.2f", encoding="utf-8-sig")
+        print("\n每日资产：reports/%s" % path.name)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="python -m quant", description="均线交叉策略：回测和每日信号")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -201,6 +289,24 @@ def main(argv=None):
     sg.add_argument("symbols", nargs="+")
     common(sg)
     sg.set_defaults(fn=cmd_signal)
+
+    pp = sub.add_parser("paper", help="模拟盘：每天记录策略的决定，跟踪模拟账户")
+    psub = pp.add_subparsers(dest="paper_cmd", required=True)
+    pn = psub.add_parser("new", help="创建模拟账户")
+    pn.add_argument("name", help="账户名称，如 核心")
+    pn.add_argument("--symbols", required=True, help="股票代码，逗号分隔，如 QQQM,VOO,MCD,PEP")
+    pn.add_argument("--fast", type=int, default=50, help="短均线天数（默认 50）")
+    pn.add_argument("--slow", type=int, default=200, help="长均线天数（默认 200）")
+    pn.add_argument("--cash", type=float, default=10_000, help="初始资金，美元，平均分给每只股票（默认 10000）")
+    pn.add_argument("--fee", type=float, default=0, help="每笔手续费，美元（默认 0）")
+    pn.add_argument("--slippage", type=float, default=5, help="滑点，基点（默认 5）")
+    pn.set_defaults(fn=cmd_paper_new)
+    pr = psub.add_parser("run", help="记录最新的决定并显示账户（每个交易日收盘后运行）")
+    pr.add_argument("name", nargs="?", help="只看这个账户（默认全部）")
+    pr.set_defaults(fn=cmd_paper_run)
+    pd_ = psub.add_parser("delete", help="删除模拟账户和它的全部记录")
+    pd_.add_argument("name")
+    pd_.set_defaults(fn=cmd_paper_delete)
 
     a = p.parse_args(argv)
     a.fn(a)
