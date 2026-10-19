@@ -5,6 +5,7 @@ import { type Account as AccountT, api, post, type RecordResult } from "../api/c
 import TimeChart, { type Line } from "../components/TimeChart";
 import { ErrorBox, PageHead, Signed, Stat } from "../components/ui";
 import { money } from "../lib/format";
+import { describe } from "./Paper";
 
 const fmtMoney = (v: number) => money(v);
 
@@ -42,12 +43,11 @@ export default function Account() {
 
   if (acct.error) return (<><PageHead title={name} /><ErrorBox error={acct.error} /><Link to="/paper">返回模拟盘</Link></>);
   if (!a) return <p className="empty">正在读取…</p>;
-  const p = a.params as { fast: number; slow: number };
 
   return (
     <>
       <PageHead title={`模拟账户 · ${a.name}`}>
-        {a.symbols.join("、")} · 均线 {p.fast}/{p.slow} · {a.start} 收盘时开始 · 初始资金 {money(a.cash)}（每只 {money(a.cash / a.symbols.length)}）
+        {a.symbols.join("、")} · {describe(a)} · {a.start} 收盘时开始 · 初始资金 {money(a.cash)}（每只 {money(a.cash / a.symbols.length)}）
       </PageHead>
       <div className="card">
         <div className="stats">

@@ -1,6 +1,7 @@
 """The FastAPI application: routes, error mapping, security headers, request logging and the web workbench."""
 import logging
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -9,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import __version__
+from ..ai.jobs import Worker
 from ..config import get_settings
 from ..errors import QuantLabError
 from .routes import api, public
@@ -19,8 +21,24 @@ CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
        "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 
 
-def create_app():
-    app = FastAPI(title="QuantLab API", version=__version__, docs_url="/api/docs", redoc_url=None,
+def create_app(worker=None, scheduler=None):
+    """The application. The AI worker and the daily scheduler start with it and stop when it shuts down;
+    tests can pass their own."""
+    from ..scheduler import Scheduler
+
+    worker = worker or Worker()
+    scheduler = scheduler or Scheduler(worker)
+
+    @asynccontextmanager
+    async def lifespan(app):
+        worker.start()
+        if get_settings().schedule_enabled:
+            scheduler.start()
+        yield
+        scheduler.stop()
+        worker.stop()
+
+    app = FastAPI(title="QuantLab API", version=__version__, docs_url="/api/docs", redoc_url=None, lifespan=lifespan,
                   openapi_url="/api/openapi.json",
                   description="回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。")
 
@@ -48,6 +66,8 @@ def create_app():
             response.headers["Cache-Control"] = "no-store"
             log.info("%s %s %d %.0fms", request.method, request.url.path, response.status_code, (time.perf_counter() - t0) * 1000)
         return response
+
+    app.state.worker, app.state.scheduler = worker, scheduler
 
     origins = get_settings().cors_origins
     if origins:

@@ -3,13 +3,16 @@
 Handlers are plain functions, so FastAPI runs them in its thread pool: downloads and backtests do not block
 other requests."""
 import math
+import threading
 
 import pandas as pd
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from .. import __version__
+from ..ai import engine, ledger
+from ..config import get_settings
 from ..core import data, paper, research
-from ..errors import InvalidInput, QuantLabError
+from ..errors import Conflict, InvalidInput, QuantLabError
 from . import schemas as s
 from .security import require_token
 
@@ -129,11 +132,15 @@ def list_accounts():
 
 @api.post("/paper/accounts", response_model=s.Account, status_code=201, tags=["paper"], summary="创建模拟账户")
 def create_account(req: s.AccountCreate):
-    if req.fast >= req.slow:
-        raise InvalidInput("短均线天数要小于长均线天数")
+    if req.strategy == "ma_cross":
+        if req.fast >= req.slow:
+            raise InvalidInput("短均线天数要小于长均线天数")
+        params = {"fast": req.fast, "slow": req.slow}
+    else:
+        params = {"every_days": req.every_days}
 
     def go(con):
-        paper.create(con, req.name, req.symbols, {"fast": req.fast, "slow": req.slow}, req.cash, req.fee, req.slippage)
+        paper.create(con, req.name, req.symbols, params, req.cash, req.fee, req.slippage, kind=req.strategy)
         acct = paper.get_account(con, req.name)
         paper.record(con, acct)
         return account(paper.summarize(acct, paper.replay(con, acct)), True)
@@ -165,3 +172,57 @@ def delete_account(name: str):
         paper.delete(con, name)
     _with_paper(go)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- AI research
+
+def _with_ai(fn):
+    con = ledger.connect()
+    try:
+        return fn(con)
+    finally:
+        con.close()
+
+
+def ai_run(run):
+    return {**run, "cost_cny": run["cost_usd"] * get_settings().ai_usd_cny}
+
+
+@api.get("/ai/status", response_model=s.AiStatus, tags=["ai"], summary="AI 组件、预算和定时任务的状态")
+def ai_status(request: Request):
+    st = get_settings()
+    return {
+        "available": engine.available(), "configured": engine.configured(), "provider": st.ai_provider,
+        "quick_model": st.ai_quick_model, "deep_model": st.ai_deep_model, "analysts": st.ai_analysts, "language": st.ai_language,
+        "budget": _with_ai(ledger.budget), "schedule": request.app.state.scheduler.status(),
+    }
+
+
+@api.get("/ai/runs", response_model=list[s.AiRun], tags=["ai"], summary="AI 分析记录")
+def ai_runs(symbol: str | None = None, limit: int = Query(50, ge=1, le=500)):
+    sym = data.normalize(symbol) if symbol else None
+    return [ai_run(r) for r in _with_ai(lambda con: ledger.runs(con, sym, limit))]
+
+
+@api.post("/ai/runs", response_model=s.AiRun, status_code=202, tags=["ai"], summary="提交一次 AI 分析（最近一个收盘日）")
+def ai_create_run(req: s.AiRunCreate, request: Request):
+    engine.require_ready()
+    sym = data.normalize(req.symbol)
+    trade_date = data.load(sym).index[-1].date().isoformat()  # only the latest close: no back-filled analyses
+    run = _with_ai(lambda con: ledger.get(con, ledger.enqueue(con, sym, trade_date, "manual"), with_reports=False))
+    request.app.state.worker.wake()
+    return ai_run(run)
+
+
+@api.get("/ai/runs/{run_id}", response_model=s.AiRun, tags=["ai"], summary="AI 分析详情和报告")
+def ai_get_run(run_id: int):
+    return ai_run(_with_ai(lambda con: ledger.get(con, run_id)))
+
+
+@api.post("/schedule/run", status_code=202, tags=["system"], summary="立即运行每日任务（AI 分析 + 记录模拟账户）")
+def schedule_run(request: Request):
+    sched = request.app.state.scheduler
+    if sched.status()["running"]:
+        raise Conflict("每日任务正在运行")
+    threading.Thread(target=sched.run_daily, name="daily-manual", daemon=True).start()
+    return {"status": "started"}

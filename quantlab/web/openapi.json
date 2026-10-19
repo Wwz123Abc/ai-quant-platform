@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "paths": {
     "/api/health": {
@@ -641,6 +641,298 @@
           }
         }
       }
+    },
+    "/api/ai/status": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "AI 组件、预算和定时任务的状态",
+        "operationId": "ai_status_api_ai_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/runs": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "AI 分析记录",
+        "operationId": "ai_runs_api_ai_runs_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiRun"
+                  },
+                  "title": "Response Ai Runs Api Ai Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "提交一次 AI 分析（最近一个收盘日）",
+        "operationId": "ai_create_run_api_ai_runs_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiRunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "AI 分析详情和报告",
+        "operationId": "ai_get_run_api_ai_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schedule/run": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "立即运行每日任务（AI 分析 + 记录模拟账户）",
+        "operationId": "schedule_run_api_schedule_run_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -802,11 +1094,21 @@
               ]
             ]
           },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "ma_cross",
+              "ai_rating"
+            ],
+            "title": "Strategy",
+            "default": "ma_cross"
+          },
           "fast": {
             "type": "integer",
             "maximum": 400.0,
             "minimum": 2.0,
             "title": "Fast",
+            "description": "均线账户：短均线天数",
             "default": 50
           },
           "slow": {
@@ -814,7 +1116,16 @@
             "maximum": 500.0,
             "minimum": 3.0,
             "title": "Slow",
+            "description": "均线账户：长均线天数",
             "default": 200
+          },
+          "every_days": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Every Days",
+            "description": "AI 账户：每隔多少天重新分析一次",
+            "default": 7
           }
         },
         "type": "object",
@@ -823,6 +1134,297 @@
           "symbols"
         ],
         "title": "AccountCreate"
+      },
+      "AiBudget": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "budget_cny": {
+            "type": "number",
+            "title": "Budget Cny"
+          },
+          "usd_cny": {
+            "type": "number",
+            "title": "Usd Cny"
+          },
+          "spent_cny": {
+            "type": "number",
+            "title": "Spent Cny"
+          },
+          "estimate_cny": {
+            "type": "number",
+            "title": "Estimate Cny"
+          },
+          "committed_cny": {
+            "type": "number",
+            "title": "Committed Cny"
+          },
+          "remaining_cny": {
+            "type": "number",
+            "title": "Remaining Cny"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "budget_cny",
+          "usd_cny",
+          "spent_cny",
+          "estimate_cny",
+          "committed_cny",
+          "remaining_cny",
+          "queued",
+          "running"
+        ],
+        "title": "AiBudget"
+      },
+      "AiRun": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "trade_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Trade Date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "quick_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quick Model"
+          },
+          "deep_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deep Model"
+          },
+          "llm_calls": {
+            "type": "integer",
+            "title": "Llm Calls"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_cached": {
+            "type": "integer",
+            "title": "Tokens Cached"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "cost_cny": {
+            "type": "number",
+            "title": "Cost Cny"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created"
+          },
+          "started": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started"
+          },
+          "finished": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "reports": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Report"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "trade_date",
+          "status",
+          "source",
+          "rating",
+          "quick_model",
+          "deep_model",
+          "llm_calls",
+          "tokens_in",
+          "tokens_cached",
+          "tokens_out",
+          "cost_usd",
+          "cost_cny",
+          "created",
+          "started",
+          "finished",
+          "error"
+        ],
+        "title": "AiRun"
+      },
+      "AiRunCreate": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Symbol",
+            "examples": [
+              "QQQM"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "title": "AiRunCreate"
+      },
+      "AiStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "是否安装了 AI 组件"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "description": "是否配置了大模型密钥（只检查是否存在）"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "quick_model": {
+            "type": "string",
+            "title": "Quick Model"
+          },
+          "deep_model": {
+            "type": "string",
+            "title": "Deep Model"
+          },
+          "analysts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analysts"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/AiBudget"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "configured",
+          "provider",
+          "quick_model",
+          "deep_model",
+          "analysts",
+          "language",
+          "budget",
+          "schedule"
+        ],
+        "title": "AiStatus"
       },
       "BacktestRequest": {
         "properties": {
@@ -1339,6 +1941,24 @@
         ],
         "title": "RecordResult"
       },
+      "Report": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "text"
+        ],
+        "title": "Report"
+      },
       "ScanRequest": {
         "properties": {
           "start": {
@@ -1627,6 +2247,55 @@
           "oos_trades"
         ],
         "title": "ScanRow"
+      },
+      "Schedule": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "last_result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Result"
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "time",
+          "last_run",
+          "last_result",
+          "running"
+        ],
+        "title": "Schedule"
       },
       "SignalItem": {
         "properties": {

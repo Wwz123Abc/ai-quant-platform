@@ -19,6 +19,11 @@ src/quantlab/core/                 领域层：不依赖 Web 或命令行
   research.py   回测、扫描、信号三个工作流，供命令行和接口共用
   paper.py      模拟盘：不可改写的每日决定 + 从决定重放账户
   charts.py     命令行用的 matplotlib 图表
+src/quantlab/ai/                   AI 研究（可选依赖 quantlab[ai]）
+  engine.py     TradingAgents 适配器：配置转换、按模型统计 token、计算费用
+  ledger.py     分析记录、每月预算、准入检查（SQLite：ai.db）
+  jobs.py       后台单线程任务：一次一个，运行前再查一次预算
+src/quantlab/scheduler.py          每日任务：到期的 AI 分析 → 记录所有模拟账户
         │
         ▼
 src/quantlab/storage.py            SQLite 连接 + 版本化迁移（PRAGMA user_version）
@@ -41,6 +46,9 @@ src/quantlab/errors.py             领域错误 → HTTP 状态码
 | 模拟盘的决定写入后不可修改 | 前向测试不能事后改参数 | `test_one_decision_per_close_and_never_rewritten` |
 | 补录的决定与按时记录的完全一致 | 每个决定只看当天及以前的数据 | `test_late_decisions_match_on_time_ones` |
 | 参数扫描的所有组合用同一段日期比较 | 公平比较 | `test_windows_split_after_warm_up_without_overlap` |
+| AI 只分析最近一个收盘日，不回溯 | 模型训练数据可能包含“未来” | 接口按最新收盘日提交 |
+| 之后的 AI 评级不能改变已经记录的决定 | 前向测试 | `test_ai_account_waits_for_pending_analysis_and_never_looks_ahead` |
+| 超出预算的分析不提交、不运行 | 费用可控 | `test_budget_counts_spending_and_queued_runs`、`test_worker_rechecks_budget_before_running` |
 
 ## 安全模型
 
@@ -51,12 +59,14 @@ src/quantlab/errors.py             领域错误 → HTTP 状态码
 - 股票代码在进入 URL 或数据库之前，先按白名单格式校验；静态文件服务拒绝访问 web 目录以外的路径。
 - 代码库里不保存任何密钥；`.env` 在 `.gitignore` 中。
 - 不会执行用户或大模型提供的代码；不包含实盘下单功能。
+- 大模型的密钥只从环境变量或 `.env` 读取；接口只报告“是否已配置”，从不读取或返回密钥的值。
+- AI 报告是不可信的模型输出：网页用 react-markdown 渲染，丢弃原始 HTML，并清理链接。
 
 ## 与上游开源项目的关系
 
 | 项目 | 采用方式 | 原因 |
 | --- | --- | --- |
-| [TradingAgents](https://github.com/TauricResearch/TradingAgents)（Apache-2.0） | 计划作为**锁定版本的依赖**，通过适配层接入（第二批） | 代码质量高、更新频繁；复制源码会收不到上游修复 |
+| [TradingAgents](https://github.com/TauricResearch/TradingAgents)（Apache-2.0） | **锁定提交的可选依赖**（`quantlab[ai]`，提交 e8f5503），通过 `ai/engine.py` 适配 | 代码质量高、更新频繁；复制源码会收不到上游修复。升级时修改 pyproject 里的提交哈希，跑完测试后再合并 |
 | [DeltaFStation](https://github.com/Delta-F/deltafstation) / [deltafq](https://github.com/Delta-F/deltafq)（MIT） | **只借鉴功能设计，不复制代码** | 审阅时发现：仓库里写死了 API 密钥；默认在 0.0.0.0 上开启 Flask 调试模式；AI 工具会把大模型生成的代码写成文件并执行；回测按信号当天的收盘价成交，滑点参数未生效；依赖 pandas 2，与 TradingAgents 要求的 pandas 3 冲突 |
 
 借鉴 DeltaFStation 的部分：网页工作台的页面划分（回测、交易/模拟、策略运行、AI 助手）、模拟账户的概念、MCP 和 AI 工具调用的思路（后续批次）。

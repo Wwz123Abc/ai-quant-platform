@@ -11,6 +11,8 @@ export type SignalItem = S["SignalItem"];
 export type Account = S["Account"];
 export type AccountCreate = S["AccountCreate"];
 export type RecordResult = S["RecordResult"];
+export type AiStatus = S["AiStatus"];
+export type AiRun = S["AiRun"];
 
 const TOKEN_KEY = "quantlab.token";
 let memoryToken: string | null = null; // fallback when session storage is blocked

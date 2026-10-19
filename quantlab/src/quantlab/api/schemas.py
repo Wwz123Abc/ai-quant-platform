@@ -158,8 +158,10 @@ class Bars(BaseModel):
 class AccountCreate(Costs):
     name: str = Field(min_length=1, max_length=40, examples=["核心"])
     symbols: list[str] = Field(min_length=1, max_length=20, examples=[["QQQM", "VOO"]])
-    fast: int = Field(50, ge=2, le=400)
-    slow: int = Field(200, ge=3, le=500)
+    strategy: Literal["ma_cross", "ai_rating"] = "ma_cross"
+    fast: int = Field(50, ge=2, le=400, description="均线账户：短均线天数")
+    slow: int = Field(200, ge=3, le=500, description="均线账户：长均线天数")
+    every_days: int = Field(7, ge=1, le=60, description="AI 账户：每隔多少天重新分析一次")
 
 
 class Position(BaseModel):
@@ -223,3 +225,66 @@ class RecordResult(BaseModel):
 class Health(BaseModel):
     status: Literal["ok"]
     version: str
+
+
+class AiBudget(BaseModel):
+    month: str
+    budget_cny: float
+    usd_cny: float
+    spent_cny: float
+    estimate_cny: float
+    committed_cny: float
+    remaining_cny: float
+    queued: int
+    running: int
+
+
+class Schedule(BaseModel):
+    enabled: bool
+    time: str
+    last_run: dt.date | None
+    last_result: dict | None
+    running: bool
+
+
+class AiStatus(BaseModel):
+    available: bool = Field(description="是否安装了 AI 组件")
+    configured: bool = Field(description="是否配置了大模型密钥（只检查是否存在）")
+    provider: str
+    quick_model: str
+    deep_model: str
+    analysts: list[str]
+    language: str
+    budget: AiBudget
+    schedule: Schedule
+
+
+class AiRunCreate(BaseModel):
+    symbol: str = Symbol
+
+
+class Report(BaseModel):
+    title: str
+    text: str
+
+
+class AiRun(BaseModel):
+    id: int
+    symbol: str
+    trade_date: dt.date
+    status: Literal["queued", "running", "done", "failed"]
+    source: str
+    rating: str | None
+    quick_model: str | None
+    deep_model: str | None
+    llm_calls: int
+    tokens_in: int
+    tokens_cached: int
+    tokens_out: int
+    cost_usd: float
+    cost_cny: float
+    created: dt.datetime
+    started: dt.datetime | None
+    finished: dt.datetime | None
+    error: str | None
+    reports: dict[str, Report] | None = None

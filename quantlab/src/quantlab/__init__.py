@@ -1,3 +1,3 @@
 """QuantLab: a research workstation for US and Hong Kong stocks: backtests, out-of-sample scans and paper trading."""
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

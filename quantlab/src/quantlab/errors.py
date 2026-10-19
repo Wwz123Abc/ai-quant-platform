@@ -20,3 +20,13 @@ class Conflict(QuantLabError, ValueError):
 class DataSourceError(QuantLabError):
     """The market data provider failed or could not be reached."""
     status = 502
+
+
+class BudgetExceeded(QuantLabError):
+    """The monthly AI budget would be exceeded."""
+    status = 402
+
+
+class Unavailable(QuantLabError):
+    """A feature needs something that is not installed or configured."""
+    status = 503

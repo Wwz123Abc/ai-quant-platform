@@ -401,3 +401,62 @@ tr.ref td {
   outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
+
+/* ---------- meter ---------- */
+.meter {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--grid);
+  overflow: hidden;
+  margin: 6px 0 2px;
+}
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+.meter.over span {
+  background: var(--down);
+}
+
+/* ---------- AI reports ---------- */
+.report {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.report h1,
+.report h2,
+.report h3 {
+  font-size: 15px;
+  margin: 16px 0 8px;
+}
+.report table {
+  margin: 8px 0;
+  font-size: 13px;
+}
+.report td,
+.report th {
+  white-space: normal;
+}
+.report code {
+  background: var(--wash);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+details.report-section {
+  border-top: 1px solid var(--grid);
+  padding: 10px 0;
+}
+details.report-section summary {
+  cursor: pointer;
+  font-weight: 600;
+}

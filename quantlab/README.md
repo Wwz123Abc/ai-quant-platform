@@ -6,6 +6,7 @@
 - **回测**：按收盘价算信号，**下一个交易日开盘成交**，计入滑点和手续费、按整股成交，并和同期“买入持有”对比。
 - **样本外检验**：在前一段历史上挑参数，在后一段历史上检验，判断“最优参数”是不是过拟合。
 - **模拟盘**：每个交易日收盘后记录策略的决定，写入后不可修改，是真正的前向测试。
+- **AI 研报**：接入 [TradingAgents](https://github.com/TauricResearch/TradingAgents) 多智能体（分析师 → 多空辩论 → 交易员 → 风控），给出 5 档评级和完整报告；按 token 记账，每月预算硬上限；AI 评级可以作为模拟账户的信号来源，和均线策略、买入持有放在一起比较。
 - **工程化**：分层架构、FastAPI 接口（自动生成 OpenAPI 文档）、React + TypeScript 工作台、访问令牌、安全响应头、数据库迁移、单元测试和接口测试、CI、Docker。
 
 > 仅用于学习和研究，不会下单，也不构成投资建议。回测结果不代表未来表现。
@@ -39,7 +40,8 @@ python -m quantlab serve
 | 总览 | 模拟账户的收益，以及持仓股票最新的均线信号 |
 | 均线回测 | 价格与均线（标出买卖点）、账户价值、回撤、指标对比、交易明细 |
 | 参数扫描 | 样本内和样本外两张热力图（同一色阶）、排名表，以及自动生成的结论 |
-| 模拟盘 | 创建账户、记录每日决定、持仓、待执行订单、账户价值曲线、成交记录 |
+| 模拟盘 | 创建账户（均线或 AI 评级）、记录每日决定、持仓、待执行订单、账户价值曲线、成交记录 |
+| AI 研报 | 本月预算和花费、新建分析、分析记录（评级、token、费用）、完整报告、立即运行每日任务 |
 
 ## 命令行
 
@@ -91,6 +93,30 @@ QQQ  均线 50/200  2005-01-03 → 2026-10-16（21.8 年）
 schtasks /create /tn "QuantLab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 07:30 /tr "cmd /c cd /d C:\path\to\quant-lab && python -m quantlab paper run >> paper.log 2>&1"
 ```
 
+## AI 研报
+
+安装 AI 组件（TradingAgents 锁定在一个审阅过的提交上），然后在 `.env` 里填密钥（见 [.env.example](.env.example)）：
+
+```bash
+pip install -e ".[ai]"
+```
+
+```
+DEEPSEEK_API_KEY=你的密钥
+```
+
+```bash
+python -m quantlab ai status
+python -m quantlab ai analyze QQQM
+python -m quantlab paper new AI --symbols QQQM,VOO --strategy ai --every 7
+```
+
+- **只分析最近一个收盘日，不回溯历史。** 大模型训练时可能已经读过那段历史的新闻，回溯分析等于开卷考试。
+- **费用台账和预算：** 每次分析按模型分别记录调用次数、输入（含缓存命中）和输出 token，按官方价格表计算费用；统一按高峰价计，宁可多算。提交前和开始运行前各检查一次预算，超出就不运行。失败的分析也会记入已经用掉的 token。
+- **一次只跑一个分析**，服务重启时把中断的任务标记为失败，不会重复扣费。
+- **AI 模拟账户：** 买入、增持 → 持有；卖出、减持 → 空仓；持有 → 维持原状；还没有评级时空仓。某一天的分析还在排队或运行时，那天的决定会等它完成再记录。
+- **每日任务：** `serve` 运行时，每周二至周六北京时间 7:30 以后自动执行：先分析到期的股票，再给所有模拟账户记录决定。不开服务时，也可以用 `python -m quantlab schedule run` 配合 Windows 任务计划程序运行。
+
 ## 接口
 
 除 `/api/health` 外，所有接口都需要请求头 `Authorization: Bearer <令牌>`。
@@ -106,8 +132,12 @@ schtasks /create /tn "QuantLab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 
 | GET / POST | `/api/paper/accounts` | 列出 / 创建模拟账户 |
 | GET / DELETE | `/api/paper/accounts/{name}` | 账户详情 / 删除 |
 | POST | `/api/paper/accounts/{name}/record` | 记录最新的决定 |
+| GET | `/api/ai/status` | AI 组件、密钥是否配置、本月预算、每日任务状态 |
+| GET / POST | `/api/ai/runs` | 分析记录 / 提交分析（202，后台运行） |
+| GET | `/api/ai/runs/{id}` | 分析详情和完整报告 |
+| POST | `/api/schedule/run` | 立即运行每日任务 |
 
-错误统一返回 `{"detail": "说明"}`：参数不对是 400 或 422，找不到是 404，名字重复是 409，行情源出错是 502。
+错误统一返回 `{"detail": "说明"}`：参数不对是 400 或 422，超出 AI 预算是 402，找不到是 404，重复是 409，行情源出错是 502，AI 组件未安装或未配置是 503。
 
 ## 配置
 
@@ -156,6 +186,8 @@ docker compose up -d --build
 ```
 src/quantlab/
   core/        领域层：数据、策略、回测、指标、扫描、模拟盘（不依赖 Web）
+  ai/          AI 研究：TradingAgents 适配器、费用台账和预算、后台任务
+  scheduler.py 每日任务
   api/         FastAPI 接口：路由、请求和响应模型、令牌校验
   cli.py       命令行
   config.py    配置        errors.py  领域错误       storage.py  SQLite 迁移
@@ -171,8 +203,8 @@ docs/          架构说明和图片
 - [x] 回测、参数扫描与样本外检验、每日信号
 - [x] 模拟盘（不可改写的每日决定）
 - [x] 接口服务和网页工作台
-- [ ] AI 研究层：以锁定版本的依赖接入 TradingAgents，加入费用预算和费用台账，AI 评级作为模拟盘的信号来源
-- [ ] 服务内置定时任务（每个交易日自动记录）
+- [x] AI 研究层：以锁定版本的依赖接入 TradingAgents，费用台账和每月预算，AI 评级作为模拟盘的信号来源
+- [x] 服务内置定时任务（每个交易日自动分析和记录）
 - [ ] 滚动检验（walk-forward）、更多策略、组合回测
 
 ## 许可

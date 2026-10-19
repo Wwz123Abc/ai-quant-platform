@@ -159,6 +159,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI 组件、预算和定时任务的状态 */
+        get: operations["ai_status_api_ai_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI 分析记录 */
+        get: operations["ai_runs_api_ai_runs_get"];
+        put?: never;
+        /** 提交一次 AI 分析（最近一个收盘日） */
+        post: operations["ai_create_run_api_ai_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI 分析详情和报告 */
+        get: operations["ai_get_run_api_ai_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/schedule/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 立即运行每日任务（AI 分析 + 记录模拟账户） */
+        post: operations["schedule_run_api_schedule_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -236,15 +305,135 @@ export interface components {
              */
             symbols: string[];
             /**
+             * Strategy
+             * @default ma_cross
+             * @enum {string}
+             */
+            strategy: "ma_cross" | "ai_rating";
+            /**
              * Fast
+             * @description 均线账户：短均线天数
              * @default 50
              */
             fast: number;
             /**
              * Slow
+             * @description 均线账户：长均线天数
              * @default 200
              */
             slow: number;
+            /**
+             * Every Days
+             * @description AI 账户：每隔多少天重新分析一次
+             * @default 7
+             */
+            every_days: number;
+        };
+        /** AiBudget */
+        AiBudget: {
+            /** Month */
+            month: string;
+            /** Budget Cny */
+            budget_cny: number;
+            /** Usd Cny */
+            usd_cny: number;
+            /** Spent Cny */
+            spent_cny: number;
+            /** Estimate Cny */
+            estimate_cny: number;
+            /** Committed Cny */
+            committed_cny: number;
+            /** Remaining Cny */
+            remaining_cny: number;
+            /** Queued */
+            queued: number;
+            /** Running */
+            running: number;
+        };
+        /** AiRun */
+        AiRun: {
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Trade Date
+             * Format: date
+             */
+            trade_date: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "done" | "failed";
+            /** Source */
+            source: string;
+            /** Rating */
+            rating: string | null;
+            /** Quick Model */
+            quick_model: string | null;
+            /** Deep Model */
+            deep_model: string | null;
+            /** Llm Calls */
+            llm_calls: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Cached */
+            tokens_cached: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /** Cost Cny */
+            cost_cny: number;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Started */
+            started: string | null;
+            /** Finished */
+            finished: string | null;
+            /** Error */
+            error: string | null;
+            /** Reports */
+            reports?: {
+                [key: string]: components["schemas"]["Report"];
+            } | null;
+        };
+        /** AiRunCreate */
+        AiRunCreate: {
+            /**
+             * Symbol
+             * @example QQQM
+             */
+            symbol: string;
+        };
+        /** AiStatus */
+        AiStatus: {
+            /**
+             * Available
+             * @description 是否安装了 AI 组件
+             */
+            available: boolean;
+            /**
+             * Configured
+             * @description 是否配置了大模型密钥（只检查是否存在）
+             */
+            configured: boolean;
+            /** Provider */
+            provider: string;
+            /** Quick Model */
+            quick_model: string;
+            /** Deep Model */
+            deep_model: string;
+            /** Analysts */
+            analysts: string[];
+            /** Language */
+            language: string;
+            budget: components["schemas"]["AiBudget"];
+            schedule: components["schemas"]["Schedule"];
         };
         /** BacktestRequest */
         BacktestRequest: {
@@ -453,6 +642,13 @@ export interface components {
             latest: string | null;
             account: components["schemas"]["Account"];
         };
+        /** Report */
+        Report: {
+            /** Title */
+            title: string;
+            /** Text */
+            text: string;
+        };
         /** ScanRequest */
         ScanRequest: {
             /** Start */
@@ -578,6 +774,21 @@ export interface components {
             is_trades: number;
             /** Oos Trades */
             oos_trades: number;
+        };
+        /** Schedule */
+        Schedule: {
+            /** Enabled */
+            enabled: boolean;
+            /** Time */
+            time: string;
+            /** Last Run */
+            last_run: string | null;
+            /** Last Result */
+            last_result: {
+                [key: string]: unknown;
+            } | null;
+            /** Running */
+            running: boolean;
         };
         /** SignalItem */
         SignalItem: {
@@ -1042,6 +1253,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_status_api_ai_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_runs_api_ai_runs_get: {
+        parameters: {
+            query?: {
+                symbol?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_create_run_api_ai_runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiRunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_get_run_api_ai_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_run_api_schedule_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

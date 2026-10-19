@@ -134,15 +134,22 @@ def cmd_signal(a):
     print("\n信号只是策略的计算结果，是否下单由你自己决定。")
 
 
+def describe(acct):
+    p = acct["params"]
+    return "AI 评级（每 %d 天分析一次）" % p["every_days"] if acct["strategy"] == "ai_rating" else "均线 %d/%d" % (p["fast"], p["slow"])
+
+
 def cmd_paper_new(a):
+    kind = "ai_rating" if a.strategy == "ai" else "ma_cross"
+    params = {"every_days": a.every} if kind == "ai_rating" else {"fast": a.fast, "slow": a.slow}
     con = paper.connect()
     try:
-        start = paper.create(con, a.name, a.symbols.split(","), {"fast": a.fast, "slow": a.slow}, a.cash, a.fee, a.slippage)
+        start = paper.create(con, a.name, a.symbols.split(","), params, a.cash, a.fee, a.slippage, kind=kind)
         acct = paper.get_account(con, a.name)
         paper.record(con, acct)
     finally:
         con.close()
-    print("\n已创建模拟账户 %s：%s，均线 %d/%d，初始资金 %s。" % (a.name, "、".join(acct["symbols"]), a.fast, a.slow, money(a.cash)))
+    print("\n已创建模拟账户 %s：%s，%s，初始资金 %s。" % (a.name, "、".join(acct["symbols"]), describe(acct), money(a.cash)))
     print("第一批决定按 %s 的收盘价做出，下一个交易日开盘开始模拟成交。" % start)
     print("以后每个交易日收盘后运行：quantlab paper run")
 
@@ -171,9 +178,9 @@ def cmd_paper_run(a):
 
 
 def report_paper(s, new):
-    n, p = len(s["symbols"]), s["params"]
-    print("\n模拟账户 %s · 均线 %d/%d · %s 收盘时开始 · 初始资金 %s（%d 只，每只 %s）" % (
-        s["name"], p["fast"], p["slow"], s["start"], money(s["cash"]), n, money(s["cash"] / n)))
+    n = len(s["symbols"])
+    print("\n模拟账户 %s · %s · %s 收盘时开始 · 初始资金 %s（%d 只，每只 %s）" % (
+        s["name"], describe(s), s["start"], money(s["cash"]), n, money(s["cash"] / n)))
     if new:
         print("本次记录了 %d 条新的决定（到 %s）。" % (len(new), max(x["date"] for x in new)))
     rows = [("代码", "最新决定", "当前", "股数", "资产", "收益", "同期买入持有")]
@@ -199,6 +206,86 @@ def report_paper(s, new):
         s["equity"].rename(columns={"strategy": "策略", "benchmark": "买入持有"}).to_csv(
             path, index_label="date", float_format="%.2f", encoding="utf-8-sig")
         print("\n每日资产：%s" % path)
+
+
+def cny(v):
+    return "¥%.2f" % v
+
+
+def cmd_ai_status(a):
+    from .ai import engine, ledger
+    s = get_settings()
+    con = ledger.connect()
+    try:
+        b = ledger.budget(con)
+    finally:
+        con.close()
+    print("\nAI 组件：%s · 密钥：%s · 模型 %s / %s（%s）" % (
+        "已安装" if engine.available() else "未安装（pip install -e \".[ai]\"）", "已配置" if engine.configured() else "未配置",
+        s.ai_quick_model, s.ai_deep_model, s.ai_provider))
+    print("%s 月预算 %s：已用 %s，排队中预计 %s，剩余 %s；每次分析预计 %s" % (
+        b["month"], cny(b["budget_cny"]), cny(b["spent_cny"]), cny(b["committed_cny"] - b["spent_cny"]), cny(b["remaining_cny"]),
+        cny(b["estimate_cny"])))
+
+
+def cmd_ai_runs(a):
+    from .ai import ledger
+    con = ledger.connect()
+    try:
+        runs = ledger.runs(con, data.normalize(a.symbol) if a.symbol else None, a.limit)
+    finally:
+        con.close()
+    if not runs:
+        print("还没有 AI 分析记录。")
+        return
+    rows = [("编号", "代码", "收盘日", "状态", "评级", "调用", "输入 token", "输出 token", "费用")]
+    names = {"queued": "排队中", "running": "运行中", "done": "完成", "failed": "失败"}
+    for r in runs:
+        rows.append(("%d" % r["id"], r["symbol"], r["trade_date"], names[r["status"]], r["rating"] or "—", "%d" % r["llm_calls"],
+                     format(r["tokens_in"], ","), format(r["tokens_out"], ","), cny(r["cost_usd"] * get_settings().ai_usd_cny)))
+    table(rows)
+
+
+def _drain(worker):
+    while worker.run_next():
+        pass
+
+
+def cmd_ai_analyze(a):
+    from .ai import engine, ledger
+    from .ai.jobs import Worker
+    engine.require_ready()
+    sym = data.normalize(a.symbol)
+    trade_date = data.load(sym).index[-1].date().isoformat()
+    con = ledger.connect()
+    try:
+        rid = ledger.enqueue(con, sym, trade_date, "cli")
+        print("\n正在分析 %s（%s 收盘后），通常需要几分钟……" % (sym, trade_date))
+        _drain(Worker())  # runs queued analyses in order, this one included
+        run = ledger.get(con, rid)
+    finally:
+        con.close()
+    usd_cny = get_settings().ai_usd_cny
+    if run["status"] != "done":
+        sys.exit("分析没有完成：%s（已花费 %s）" % (run["error"], cny(run["cost_usd"] * usd_cny)))
+    print("评级：%s · 调用 %d 次 · 输入 %s token（缓存 %s）· 输出 %s token · 费用 %s" % (
+        run["rating"], run["llm_calls"], format(run["tokens_in"], ","), format(run["tokens_cached"], ","),
+        format(run["tokens_out"], ","), cny(run["cost_usd"] * usd_cny)))
+    final = (run["reports"] or {}).get("final_trade_decision")
+    if final:
+        print("\n%s\n%s" % (final["title"], final["text"]))
+    print("\n完整报告：在网页工作台的“AI 研报”里查看编号 %d。以上内容是 AI 生成的研究材料，不构成投资建议。" % rid)
+
+
+def cmd_schedule_run(a):
+    import json
+
+    from .ai.jobs import Worker
+    from .scheduler import Scheduler
+    worker = Worker()
+    worker.wake = lambda: None
+    worker.wait_idle = lambda timeout=None: (_drain(worker), True)[1]  # no background thread here: run the queue now
+    print(json.dumps(Scheduler(worker).run_daily(), ensure_ascii=False, indent=2))
 
 
 def cmd_serve(a):
@@ -262,6 +349,8 @@ def build_parser():
     pn = psub.add_parser("new", help="创建模拟账户")
     pn.add_argument("name", help="账户名称，如 核心")
     pn.add_argument("--symbols", required=True, help="股票代码，逗号分隔，如 QQQM,VOO")
+    pn.add_argument("--strategy", choices=("ma", "ai"), default="ma", help="ma：均线交叉（默认）；ai：按 AI 评级")
+    pn.add_argument("--every", type=int, default=7, help="AI 账户每隔多少天重新分析一次（默认 7）")
     ma(pn)
     pn.add_argument("--cash", type=float, default=10_000, help="初始资金，美元，平均分给每只股票（默认 10000）")
     pn.add_argument("--fee", type=float, default=0, help="每笔手续费，美元（默认 0）")
@@ -273,6 +362,21 @@ def build_parser():
     pdel = psub.add_parser("delete", help="删除模拟账户和它的全部记录")
     pdel.add_argument("name")
     pdel.set_defaults(fn=cmd_paper_delete)
+
+    ai = sub.add_parser("ai", help="AI 研究：用 TradingAgents 分析股票（需要安装 AI 组件并配置密钥）")
+    aisub = ai.add_subparsers(dest="ai_cmd", required=True)
+    aisub.add_parser("status", help="安装、密钥和本月预算").set_defaults(fn=cmd_ai_status)
+    an = aisub.add_parser("analyze", help="分析一只股票（按最近一个收盘日），会产生模型费用")
+    an.add_argument("symbol")
+    an.set_defaults(fn=cmd_ai_analyze)
+    ar = aisub.add_parser("runs", help="分析记录和费用")
+    ar.add_argument("--symbol")
+    ar.add_argument("--limit", type=int, default=20)
+    ar.set_defaults(fn=cmd_ai_runs)
+
+    sch = sub.add_parser("schedule", help="每日任务")
+    schsub = sch.add_subparsers(dest="schedule_cmd", required=True)
+    schsub.add_parser("run", help="立即运行一次：到期的 AI 分析 + 记录所有模拟账户").set_defaults(fn=cmd_schedule_run)
 
     sv = sub.add_parser("serve", help="启动接口服务和网页工作台")
     sv.add_argument("--host", help="监听地址（默认 127.0.0.1，只允许本机访问）")
