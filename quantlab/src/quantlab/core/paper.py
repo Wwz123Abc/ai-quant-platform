@@ -197,16 +197,18 @@ def summarize(acct, rep):
     positions, pending, fills, curves = [], [], [], []
     for sym, r in rep.items():
         sig, res, bench, cash = r["signals"], r["result"], r["bench"], r["cash"]
-        last = sig.iloc[-1]
+        # An AI account's first decision can still be waiting for its analysis: then there is none yet.
+        last = sig.iloc[-1] if len(sig) else None
+        decision = None if last is None else bool(last["target"])
         held = bool(res.in_market.iloc[-1]) if res else False
         value = float(res.equity.iloc[-1]) if res else cash
         bvalue = float(bench.equity.iloc[-1]) if bench else cash
         positions.append({
-            "symbol": sym, "decision": bool(last["target"]), "decision_date": sig.index[-1].date(), "held": held,
+            "symbol": sym, "decision": decision, "decision_date": sig.index[-1].date() if len(sig) else None, "held": held,
             "shares": int(res.trades[res.trades["open"]]["shares"].sum()) if res else 0,
             "value": value, "cash": cash, "return": value / cash - 1, "benchmark_return": bvalue / cash - 1,
         })
-        if bool(last["target"]) != held:
+        if decision is not None and decision != held:
             pending.append({"symbol": sym, "side": "buy" if last["target"] else "sell", "decision_date": sig.index[-1].date(),
                             "affordable": not (last["target"] and cash < r["bars"]["close"].iloc[-1])})
         if res:

@@ -166,8 +166,8 @@ class AccountCreate(Costs):
 
 class Position(BaseModel):
     symbol: str
-    decision: bool
-    decision_date: dt.date
+    decision: bool | None = Field(description="最新决定：持有、空仓，或还在等待第一个决定（null）")
+    decision_date: dt.date | None
     held: bool
     shares: int
     value: float

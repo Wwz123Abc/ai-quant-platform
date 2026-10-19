@@ -1,5 +1,6 @@
 """Command line: quantlab backtest QQQ / scan QQQ / signal QQQM VOO / paper run / serve"""
 import argparse
+import logging
 import sys
 import unicodedata
 
@@ -185,7 +186,10 @@ def report_paper(s, new):
         print("本次记录了 %d 条新的决定（到 %s）。" % (len(new), max(x["date"] for x in new)))
     rows = [("代码", "最新决定", "当前", "股数", "资产", "收益", "同期买入持有")]
     for q in s["positions"]:
-        rows.append((q["symbol"], "%s（%s）" % ("持有" if q["decision"] else "空仓", q["decision_date"].strftime("%m-%d")),
+        decided = "等待 AI 分析"
+        if q["decision"] is not None:
+            decided = "%s（%s）" % ("持有" if q["decision"] else "空仓", q["decision_date"].strftime("%m-%d"))
+        rows.append((q["symbol"], decided,
                      "持有" if q["held"] else "空仓", "%d" % q["shares"], money(q["value"]), pct(q["return"]), pct(q["benchmark_return"])))
     rows.append(("合计", "", "", "", money(s["value"]), pct(s["return"]), pct(s["benchmark_return"])))
     table(rows)
@@ -295,11 +299,29 @@ def cmd_serve(a):
     from .api.security import api_token
     s = get_settings()
     host, port = a.host or s.host, a.port or s.port
-    print("QuantLab %s 已启动：http://%s:%d/?token=%s" % (__version__, host, port, api_token()))
-    print("接口文档：http://%s:%d/api/docs" % (host, port))
+    if a.log_file:  # running in the background: keep the token out of the log; `quantlab open` opens the page
+        logging.getLogger("quantlab").info("QuantLab %s listening on http://%s:%d", __version__, host, port)
+    else:
+        print("QuantLab %s 已启动：http://%s:%d/?token=%s" % (__version__, host, port, api_token()))
+        print("接口文档：http://%s:%d/api/docs" % (host, port))
     if host not in ("127.0.0.1", "localhost", "::1"):
-        print("注意：正在监听 %s，同一网络里的其他设备也能访问，请保管好上面的令牌。" % host)
+        logging.getLogger("quantlab").warning("listening on %s: other devices on the network can reach it; keep the token safe", host)
     uvicorn.run(create_app(), host=host, port=port, log_config=None)
+
+
+def cmd_open(a):
+    """Opens the workbench in the default browser with the token, for a service already running in the background."""
+    import urllib.request
+    import webbrowser
+
+    from .api.security import api_token
+    s = get_settings()
+    base = "http://%s:%d" % ("127.0.0.1" if s.host in ("0.0.0.0", "::") else s.host, s.port)
+    try:
+        urllib.request.urlopen(base + "/api/health", timeout=3)
+    except OSError:
+        sys.exit("服务没有在运行（%s）。先运行：python -m quantlab serve" % base)
+    webbrowser.open(base + "/?token=" + api_token())
 
 
 def build_parser():
@@ -381,13 +403,15 @@ def build_parser():
     sv = sub.add_parser("serve", help="启动接口服务和网页工作台")
     sv.add_argument("--host", help="监听地址（默认 127.0.0.1，只允许本机访问）")
     sv.add_argument("--port", type=int, help="端口（默认 8000）")
+    sv.add_argument("--log-file", help="日志写入这个文件（按 5 MB 轮换），用于后台运行")
     sv.set_defaults(fn=cmd_serve)
+    sub.add_parser("open", help="用浏览器打开正在运行的工作台（自动带上令牌）").set_defaults(fn=cmd_open)
     return p
 
 
 def main(argv=None):
-    logs.setup()
     a = build_parser().parse_args(argv)
+    logs.setup(getattr(a, "log_file", None))
     try:
         a.fn(a)
     except QuantLabError as e:

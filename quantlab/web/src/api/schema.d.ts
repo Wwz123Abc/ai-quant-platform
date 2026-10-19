@@ -614,13 +614,13 @@ export interface components {
         Position: {
             /** Symbol */
             symbol: string;
-            /** Decision */
-            decision: boolean;
             /**
-             * Decision Date
-             * Format: date
+             * Decision
+             * @description 最新决定：持有、空仓，或还在等待第一个决定（null）
              */
-            decision_date: string;
+            decision: boolean | null;
+            /** Decision Date */
+            decision_date: string | null;
             /** Held */
             held: boolean;
             /** Shares */

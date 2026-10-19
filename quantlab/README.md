@@ -33,6 +33,20 @@ python -m quantlab serve
 
 终端里会显示一个带令牌的链接，例如 `http://127.0.0.1:8000/?token=…`，用浏览器打开就能进入工作台。接口文档在 `http://127.0.0.1:8000/api/docs`。
 
+### 开机自动启动（Windows）
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/install_autostart.ps1
+```
+
+它会在“启动”文件夹里放一个快捷方式：登录 Windows 后，用 `pythonw` 在后台运行服务（没有命令行窗口），日志写到 `data/logs/serve.log`（按 5 MB 轮换，令牌不会写进日志）。每日任务也随服务一起运行。不需要管理员权限，删除用 `scripts/uninstall_autostart.ps1`。
+
+服务在后台运行时，用这条命令打开工作台（自动带上令牌）：
+
+```bash
+python -m quantlab open
+```
+
 ## 网页工作台
 
 | 页面 | 功能 |

@@ -103,7 +103,7 @@ export default function Account() {
               {a.positions.map((q) => (
                 <tr key={q.symbol}>
                   <td>{q.symbol}</td>
-                  <td>{q.decision ? "持有" : "空仓"}（{q.decision_date}）</td>
+                  <td>{q.decision == null ? "等待 AI 分析" : `${q.decision ? "持有" : "空仓"}（${q.decision_date}）`}</td>
                   <td>{q.held ? "持有" : "空仓"}</td>
                   <td className="num">{q.shares}</td>
                   <td className="num">{money(q.value)}</td>

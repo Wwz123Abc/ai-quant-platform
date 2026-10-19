@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.5.0"
+    "version": "0.5.1"
   },
   "paths": {
     "/api/health": {
@@ -1864,12 +1864,27 @@
             "title": "Symbol"
           },
           "decision": {
-            "type": "boolean",
-            "title": "Decision"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision",
+            "description": "最新决定：持有、空仓，或还在等待第一个决定（null）"
           },
           "decision_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Decision Date"
           },
           "held": {

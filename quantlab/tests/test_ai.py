@@ -292,3 +292,20 @@ def test_a_run_is_claimed_once_across_connections(con):
     first, second = ledger.claim_next(con, NOW), ledger.claim_next(other, NOW)
     other.close()
     assert first["id"] == rid and second is None
+
+
+def test_summary_while_first_ai_decision_waits():
+    market = bars(300, end="2026-10-16")
+    load = lambda sym, refresh=False: market
+    pc = paper.connect()
+    paper.create(pc, "AI", ["QQQM", "VOO"], {"every_days": 1}, kind="ai_rating", load=load)
+    acct = paper.get_account(pc, "AI")
+    ai = FakeAi()
+    ai.r.append(("2026-10-16", "Buy"))
+    ai.p.add(("VOO", "2026-10-16"))
+    paper.record(pc, acct, load, ai=ai)
+    s = paper.summarize(acct, paper.replay(pc, acct, load))
+    by = {p["symbol"]: p for p in s["positions"]}
+    assert by["QQQM"]["decision"] is True and by["VOO"]["decision"] is None and by["VOO"]["decision_date"] is None
+    assert [o["symbol"] for o in s["pending"]] == ["QQQM"]
+    pc.close()
