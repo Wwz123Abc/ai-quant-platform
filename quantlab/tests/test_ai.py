@@ -284,3 +284,11 @@ def test_key_name_without_tradingagents(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", no_tradingagents)
     assert engine.key_env("deepseek") == "DEEPSEEK_API_KEY"
+
+
+def test_a_run_is_claimed_once_across_connections(con):
+    rid = ledger.enqueue(con, "QQQM", "2026-10-16", now=NOW)
+    other = ledger.connect()
+    first, second = ledger.claim_next(con, NOW), ledger.claim_next(other, NOW)
+    other.close()
+    assert first["id"] == rid and second is None

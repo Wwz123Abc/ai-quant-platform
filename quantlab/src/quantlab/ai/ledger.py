@@ -122,13 +122,19 @@ def _enqueue(con, symbol, trade_date, source, now, s):
 
 
 def claim_next(con, now=None):
-    """Marks the oldest queued run as running and returns it, or None."""
-    with con:
+    """Marks the oldest queued run as running and returns it, or None.
+
+    Several processes may share the ledger (the service and the command line): a run belongs to whichever one's
+    update actually changed it from queued to running, so no run is ever started twice."""
+    while True:
         r = con.execute("SELECT id FROM runs WHERE status = 'queued' ORDER BY id LIMIT 1").fetchone()
         if not r:
             return None
-        con.execute("UPDATE runs SET status = 'running', started = ? WHERE id = ? AND status = 'queued'", (iso(now or utcnow()), r[0]))
-    return get(con, r[0], with_reports=False)
+        with con:
+            won = con.execute("UPDATE runs SET status = 'running', started = ? WHERE id = ? AND status = 'queued'",
+                              (iso(now or utcnow()), r[0])).rowcount
+        if won:
+            return get(con, r[0], with_reports=False)
 
 
 def _usage(usage):
