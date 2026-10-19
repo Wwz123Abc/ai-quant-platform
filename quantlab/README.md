@@ -142,7 +142,7 @@ python -m quant paper run
 美股北京时间凌晨 4–5 点收盘。可以用 Windows 任务计划程序在每个交易日早上运行，例如（在 PowerShell 里执行一次，把路径换成你的）：
 
 ```
-schtasks /create /tn "quant-lab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 07:30 /tr "cmd /c cd /d C:\path	o\quant-lab && python -m quant paper run >> paper.log 2>&1"
+schtasks /create /tn "quant-lab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 07:30 /tr "cmd /c cd /d C:\path\to\quant-lab && python -m quant paper run >> paper.log 2>&1"
 ```
 
 Linux 或 macOS 用 cron：
