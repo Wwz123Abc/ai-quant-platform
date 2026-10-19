@@ -2,6 +2,11 @@
 
 美股和港股的量化研究工具：**回测**、**参数扫描与样本外检验**、**每日信号**、**模拟盘**。可以在命令行使用，也可以打开网页工作台。
 
+它分成两端：
+
+- **分析端**：想买一只股票时，`个股分析` 给出趋势和风险、时点基本面、AI 评级、和你现有持仓的相关性，以及**按你的规则**能不能买、最多买多少。
+- **执行端**：`我的持仓` 每天从账本同步你的真实持仓，按你设定的规则（目标仓位和再平衡区间、单只上限、现金储备）给出建议订单；你逐条确认，自己去券商下单。趋势、基本面和 AI 评级只作为提醒，不会生成订单。
+
 - **数据**：Yahoo Finance 日线，按拆股和分红复权，缓存在本地 SQLite。
 - **回测**：按收盘价算信号，**下一个交易日开盘成交**，计入滑点和手续费、按整股成交，并和同期“买入持有”对比。
 - **样本外检验**：在前一段历史上挑参数，在后一段历史上检验，判断“最优参数”是不是过拟合。
@@ -109,6 +114,23 @@ QQQ  均线 50/200  2005-01-03 → 2026-10-16（21.8 年）
 schtasks /create /tn "QuantLab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 07:30 /tr "cmd /c cd /d C:\path\to\quant-lab && python -m quantlab paper run >> paper.log 2>&1"
 ```
 
+## 我的持仓和个股分析
+
+1. 在账本网站的“账号”页面创建**只读访问密钥**（它只能读取交易、国债定存和现金，不能修改任何数据），填进 `.env`：`LEDGER_TOKEN=密钥`。
+2. 在网页的“我的持仓”里设定规则，点“同步账本并检查”。
+
+```bash
+python -m quantlab holdings review
+python -m quantlab holdings policy --set max_position=0.3 --set target=QQQM:0.4
+python -m quantlab holdings approve 12
+python -m quantlab analyze NVDA --amount 500
+```
+
+- **规则只有这几条，也只有它们会生成建议订单：**目标仓位（偏离超过再平衡区间才调整）、单只上限、现金储备（买入不会让现金低于储备）、最小下单金额、是否按整股。占比都按“股票 + 现金”计算，国债和定存持有到期，不参与调整。
+- **提醒**（不生成订单）：低于成本或离一年高点太远、均线空头排列、最近的 AI 评级、净利润为负、盈利明显低于去年同期、收入同比下降。
+- **确认**只是记录你同意这笔调整，系统不会替你下单；成交后在账本记一笔，下次同步就会更新。每日任务也会自动检查。
+- **个股分析**的结论只来自你的规则；其余信息供参考，不是买卖建议。
+
 ## 机器学习选股
 
 ```bash
@@ -215,6 +237,11 @@ python -m quantlab paper new AI --symbols QQQM,VOO --strategy ai --every 7
 | POST | `/api/trading/accounts/{name}/halt`、`/resume`、`/mode` | 暂停、恢复、切换模式 |
 | POST | `/api/trading/run` | 运行交易步骤（可强制调仓） |
 | GET | `/api/trading/limits` | 风控上限 |
+| GET | `/api/holdings/status` | 账本同步状态 |
+| GET / POST | `/api/holdings/review` | 最近一次持仓检查 / 同步并检查 |
+| GET / PUT | `/api/holdings/policy` | 你的规则 |
+| POST | `/api/holdings/proposals/{id}/approve`、`/reject` | 确认或拒绝建议订单 |
+| GET | `/api/analyze/{symbol}?amount=` | 个股分析 |
 
 错误统一返回 `{"detail": "说明"}`：参数不对是 400 或 422，超出 AI 预算是 402，找不到是 404，重复是 409，行情源出错是 502，AI 组件未安装或未配置是 503。
 
@@ -268,6 +295,7 @@ src/quantlab/
   ai/          AI 研究：TradingAgents 适配器、费用台账和预算、后台任务
   ml/          机器学习选股：股票池、因子、滚动训练、仓位、组合回测、最新信号
   trading/     自动交易：券商接口和模拟券商、风控和订单、每日交易步骤
+  holdings/    你的真实持仓：账本同步、规则、每日检查和建议订单、个股分析
   scheduler.py 每日任务
   api/         FastAPI 接口：路由、请求和响应模型、令牌校验
   cli.py       命令行

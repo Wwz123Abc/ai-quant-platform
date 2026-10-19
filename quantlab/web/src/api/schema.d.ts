@@ -383,6 +383,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/holdings/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 账本同步状态 */
+        get: operations["holdings_status_api_holdings_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/holdings/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 最近一次持仓检查 */
+        get: operations["holdings_review_api_holdings_review_get"];
+        put?: never;
+        /** 同步账本并按你的规则检查持仓 */
+        post: operations["holdings_review_now_api_holdings_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/holdings/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 你的规则 */
+        get: operations["get_policy_api_holdings_policy_get"];
+        /** 修改你的规则 */
+        put: operations["put_policy_api_holdings_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/holdings/proposals/{pid}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 确认一条建议订单（你会自己去券商下单） */
+        post: operations["approve_api_holdings_proposals__pid__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/holdings/proposals/{pid}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 拒绝一条建议订单 */
+        post: operations["reject_api_holdings_proposals__pid__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analyze/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 个股分析：趋势、基本面、AI 评级、和持仓的关系、你的规则允许买多少 */
+        get: operations["analyze_api_analyze__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -505,6 +609,15 @@ export interface components {
             /** Running */
             running: number;
         };
+        /** AiInfo */
+        AiInfo: {
+            /** Id */
+            id: number;
+            /** Rating */
+            rating: string | null;
+            /** Trade Date */
+            trade_date: string;
+        };
         /** AiRun */
         AiRun: {
             /** Id */
@@ -589,6 +702,26 @@ export interface components {
             language: string;
             budget: components["schemas"]["AiBudget"];
             schedule: components["schemas"]["Schedule"];
+        };
+        /** Analysis */
+        Analysis: {
+            /** Symbol */
+            symbol: string;
+            technical: components["schemas"]["Technical"];
+            fundamentals: components["schemas"]["Fundamentals"] | null;
+            ai: components["schemas"]["AiInfo"] | null;
+            model: components["schemas"]["ModelRank"] | null;
+            portfolio: components["schemas"]["PortfolioFit"] | null;
+            /** Checks */
+            checks: components["schemas"]["Check"][];
+            /** Allowed */
+            allowed: boolean;
+            /** Verdict */
+            verdict: string;
+            /** Notes */
+            notes: components["schemas"]["Note"][];
+            /** Disclaimer */
+            disclaimer: string;
         };
         /** BacktestRequest */
         BacktestRequest: {
@@ -690,6 +823,23 @@ export interface components {
             /** Volume */
             volume: number[];
         };
+        /** Check */
+        Check: {
+            /** Rule */
+            rule: string;
+            /** Ok */
+            ok: boolean;
+            /** Text */
+            text: string;
+        };
+        /** Decision */
+        Decision: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** EquitySeries */
         EquitySeries: {
             /** Dates */
@@ -717,6 +867,29 @@ export interface components {
             shares: number;
             /** Price */
             price: number;
+        };
+        /** Fundamentals */
+        Fundamentals: {
+            /** Revenue Ttm */
+            revenue_ttm: number | null;
+            /** Net Income Ttm */
+            net_income_ttm: number | null;
+            /** Op Margin */
+            op_margin: number | null;
+            /** Rev Growth */
+            rev_growth: number | null;
+            /** Roa */
+            roa: number | null;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Market Cap */
+            market_cap: number | null;
+            /** Sue */
+            sue: number | null;
+            /** Cfo To Ni */
+            cfo_to_ni: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -749,6 +922,37 @@ export interface components {
             weight: number;
             /** Score */
             score: number | null;
+        };
+        /** HoldingPosition */
+        HoldingPosition: {
+            /** Symbol */
+            symbol: string;
+            /** Currency */
+            currency: string;
+            /** Shares */
+            shares: number;
+            /** Avg Cost */
+            avg_cost: number;
+            /** Price */
+            price: number | null;
+            /** Value */
+            value: number | null;
+            /** Gain */
+            gain: number | null;
+            /** Weight */
+            weight: number | null;
+        };
+        /** HoldingsStatus */
+        HoldingsStatus: {
+            /**
+             * Configured
+             * @description 是否配置了账本的只读访问密钥（只检查是否存在）
+             */
+            configured: boolean;
+            /** Synced */
+            synced: string | null;
+            /** Account */
+            account: string | null;
         };
         /** Limits */
         Limits: {
@@ -785,6 +989,22 @@ export interface components {
              */
             mode: "plan" | "paper" | "live";
         };
+        /** ModelRank */
+        ModelRank: {
+            /** Rank */
+            rank: number;
+            /** Of */
+            of: number;
+            /** Signal Date */
+            signal_date: string;
+        };
+        /** Note */
+        Note: {
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
+        };
         /** PendingOrder */
         PendingOrder: {
             /** Symbol */
@@ -817,6 +1037,77 @@ export interface components {
             /** Years */
             years: number;
         };
+        /** Policy */
+        Policy: {
+            /**
+             * Targets
+             * @description 股票 -> 目标仓位（占股票加现金的比例）
+             */
+            targets?: {
+                [key: string]: number;
+            };
+            /**
+             * Band
+             * @description 偏离目标超过这么多（绝对值）才再平衡
+             * @default 0.05
+             */
+            band: number;
+            /**
+             * Max Position
+             * @description 单只股票上限
+             * @default 0.3
+             */
+            max_position: number;
+            /**
+             * Cash Reserve
+             * @description 现金储备下限
+             * @default 0.1
+             */
+            cash_reserve: number;
+            /**
+             * Min Trade Usd
+             * @default 50
+             */
+            min_trade_usd: number;
+            /**
+             * Whole Shares
+             * @default true
+             */
+            whole_shares: boolean;
+            /**
+             * Alert Drawdown From Cost
+             * @default 0.2
+             */
+            alert_drawdown_from_cost: number;
+            /**
+             * Alert Drawdown From High
+             * @default 0.25
+             */
+            alert_drawdown_from_high: number;
+        };
+        /** PortfolioFit */
+        PortfolioFit: {
+            /** Investable */
+            investable: number;
+            /** Cash */
+            cash: number;
+            /** Held Value */
+            held_value: number;
+            /** Max Buy */
+            max_buy: number;
+            /** Amount */
+            amount: number;
+            /** Weight After */
+            weight_after: number | null;
+            /** Correlations */
+            correlations: {
+                [key: string]: number;
+            };
+            /** Avg Correlation */
+            avg_correlation: number | null;
+            /** Shares At Close */
+            shares_at_close: number | null;
+        };
         /** Position */
         Position: {
             /** Symbol */
@@ -841,6 +1132,32 @@ export interface components {
             /** Benchmark Return */
             benchmark_return: number;
         };
+        /** Proposal */
+        Proposal: {
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Shares */
+            shares: number;
+            /** Price */
+            price: number;
+            /** Value */
+            value: number;
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Note */
+            note: string | null;
+        };
         /** RecordResult */
         RecordResult: {
             /** Recorded */
@@ -849,12 +1166,45 @@ export interface components {
             latest: string | null;
             account: components["schemas"]["Account"];
         };
+        /** Reminder */
+        Reminder: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "info" | "warn";
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
+        };
         /** Report */
         Report: {
             /** Title */
             title: string;
             /** Text */
             text: string;
+        };
+        /** Review */
+        Review: {
+            /** Id */
+            id: number;
+            /** At */
+            at: string;
+            /** Synced */
+            synced: string | null;
+            /** Account */
+            account: string | null;
+            policy: components["schemas"]["Policy"];
+            valuation: components["schemas"]["Valuation"];
+            /** Proposals */
+            proposals: components["schemas"]["Proposal"][];
+            /** Notes */
+            notes: string[];
+            /** Reminders */
+            reminders: components["schemas"]["Reminder"][];
         };
         /** RunRequest */
         RunRequest: {
@@ -1197,6 +1547,41 @@ export interface components {
             /** Avg Trade */
             avg_trade: number | null;
         };
+        /** Technical */
+        Technical: {
+            /** Symbol */
+            symbol: string;
+            /** Date */
+            date: string | null;
+            /** Close */
+            close: number | null;
+            /** R1M */
+            r1m?: number | null;
+            /** R3M */
+            r3m?: number | null;
+            /** R6M */
+            r6m?: number | null;
+            /** R1Y */
+            r1y?: number | null;
+            /** Mom 12 1 */
+            mom_12_1?: number | null;
+            /** Vol */
+            vol?: number | null;
+            /** From High */
+            from_high?: number | null;
+            /** Max Dd 1Y */
+            max_dd_1y?: number | null;
+            /** Ma50 */
+            ma50?: number | null;
+            /** Ma200 */
+            ma200?: number | null;
+            /** Uptrend */
+            uptrend?: boolean | null;
+            /** Last Cross */
+            last_cross?: string | null;
+            /** Beta */
+            beta?: number | null;
+        };
         /** Trade */
         Trade: {
             /**
@@ -1329,6 +1714,23 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** Valuation */
+        Valuation: {
+            /** Positions */
+            positions: components["schemas"]["HoldingPosition"][];
+            /** Cash */
+            cash: number;
+            /** Stocks */
+            stocks: number;
+            /** Investable */
+            investable: number;
+            /** Fixed */
+            fixed: number;
+            /** Total */
+            total: number;
+            /** Cash Weight */
+            cash_weight: number | null;
         };
     };
     responses: never;
@@ -2214,6 +2616,274 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holdings_status_api_holdings_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holdings_review_api_holdings_review_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Review"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holdings_review_now_api_holdings_review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Review"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_policy_api_holdings_policy_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policy"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_policy_api_holdings_policy_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Policy"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policy"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_holdings_proposals__pid__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_holdings_proposals__pid__reject_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                pid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_api_analyze__symbol__get: {
+        parameters: {
+            query?: {
+                amount?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Analysis"];
                 };
             };
             /** @description Validation Error */

@@ -122,8 +122,18 @@ class Scheduler:
                 except Exception as e:  # trading problems must not stop the rest of the job; they are reported
                     log.exception("trading step failed")
                     trading, notes = {"error": str(e)}, [*notes, "自动交易步骤出错：%s" % e]
+                holdings = None
+                try:
+                    from .holdings import ledger as hledger
+                    from .holdings import review as hreview
+                    if hledger.configured():
+                        r = hreview.run(load=self.load)
+                        holdings = {"review": r["id"], "proposals": len(r["proposals"]), "reminders": len(r["reminders"])}
+                except Exception as e:  # a ledger problem must not stop the rest of the job
+                    log.exception("holdings review failed")
+                    holdings, notes = {"error": str(e)}, [*notes, "持仓检查出错：%s" % e]
                 result = {"at": now.isoformat(timespec="seconds"), "queued": queued, "recorded": recorded,
-                          "trading": trading, "notes": notes}
+                          "trading": trading, "holdings": holdings, "notes": notes}
                 ledger.set_meta(ai_con, "daily_last", now.astimezone(BEIJING).date().isoformat())
                 ledger.set_meta(ai_con, "daily_result", json.dumps(result, ensure_ascii=False))
             finally:

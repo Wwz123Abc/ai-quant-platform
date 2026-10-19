@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     trading_live_enabled: bool = False      # live orders also need a broker connector and 8 weeks of paper trading
     trading_paper_weeks_before_live: int = 8
 
+    # Your real holdings, read from the stock ledger with its read-only key (LEDGER_TOKEN in .env).
+    ledger_url: str = "https://stock.wwz.cool"
+    hkd_per_usd: float = 7.8                 # Hong Kong dollars are pegged near this rate
+
     # Daily job: AI analyses for AI accounts, then a decision for every paper account. Runs inside `serve`.
     schedule_enabled: bool = True
     schedule_time: str = "07:30"             # Beijing time, Tuesday to Saturday, after the US close

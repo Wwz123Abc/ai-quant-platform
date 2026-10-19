@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.7.0"
+    "version": "0.8.0"
   },
   "paths": {
     "/api/health": {
@@ -1556,6 +1556,469 @@
           }
         }
       }
+    },
+    "/api/holdings/status": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "账本同步状态",
+        "operationId": "holdings_status_api_holdings_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/review": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "最近一次持仓检查",
+        "operationId": "holdings_review_api_holdings_review_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "同步账本并按你的规则检查持仓",
+        "operationId": "holdings_review_now_api_holdings_review_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/policy": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "你的规则",
+        "operationId": "get_policy_api_holdings_policy_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "修改你的规则",
+        "operationId": "put_policy_api_holdings_policy_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Policy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/proposals/{pid}/approve": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "确认一条建议订单（你会自己去券商下单）",
+        "operationId": "approve_api_holdings_proposals__pid__approve_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/proposals/{pid}/reject": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "拒绝一条建议订单",
+        "operationId": "reject_api_holdings_proposals__pid__reject_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analyze/{symbol}": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "个股分析：趋势、基本面、AI 评级、和持仓的关系、你的规则允许买多少",
+        "operationId": "analyze_api_analyze__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 100000000.0,
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Amount"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1811,6 +2274,36 @@
         ],
         "title": "AiBudget"
       },
+      "AiInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "trade_date": {
+            "type": "string",
+            "title": "Trade Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rating",
+          "trade_date"
+        ],
+        "title": "AiInfo"
+      },
       "AiRun": {
         "properties": {
           "id": {
@@ -2048,6 +2541,98 @@
           "schedule"
         ],
         "title": "AiStatus"
+      },
+      "Analysis": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "technical": {
+            "$ref": "#/components/schemas/Technical"
+          },
+          "fundamentals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Fundamentals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ai": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelRank"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioFit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "technical",
+          "fundamentals",
+          "ai",
+          "model",
+          "portfolio",
+          "checks",
+          "allowed",
+          "verdict",
+          "notes",
+          "disclaimer"
+        ],
+        "title": "Analysis"
       },
       "BacktestRequest": {
         "properties": {
@@ -2319,6 +2904,41 @@
         ],
         "title": "Bars"
       },
+      "Check": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "ok",
+          "text"
+        ],
+        "title": "Check"
+      },
+      "Decision": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "Decision"
+      },
       "EquitySeries": {
         "properties": {
           "dates": {
@@ -2389,6 +3009,134 @@
           "price"
         ],
         "title": "Fill"
+      },
+      "Fundamentals": {
+        "properties": {
+          "revenue_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Ttm"
+          },
+          "net_income_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Income Ttm"
+          },
+          "op_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Op Margin"
+          },
+          "rev_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rev Growth"
+          },
+          "roa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roa"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "sue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sue"
+          },
+          "cfo_to_ni": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfo To Ni"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revenue_ttm",
+          "net_income_ttm",
+          "op_margin",
+          "rev_growth",
+          "roa",
+          "pe",
+          "pb",
+          "market_cap",
+          "sue",
+          "cfo_to_ni"
+        ],
+        "title": "Fundamentals"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2463,6 +3211,120 @@
           "score"
         ],
         "title": "Holding"
+      },
+      "HoldingPosition": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "shares": {
+            "type": "number",
+            "title": "Shares"
+          },
+          "avg_cost": {
+            "type": "number",
+            "title": "Avg Cost"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "gain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "currency",
+          "shares",
+          "avg_cost",
+          "price",
+          "value",
+          "gain",
+          "weight"
+        ],
+        "title": "HoldingPosition"
+      },
+      "HoldingsStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "description": "是否配置了账本的只读访问密钥（只检查是否存在）"
+          },
+          "synced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "synced",
+          "account"
+        ],
+        "title": "HoldingsStatus"
       },
       "Limits": {
         "properties": {
@@ -2550,6 +3412,47 @@
         ],
         "title": "ModeRequest"
       },
+      "ModelRank": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "of": {
+            "type": "integer",
+            "title": "Of"
+          },
+          "signal_date": {
+            "type": "string",
+            "title": "Signal Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "of",
+          "signal_date"
+        ],
+        "title": "ModelRank"
+      },
+      "Note": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "Note"
+      },
       "PendingOrder": {
         "properties": {
           "symbol": {
@@ -2607,6 +3510,135 @@
           "years"
         ],
         "title": "Period"
+      },
+      "Policy": {
+        "properties": {
+          "targets": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Targets",
+            "description": "股票 -> 目标仓位（占股票加现金的比例）"
+          },
+          "band": {
+            "type": "number",
+            "title": "Band",
+            "description": "偏离目标超过这么多（绝对值）才再平衡",
+            "default": 0.05
+          },
+          "max_position": {
+            "type": "number",
+            "title": "Max Position",
+            "description": "单只股票上限",
+            "default": 0.3
+          },
+          "cash_reserve": {
+            "type": "number",
+            "title": "Cash Reserve",
+            "description": "现金储备下限",
+            "default": 0.1
+          },
+          "min_trade_usd": {
+            "type": "number",
+            "title": "Min Trade Usd",
+            "default": 50.0
+          },
+          "whole_shares": {
+            "type": "boolean",
+            "title": "Whole Shares",
+            "default": true
+          },
+          "alert_drawdown_from_cost": {
+            "type": "number",
+            "title": "Alert Drawdown From Cost",
+            "default": 0.2
+          },
+          "alert_drawdown_from_high": {
+            "type": "number",
+            "title": "Alert Drawdown From High",
+            "default": 0.25
+          }
+        },
+        "type": "object",
+        "title": "Policy"
+      },
+      "PortfolioFit": {
+        "properties": {
+          "investable": {
+            "type": "number",
+            "title": "Investable"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "held_value": {
+            "type": "number",
+            "title": "Held Value"
+          },
+          "max_buy": {
+            "type": "number",
+            "title": "Max Buy"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "weight_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight After"
+          },
+          "correlations": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Correlations"
+          },
+          "avg_correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Correlation"
+          },
+          "shares_at_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares At Close"
+          }
+        },
+        "type": "object",
+        "required": [
+          "investable",
+          "cash",
+          "held_value",
+          "max_buy",
+          "amount",
+          "weight_after",
+          "correlations",
+          "avg_correlation",
+          "shares_at_close"
+        ],
+        "title": "PortfolioFit"
       },
       "Position": {
         "properties": {
@@ -2677,6 +3709,82 @@
         ],
         "title": "Position"
       },
+      "Proposal": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side"
+          },
+          "shares": {
+            "type": "number",
+            "title": "Shares"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "side",
+          "shares",
+          "price",
+          "value",
+          "reason",
+          "status",
+          "decided_at",
+          "note"
+        ],
+        "title": "Proposal"
+      },
       "RecordResult": {
         "properties": {
           "recorded": {
@@ -2707,6 +3815,38 @@
         ],
         "title": "RecordResult"
       },
+      "Reminder": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warn"
+            ],
+            "title": "Level"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "level",
+          "kind",
+          "text"
+        ],
+        "title": "Reminder"
+      },
       "Report": {
         "properties": {
           "title": {
@@ -2724,6 +3864,80 @@
           "text"
         ],
         "title": "Report"
+      },
+      "Review": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "synced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/Policy"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/Valuation"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "type": "array",
+            "title": "Proposals"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "reminders": {
+            "items": {
+              "$ref": "#/components/schemas/Reminder"
+            },
+            "type": "array",
+            "title": "Reminders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "synced",
+          "account",
+          "policy",
+          "valuation",
+          "proposals",
+          "notes",
+          "reminders"
+        ],
+        "title": "Review"
       },
       "RunRequest": {
         "properties": {
@@ -3631,6 +4845,188 @@
         ],
         "title": "Summary"
       },
+      "Technical": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "r1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R1M"
+          },
+          "r3m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R3M"
+          },
+          "r6m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R6M"
+          },
+          "r1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R1Y"
+          },
+          "mom_12_1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mom 12 1"
+          },
+          "vol": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vol"
+          },
+          "from_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From High"
+          },
+          "max_dd_1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Dd 1Y"
+          },
+          "ma50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma50"
+          },
+          "ma200": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma200"
+          },
+          "uptrend": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptrend"
+          },
+          "last_cross": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Cross"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "date",
+          "close"
+        ],
+        "title": "Technical"
+      },
       "Trade": {
         "properties": {
           "entry_date": {
@@ -4038,6 +5434,59 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Valuation": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "stocks": {
+            "type": "number",
+            "title": "Stocks"
+          },
+          "investable": {
+            "type": "number",
+            "title": "Investable"
+          },
+          "fixed": {
+            "type": "number",
+            "title": "Fixed"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "cash_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "cash",
+          "stocks",
+          "investable",
+          "fixed",
+          "total",
+          "cash_weight"
+        ],
+        "title": "Valuation"
       }
     }
   }

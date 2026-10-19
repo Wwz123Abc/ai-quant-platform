@@ -18,6 +18,11 @@ export type StudyRequest = S["StudyRequest"];
 export type MlSignal = S["Signal"];
 export type TradingAccount = S["TradingAccount"];
 export type Limits = S["Limits"];
+export type Analysis = S["Analysis"];
+export type HoldingsReview = S["Review"];
+export type HoldingsPolicy = S["Policy"];
+export type HoldingsStatus = S["HoldingsStatus"];
+export type Proposal = S["Proposal"];
 
 const TOKEN_KEY = "quantlab.token";
 let memoryToken: string | null = null; // fallback when session storage is blocked

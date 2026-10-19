@@ -33,5 +33,6 @@ def latest(top=None, max_weight=None, pause=0.2):
     folder = s.data_dir / "models" / day.date().isoformat()
     M.save(model, card, folder)
     (folder / "weights.json").write_text(json.dumps(weights.round(6).to_dict(), indent=1), encoding="utf-8")
+    (folder / "scores.json").write_text(json.dumps(scores.round(6).to_dict(), indent=1), encoding="utf-8")
     return {"signal_date": day.date(), "weights": weights, "scores": scores, "prices": close.loc[day], "card": card,
             "data_date": close["QQQ"].last_valid_index().date() if "QQQ" in close else day.date()}

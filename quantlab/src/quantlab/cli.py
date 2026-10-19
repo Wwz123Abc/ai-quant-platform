@@ -447,6 +447,112 @@ def cmd_trade_mode(a):
     print("%s 已切换为 %s 模式。" % (a.name, a.mode))
 
 
+def big(v):
+    """Large dollar amounts in 亿 (hundred millions), e.g. $3,030 亿."""
+    return "—" if v is None else ("$%s 亿" % format(v / 1e8, ",.0f")) if abs(v) >= 1e8 else money(v)
+
+
+def _p(v, digits=1):
+    return "—" if v is None else "%+.*f%%" % (digits, v * 100)
+
+
+def cmd_analyze(a):
+    from .holdings import analysis
+    r = analysis.analyze(a.symbol, a.amount)
+    t, f, pf = r["technical"], r["fundamentals"], r["portfolio"]
+    print("\n%s · %s 收盘 %.2f" % (r["symbol"], t["date"], t["close"] or 0))
+    print("  趋势：1 个月 %s · 3 个月 %s · 1 年 %s · 12-1 月动量 %s · %s" % (
+        _p(t.get("r1m")), _p(t.get("r3m")), _p(t.get("r1y")), _p(t.get("mom_12_1")),
+        "50 日线在 200 日线上方" if t.get("uptrend") else "50 日线在 200 日线下方" if t.get("uptrend") is False else "均线数据不足"))
+    print("  风险：年化波动率 %s · 距一年最高点 %s · 一年最大回撤 %s · 相对 QQQ 的 β %s" % (
+        _p(t.get("vol"), 0).lstrip("+"), _p(t.get("from_high"), 0), _p(t.get("max_dd_1y"), 0), "%.2f" % t["beta"] if t.get("beta") else "—"))
+    if f:
+        print("  基本面（SEC，按公告日）：收入 %s · 净利润 %s · 营业利润率 %s · 收入同比 %s · 市盈率 %s · SUE %s" % (
+            big(f["revenue_ttm"]), big(f["net_income_ttm"]),
+            _p(f["op_margin"], 0).lstrip("+"), _p(f["rev_growth"], 0), "%.0f" % f["pe"] if f["pe"] else "—",
+            "%.1f" % f["sue"] if f["sue"] is not None else "—"))
+    else:
+        print("  基本面：没有 SEC 数据（非美国公司或已退市）")
+    if r["ai"]:
+        print("  AI 评级：%s（%s 收盘后，分析 #%d）" % (r["ai"]["rating"], r["ai"]["trade_date"], r["ai"]["id"]))
+    if r["model"]:
+        print("  机器学习排名：第 %d / %d（%s；该模型未通过考试期检验）" % (r["model"]["rank"], r["model"]["of"], r["model"]["signal_date"]))
+    if pf:
+        corr = "、".join("%s %.2f" % kv for kv in sorted(pf["correlations"].items(), key=lambda kv: -kv[1]))
+        print("  和持仓的相关性：%s" % (corr or "—"))
+        for c in r["checks"]:
+            print("  %s %s：%s" % ("✓" if c["ok"] else "✗", c["rule"], c["text"]))
+    print("\n%s" % r["verdict"])
+    for n in r["notes"]:
+        print("  · [%s] %s" % (n["kind"], n["text"]))
+    print("\n%s" % r["disclaimer"])
+
+
+def cmd_holdings_status(a):
+    from .holdings import ledger
+    snap = ledger.load(refresh=False) if ledger.snapshot_path().exists() else None
+    print("账本只读密钥：%s · 上次同步：%s" % ("已配置" if ledger.configured() else "未配置（在账本“账号”页面创建，填进 .env 的 LEDGER_TOKEN）",
+                                       (snap or {}).get("synced") or "从未"))
+
+
+def _print_review(r):
+    v = r["valuation"]
+    print("\n持仓检查 #%d（同步于 %s）· 可投资资金 %s（股票 %s + 现金 %s）· 国债定存 %s" % (
+        r["id"], r.get("synced") or "—", money(v["investable"]), money(v["stocks"]), money(v["cash"]), money(v["fixed"])))
+    rows = [("代码", "股数", "成本", "现价", "市值", "盈亏", "占比", "目标")]
+    for p in v["positions"]:
+        tgt = r["policy"]["targets"].get(p["symbol"])
+        rows.append((p["symbol"], "%g" % p["shares"], "%.2f" % p["avg_cost"], "%.2f" % p["price"] if p["price"] else "—",
+                     money(p["value"]) if p["value"] else "—", _p(p["gain"]), "%.1f%%" % (p["weight"] * 100) if p["weight"] else "—",
+                     "%.0f%%" % (tgt * 100) if tgt else "—"))
+    table(rows)
+    if r["proposals"]:
+        print("\n建议订单（按你的规则；确认后请自己去券商下单，成交后在账本记一笔）：")
+        for o in r["proposals"]:
+            print("  #%d %s %s %g 股 @ 约 %.2f（约 %s）· %s · %s" % (
+                o["id"], "买入" if o["side"] == "buy" else "卖出", o["symbol"], o["shares"], o["price"], money(o["value"]), o["reason"],
+                {"pending": "待确认", "approved": "已确认", "rejected": "已拒绝", "superseded": "已过期"}.get(o["status"], o["status"])))
+    else:
+        print("\n没有建议订单：持仓符合你的规则。")
+    for n in r["notes"]:
+        print("  · %s" % n)
+    if r["reminders"]:
+        print("\n提醒（只是信号，不会生成订单）：")
+        for m in r["reminders"]:
+            print("  %s %s [%s] %s" % ("⚠" if m["level"] == "warn" else "·", m["symbol"], m["kind"], m["text"]))
+
+
+def cmd_holdings_review(a):
+    from .holdings import review
+    _print_review(review.run())
+
+
+def cmd_holdings_policy(a):
+    import json
+
+    from .holdings import policy
+    p = policy.load()
+    for item in a.set or []:
+        key, _, val = item.partition("=")
+        if key == "target":
+            sym, _, w = val.partition(":")
+            p["targets"][sym.upper()] = float(w)
+        elif key in p:
+            p[key] = val.lower() in ("1", "true", "yes") if isinstance(p[key], bool) else float(val)
+        else:
+            sys.exit("没有这个规则：%s" % key)
+    if a.set:
+        p = policy.save(p)
+    print(json.dumps(p, ensure_ascii=False, indent=2))
+
+
+def cmd_holdings_decide(a):
+    from .holdings import review
+    o = review.decide(a.id, a.cmd_name == "approve", a.note or "")
+    print("#%d %s %s %g 股：%s" % (o["id"], "买入" if o["side"] == "buy" else "卖出", o["symbol"], o["shares"],
+                                  "已确认，请自己去券商下单，成交后在账本记一笔" if o["status"] == "approved" else "已拒绝"))
+
+
 def cmd_serve(a):
     import uvicorn
 
@@ -598,6 +704,24 @@ def build_parser():
     tm.add_argument("name")
     tm.add_argument("mode", choices=("plan", "paper", "live"))
     tm.set_defaults(fn=cmd_trade_mode)
+
+    az = sub.add_parser("analyze", help="个股分析：趋势、基本面、AI 评级、和持仓的关系、你的规则允许买多少")
+    az.add_argument("symbol")
+    az.add_argument("--amount", type=float, help="打算买多少美元（默认：规则允许的最大金额）")
+    az.set_defaults(fn=cmd_analyze)
+
+    ho = sub.add_parser("holdings", help="你的真实持仓：从账本同步，按你的规则检查，给出建议订单")
+    hosub = ho.add_subparsers(dest="holdings_cmd", required=True)
+    hosub.add_parser("status", help="账本密钥和上次同步时间").set_defaults(fn=cmd_holdings_status)
+    hosub.add_parser("review", help="同步账本并检查持仓").set_defaults(fn=cmd_holdings_review)
+    hp = hosub.add_parser("policy", help="查看或修改规则，例如 --set max_position=0.3 --set target=QQQM:0.4")
+    hp.add_argument("--set", action="append", metavar="KEY=VALUE")
+    hp.set_defaults(fn=cmd_holdings_policy)
+    for name, text in (("approve", "确认一条建议订单"), ("reject", "拒绝一条建议订单")):
+        hd = hosub.add_parser(name, help=text)
+        hd.add_argument("id", type=int)
+        hd.add_argument("--note")
+        hd.set_defaults(fn=cmd_holdings_decide, cmd_name=name)
 
     sch = sub.add_parser("schedule", help="每日任务")
     schsub = sch.add_subparsers(dest="schedule_cmd", required=True)

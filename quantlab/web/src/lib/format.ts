@@ -45,3 +45,9 @@ export function parseInts(text: string): number[] {
     .map((x) => Number(x))
     .filter((x) => Number.isInteger(x) && x > 0);
 }
+
+/** Large dollar amounts in 亿 (hundred millions): $3,030 亿. */
+export function big(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return Math.abs(v) >= 1e8 ? `${v < 0 ? MINUS : ""}$${Math.round(Math.abs(v) / 1e8).toLocaleString("en-US")} 亿` : money(v);
+}

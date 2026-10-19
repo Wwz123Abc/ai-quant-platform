@@ -3,6 +3,8 @@ import { type FormEvent, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { api, ApiError, setToken } from "./api/client";
 import Account from "./pages/Account";
+import Analyze from "./pages/Analyze";
+import Holdings from "./pages/Holdings";
 import Ai from "./pages/Ai";
 import AiRun from "./pages/AiRun";
 import Ml from "./pages/Ml";
@@ -27,6 +29,8 @@ export default function App() {
       <nav className="nav" aria-label="主导航">
         <div className="brand">QuantLab<small>量化研究工作站</small></div>
         <NavLink to="/" end>总览</NavLink>
+        <NavLink to="/holdings">我的持仓</NavLink>
+        <NavLink to="/analyze">个股分析</NavLink>
         <NavLink to="/backtest">均线回测</NavLink>
         <NavLink to="/scan">参数扫描</NavLink>
         <NavLink to="/paper">模拟盘</NavLink>
@@ -39,6 +43,8 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/holdings" element={<Holdings />} />
+          <Route path="/analyze" element={<Analyze />} />
           <Route path="/backtest" element={<Backtest />} />
           <Route path="/scan" element={<Scan />} />
           <Route path="/paper" element={<Paper />} />
