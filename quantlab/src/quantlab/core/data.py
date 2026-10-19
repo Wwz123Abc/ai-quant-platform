@@ -1,19 +1,43 @@
 """Daily bars from Yahoo Finance, adjusted for splits and dividends, cached in SQLite."""
 import datetime as dt
 import json
-import sqlite3
+import logging
+import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from .. import storage
+from ..config import get_settings
+from ..errors import DataSourceError, InvalidInput, NotFound
+
+log = logging.getLogger(__name__)
+
 NY = ZoneInfo("America/New_York")
 HK = ZoneInfo("Asia/Hong_Kong")
-DB = Path(__file__).resolve().parent.parent / "data" / "prices.db"
-MAX_AGE = 6 * 3600  # refetch a cached symbol after this many seconds
+SYMBOL_RE = re.compile(r"^(\d{1,5}|[A-Z][A-Z0-9.\-]{0,9})$")  # Hong Kong codes or US tickers
+
+MIGRATIONS = [
+    """CREATE TABLE IF NOT EXISTS bars (symbol TEXT, date TEXT, open REAL, high REAL, low REAL, close REAL, volume REAL,
+                                         PRIMARY KEY (symbol, date));
+       CREATE TABLE IF NOT EXISTS fetched (symbol TEXT PRIMARY KEY, at REAL)""",
+]
+
+
+def db_path():
+    return get_settings().data_dir / "prices.db"
+
+
+def normalize(sym):
+    """Upper-cased symbol, checked against what Yahoo accepts, so it is safe to put in a URL or a file name."""
+    key = str(sym).strip().upper()
+    if not SYMBOL_RE.match(key):
+        raise InvalidInput("股票代码格式不对：%s（美股写代码如 QQQM，港股写数字如 700）" % sym)
+    return key
 
 
 def market_tz(sym):
@@ -34,10 +58,17 @@ def fetch(sym):
     url = ("https://query1.finance.yahoo.com/v8/finance/chart/" + urllib.parse.quote(yahoo_symbol(sym)) +
            "?period1=0&period2=%d&interval=1d&events=div,split" % (time.time() + 86400))
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        chart = json.load(r)["chart"]
+    try:
+        with urllib.request.urlopen(req, timeout=get_settings().http_timeout) as r:
+            chart = json.load(r)["chart"]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise NotFound("Yahoo 找不到 %s 的数据，请检查代码是否正确" % sym) from e
+        raise DataSourceError("Yahoo 返回错误 %d，请稍后再试" % e.code) from e
+    except (urllib.error.URLError, TimeoutError, ValueError) as e:
+        raise DataSourceError("连不上 Yahoo 行情：%s" % getattr(e, "reason", e)) from e
     if chart.get("error") or not chart.get("result"):
-        raise ValueError("Yahoo 没有 %s 的数据：%s" % (sym, (chart.get("error") or {}).get("description", "空结果")))
+        raise NotFound("Yahoo 没有 %s 的数据：%s" % (sym, (chart.get("error") or {}).get("description", "空结果")))
     res = chart["result"][0]
     q, adj = res["indicators"]["quote"][0], res["indicators"]["adjclose"][0]["adjclose"]
     tz, rows = market_tz(sym), []
@@ -47,6 +78,8 @@ def fetch(sym):
             continue
         f = a / c
         rows.append((dt.datetime.fromtimestamp(ts, tz).date().isoformat(), o * f, h * f, l * f, a, v or 0))
+    if not rows:
+        raise NotFound("Yahoo 没有 %s 的日线数据" % sym)
     df = pd.DataFrame(rows, columns=["date", "open", "high", "low", "close", "volume"]).drop_duplicates("date", keep="last")
     return df.set_index(pd.to_datetime(df.pop("date")))
 
@@ -62,22 +95,23 @@ def completed(df, tz=NY, now=None):
 
 
 def load(sym, refresh=False):
-    """Cached bars for one symbol, refetched when older than MAX_AGE or when refresh is set.
+    """Cached bars for one symbol, refetched when older than the cache age or when refresh is set.
 
     The whole history is replaced on each fetch: a new dividend changes every earlier adjusted price."""
-    DB.parent.mkdir(exist_ok=True)
-    key = sym.strip().upper()
-    with sqlite3.connect(DB) as con:
-        con.execute("CREATE TABLE IF NOT EXISTS bars (symbol TEXT, date TEXT, open REAL, high REAL, low REAL, close REAL, volume REAL,"
-                    " PRIMARY KEY (symbol, date))")
-        con.execute("CREATE TABLE IF NOT EXISTS fetched (symbol TEXT PRIMARY KEY, at REAL)")
+    key = normalize(sym)
+    con = storage.connect(db_path(), MIGRATIONS)
+    try:
         row = con.execute("SELECT at FROM fetched WHERE symbol = ?", (key,)).fetchone()
-        if refresh or not row or time.time() - row[0] > MAX_AGE:
+        if refresh or not row or time.time() - row[0] > get_settings().cache_max_age:
+            log.info("downloading %s", key)
             df = fetch(key)
-            con.execute("DELETE FROM bars WHERE symbol = ?", (key,))
-            con.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?, ?)",
-                            [(key, d.date().isoformat(), *r) for d, r in zip(df.index, df.itertuples(index=False))])
-            con.execute("INSERT OR REPLACE INTO fetched VALUES (?, ?)", (key, time.time()))
+            with con:
+                con.execute("DELETE FROM bars WHERE symbol = ?", (key,))
+                con.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                [(key, d.date().isoformat(), *r) for d, r in zip(df.index, df.itertuples(index=False), strict=True)])
+                con.execute("INSERT OR REPLACE INTO fetched VALUES (?, ?)", (key, time.time()))
         df = pd.read_sql("SELECT date, open, high, low, close, volume FROM bars WHERE symbol = ? ORDER BY date", con,
                          params=(key,), parse_dates=["date"], index_col="date")
+    finally:
+        con.close()
     return completed(df, market_tz(key))

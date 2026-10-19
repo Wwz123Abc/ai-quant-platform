@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant import scan
+from quantlab.core import scan
 
 
 def walk(n=1500, seed=1):
@@ -33,7 +33,7 @@ def test_scan_skips_pairs_with_fast_not_below_slow():
     b = walk()
     ins, oos = scan.windows(b, 100)
     df = scan.scan(b, ins, oos, fasts=(10, 50, 100), slows=(50, 100), slippage_bps=0)
-    assert sorted(zip(df["fast"], df["slow"])) == [(10, 50), (10, 100), (50, 100)]
+    assert sorted(zip(df["fast"], df["slow"], strict=True)) == [(10, 50), (10, 100), (50, 100)]
     assert {"is_sharpe", "oos_sharpe", "is_cagr", "oos_cagr"} <= set(df.columns)
 
 

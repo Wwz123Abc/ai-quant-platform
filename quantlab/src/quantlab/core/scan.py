@@ -1,6 +1,7 @@
 """Parameter scan with an out-of-sample check: choose parameters on an earlier period, then test them on a later one."""
 import pandas as pd
 
+from ..errors import InvalidInput
 from . import backtest, metrics, strategy
 
 FAST = (5, 10, 15, 20, 30, 40, 50, 75, 100)
@@ -14,14 +15,14 @@ def windows(bars, slowest, start=None, end=None, split=None):
     Both begin after the slowest average has enough history, so every pair is tested on the same days.
     Without a split date the last 30% of the days are held out."""
     if len(bars) < slowest + 500:
-        raise ValueError("数据只有 %d 个交易日，扣掉 %d 日均线的预热期后不够分成两段" % (len(bars), slowest))
+        raise InvalidInput("数据只有 %d 个交易日，扣掉 %d 日均线的预热期后不够分成两段" % (len(bars), slowest))
     first = bars.index[slowest - 1]
     lo = max(first, pd.Timestamp(start)) if start else first
     w = bars.loc[lo:end] if end else bars.loc[lo:]
     cut = pd.Timestamp(split) if split else w.index[int(len(w) * 0.7)]
     ins, oos = w[w.index < cut], w[w.index >= cut]
     if len(ins) < 250 or len(oos) < 250:
-        raise ValueError("样本内和样本外都至少要有一年（250 个交易日）的数据")
+        raise InvalidInput("样本内和样本外都至少要有一年（250 个交易日）的数据")
     return ins, oos
 
 

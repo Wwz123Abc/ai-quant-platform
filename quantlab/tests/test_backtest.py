@@ -3,7 +3,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-from quant import backtest, data, metrics, strategy
+from quantlab.core import backtest, data, metrics, strategy
 
 
 def bars(closes, opens=None):

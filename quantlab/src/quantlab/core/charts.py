@@ -56,7 +56,7 @@ def heatmap(path, sym, df, by, best, spans):
     lo, hi = min(g.min().min() for g in grids), max(g.max().max() for g in grids)
     name = {"sharpe": "夏普比率", "cagr": "年化收益"}[by]
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.6), constrained_layout=True)
-    for ax, g, label, span in zip(axes, grids, ("样本内（挑参数）", "样本外（检验）"), spans):
+    for ax, g, label, span in zip(axes, grids, ("样本内（挑参数）", "样本外（检验）"), spans, strict=True):
         im = ax.imshow(g.to_numpy(dtype=float), cmap="RdYlGn", vmin=lo, vmax=hi, aspect="auto")
         for i, f in enumerate(fasts):
             for j, s in enumerate(slows):

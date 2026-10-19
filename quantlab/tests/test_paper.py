@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quant import paper
+from quantlab.core import paper
 
 PARAMS = {"fast": 3, "slow": 10}
 
