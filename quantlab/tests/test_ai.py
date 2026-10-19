@@ -271,3 +271,16 @@ def test_create_ai_account(ai_client):
     r = ai_client.post("/api/paper/accounts", json=body, headers=AUTH)
     assert r.status_code == 201, r.text
     assert r.json()["strategy"] == "ai_rating" and r.json()["params"] == {"every_days": 5}
+
+
+def test_key_name_without_tradingagents(monkeypatch):
+    import builtins
+    real = builtins.__import__
+
+    def no_tradingagents(name, *args, **kwargs):
+        if name.startswith("tradingagents"):
+            raise ImportError(name)
+        return real(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_tradingagents)
+    assert engine.key_env("deepseek") == "DEEPSEEK_API_KEY"

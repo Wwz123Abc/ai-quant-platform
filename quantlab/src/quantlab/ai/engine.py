@@ -39,9 +39,11 @@ def _load_env():
 
 
 def key_env(provider):
-    if not available():
-        return None
-    from tradingagents.llm_clients.api_key_env import get_api_key_env
+    """The environment variable holding provider's key, from TradingAgents' own table when it is installed."""
+    try:
+        from tradingagents.llm_clients.api_key_env import get_api_key_env
+    except ImportError:
+        return "%s_API_KEY" % provider.upper().replace("-", "_")
     return get_api_key_env(provider)
 
 
