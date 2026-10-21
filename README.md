@@ -1,6 +1,6 @@
 # AI量化交易分析平台
 
-一个人用的美股投资平台：记账、分析、按规则管理持仓，三件事放在同一个网站、同一个登录下。
+一个人用的美股投资平台：记账、分析、按规则管理持仓，三件事放在同一个网站、同一个登录下。目标和取舍见[目标说明](docs/goals.md)。
 
 线上地址：https://stock.wwz.cool （首页是持仓账本，量化分析在 `/lab/`，只有指定的一个账号能进）
 
@@ -36,7 +36,7 @@
 ```
 ledger/      持仓账本：app.py（服务器和命令行）、static/（页面）、tests/（端到端测试）、deploy/
 quantlab/    量化分析：src/quantlab/（Python 包）、web/（React 工作台）、tests/、docs/、deploy/
-docs/        平台文档：路线图、市场调研
+docs/        平台文档：目标说明、路线图、市场调研
 ```
 
 ## 本机试用
@@ -49,7 +49,7 @@ cd ledger && python3 app.py serve
 cd quantlab && pip install -e ".[ml]" && python -m quantlab serve
 ```
 
-各模块的完整说明：[持仓账本](ledger/README.md) · [量化分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [路线图](docs/roadmap.md) · [市场调研](docs/research/2026-10-market-research.md)
+各模块的完整说明：[持仓账本](ledger/README.md) · [量化分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [目标说明](docs/goals.md) · [路线图](docs/roadmap.md) · [市场调研](docs/research/2026-10-market-research.md)
 
 ## 测试
 
