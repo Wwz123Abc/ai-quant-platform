@@ -88,7 +88,7 @@ def load_history(refresh=False):
     """The changes table, fetched from Wikipedia (CC BY-SA) on first use or when refresh is set."""
     p = history_path()
     if refresh or not p.exists():
-        req = urllib.request.Request(HISTORY_URL, headers={"User-Agent": "quantlab research (https://github.com/Wwz123Abc/quant-lab)"})
+        req = urllib.request.Request(HISTORY_URL, headers={"User-Agent": "quantlab research (https://github.com/Wwz123Abc/ai-quant-platform)"})
         try:
             with urllib.request.urlopen(req, timeout=get_settings().http_timeout) as r:
                 text = r.read().decode("utf-8")

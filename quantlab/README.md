@@ -1,4 +1,4 @@
-# QuantLab 量化研究工作站
+# QuantLab：AI量化交易分析平台的量化分析模块
 
 美股和港股的量化研究工具：**回测**、**参数扫描与样本外检验**、**每日信号**、**模拟盘**。可以在命令行使用，也可以打开网页工作台。
 
@@ -259,7 +259,7 @@ python -m quantlab paper new AI --symbols QQQM,VOO --strategy ai --every 7
 | `QUANTLAB_PRICE_SOURCE` | `yahoo` | `cn`：腾讯 K 线 + 新浪复权因子，用于连不上 Yahoo 的服务器 |
 | `QUANTLAB_AUTH_MODE` | `token` | `proxy`：放在账本网站后面，由 nginx 先检查账本登录（见[部署文档](docs/deploy.md)） |
 | `QUANTLAB_BASE_PATH` | 空 | 挂在子路径下时填，例如 `/lab` |
-| `QUANTLAB_HOME_URL` | 空 | 导航栏里“← 美股账本”的链接 |
+| `QUANTLAB_HOME_URL` | 空 | 导航栏里“← 持仓账本”的链接 |
 
 ## 开发
 
@@ -318,6 +318,8 @@ docs/          架构说明和图片
 设计和取舍见 [docs/architecture.md](docs/architecture.md)，其中也说明了与 TradingAgents、DeltaFStation 两个开源项目的关系。
 
 ## 路线图
+
+整个平台（持仓账本 + 量化分析）的计划见 [平台路线图](../docs/roadmap.md)。
 
 - [x] 回测、参数扫描与样本外检验、每日信号
 - [x] 模拟盘（不可改写的每日决定）

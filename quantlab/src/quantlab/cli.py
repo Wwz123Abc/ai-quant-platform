@@ -621,7 +621,7 @@ def cmd_open(a):
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="quantlab", description="量化研究工作站：回测、参数扫描、每日信号、模拟盘")
+    p = argparse.ArgumentParser(prog="quantlab", description="AI量化交易分析平台 · 量化分析：回测、参数扫描、每日信号、模拟盘")
     p.add_argument("--version", action="version", version="%(prog)s " + __version__)
     sub = p.add_subparsers(dest="cmd", required=True)
 

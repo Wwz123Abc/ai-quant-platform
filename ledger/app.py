@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""美股持仓账本 — self-hosted server.
+"""持仓账本（AI量化交易分析平台）— self-hosted server.
 
 Standard library only (Python 3.10+). Serves the ledger pages to registered accounts, keeps each account's
 records in SQLite as small JSON documents grouped in collections, and refreshes prices, daily closes and
@@ -700,7 +700,7 @@ class Handler(BaseHTTPRequestHandler):
         # ---- nginx's check before every request to the quant platform (auth_request): 200 for its owner only
         if parts == ["sso"] and method == "GET":
             if not platform_owner(uid):
-                return self.send_json(403, {"error": "这个账号不能使用量化平台。"})
+                return self.send_json(403, {"error": "这个账号不能使用量化分析。"})
             return self.send_json(200, {"ok": True}, {"X-Ledger-User": urllib.parse.quote(get_user_by_id(uid)["name"])})
 
         # ---- signed in: the account itself

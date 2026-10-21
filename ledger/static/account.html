@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>账号 · 美股持仓账本</title>
+<title>账号 · AI量化交易分析平台</title>
 <style>
 /* Layout: one column of cards: change password, export records, delete the account */
 :root {
@@ -39,7 +39,7 @@ button:disabled { opacity: .6; cursor: default; }
 <body>
 <main>
   <div>
-    <p><a href="/">← 回到美股持仓账本</a></p>
+    <p><a href="/">← 回到持仓账本</a></p>
     <h1>账号</h1>
     <p id="who">正在读取…</p>
   </div>
@@ -129,7 +129,7 @@ button:disabled { opacity: .6; cursor: default; }
       const data = await api("GET", "/api/export");
       const n = Object.values(data).reduce((t, docs) => t + Object.keys(docs).length, 0);
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
-      const a = Object.assign(document.createElement("a"), { href: url, download: "美股持仓账本-" + name + "-" + new Date().toISOString().slice(0, 10) + ".json" });
+      const a = Object.assign(document.createElement("a"), { href: url, download: "持仓账本-" + name + "-" + new Date().toISOString().slice(0, 10) + ".json" });
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       say(msg, "已导出 " + n + " 条记录。", "ok");

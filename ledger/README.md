@@ -1,4 +1,6 @@
-# 美股持仓账本
+# 持仓账本
+
+[AI量化交易分析平台](../README.md)的持仓账本模块，也可以单独部署使用。
 
 一个可以自己部署的个人投资账本：把**美股、港股、美国国债、定期存款**记在一处，自动算持仓成本、盈亏、资产占比和收益走势。
 
@@ -40,8 +42,8 @@
 需要 Python 3.10 或更新版本。
 
 ```bash
-git clone https://github.com/Wwz123Abc/stock-ledger.git
-cd stock-ledger
+git clone https://github.com/Wwz123Abc/ai-quant-platform.git
+cd ai-quant-platform/ledger
 python3 app.py serve
 ```
 
@@ -59,9 +61,10 @@ python3 app.py serve
 # 0. 装好 git、nginx 和 certbot（Ubuntu 自带 Python 3）
 sudo apt update && sudo apt install -y git nginx certbot python3-certbot-nginx
 
-# 1. 建一个专用用户，把代码放到 /opt/stock-ledger
+# 1. 建一个专用用户，把代码放到 /opt/ai-quant-platform，账本目录链接成 /opt/stock-ledger
 sudo useradd --system --home /opt/stock-ledger --shell /usr/sbin/nologin stockledger
-sudo git clone https://github.com/Wwz123Abc/stock-ledger.git /opt/stock-ledger
+sudo git clone https://github.com/Wwz123Abc/ai-quant-platform.git /opt/ai-quant-platform
+sudo ln -s /opt/ai-quant-platform/ledger /opt/stock-ledger
 sudo mkdir -p /opt/stock-ledger/data
 sudo chown -R stockledger:stockledger /opt/stock-ledger/data
 
@@ -120,7 +123,9 @@ docker compose exec ledger python app.py users
 | 手动备份 | `python3 app.py backup`（存到 `data/backups/`） |
 | 命令行取行情 | `python3 app.py refresh 用户名` |
 | 导入数据 | `python3 app.py import 用户名 文件.json`，格式见 `demo.json`，和“账号”页导出的文件相同 |
-| 更新到新版本 | `cd /opt/stock-ledger && sudo git pull && sudo systemctl restart stock-ledger` |
+| 更新到新版本 | `cd /opt/ai-quant-platform && sudo git pull && sudo systemctl restart stock-ledger` |
+| 指定量化分析的使用者 | `python3 app.py platform-owner 用户名`（只有这个账号能打开 `/lab/`）；`platform-owner off` 关闭 |
+| 把只读密钥写给程序 | `python3 app.py read-key 用户名 文件`：新建该账号的只读密钥，直接写进文件的 `LEDGER_TOKEN=` 一行，不显示；旧密钥失效 |
 
 全部数据就是 `data/ledger.db` 这一个文件，换服务器时把它复制过去就行。
 

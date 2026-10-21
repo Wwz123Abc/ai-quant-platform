@@ -25,7 +25,7 @@ def _agent():
         load_dotenv(".env", override=False)
     except ImportError:
         pass
-    return os.environ.get("SEC_EDGAR_USER_AGENT") or "quantlab research https://github.com/Wwz123Abc/quant-lab"
+    return os.environ.get("SEC_EDGAR_USER_AGENT") or "quantlab research https://github.com/Wwz123Abc/ai-quant-platform"
 
 
 def _get(url):

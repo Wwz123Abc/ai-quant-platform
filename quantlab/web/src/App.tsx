@@ -24,14 +24,14 @@ export default function App() {
   if (auth.isPending) return <p className="empty">正在连接…</p>;
   if (auth.error instanceof ApiError && auth.error.status === 401) {
     // under the ledger site a 401 means the ledger session ended; nginx sends page loads back to its sign-in
-    if (BASE) return <p className="empty">登录已过期，请<a href="/">回到美股账本</a>重新登录。</p>;
+    if (BASE) return <p className="empty">登录已过期，请<a href="/">回到持仓账本</a>重新登录。</p>;
     return <TokenGate onDone={() => auth.refetch()} />;
   }
 
   return (
     <div className="shell">
       <nav className="nav" aria-label="主导航">
-        <div className="brand">QuantLab<small>量化研究工作站</small></div>
+        <div className="brand">AI量化交易分析平台<small>量化分析 · QuantLab</small></div>
         <NavLink to="/" end>总览</NavLink>
         <NavLink to="/holdings">我的持仓</NavLink>
         <NavLink to="/analyze">个股分析</NavLink>
@@ -42,7 +42,7 @@ export default function App() {
         <NavLink to="/ml">机器学习选股</NavLink>
         <NavLink to="/trading">自动交易</NavLink>
         <a href={`${BASE}/api/docs`} target="_blank" rel="noreferrer">接口文档 ↗</a>
-        {auth.data?.home_url ? <a href={auth.data.home_url}>← 美股账本</a> : null}
+        {auth.data?.home_url ? <a href={auth.data.home_url}>← 持仓账本</a> : null}
         <div className="foot">v{auth.data?.version} · 仅用于研究，不构成投资建议</div>
       </nav>
       <main>

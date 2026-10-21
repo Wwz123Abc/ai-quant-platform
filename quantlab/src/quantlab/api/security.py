@@ -34,7 +34,7 @@ def require_token(request: Request, authorization: str | None = Header(default=N
     s = get_settings()
     if s.auth_mode == "proxy":
         if not request.headers.get(s.user_header, "").strip():
-            raise HTTPException(401, "请先登录美股账本")
+            raise HTTPException(401, "请先登录AI量化交易分析平台")
         if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get("X-Requested-With") != "quantlab":
             raise HTTPException(403, "请求来源不对")
         return
