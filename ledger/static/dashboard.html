@@ -290,7 +290,7 @@ window.dash = (() => {
 <script>
 dash.calc("holdings", {
   title: "每只股票的持仓",
-  description: "按交易记录用移动平均法算持股和成本（含拆股、合股），再用最新一根日 K 线的收盘价算市值和盈亏。",
+  description: "按交易记录用移动平均法算持股和成本（含拆股、合股），再用最新一根日 K 线的收盘价算市值和盈亏。K 线已按拆股、合股调整，52 周高低点按调整后的价格算。",
   inputs: ["trades", "candles"],
   fn: (trades, candles) => {
     const bars = {};
@@ -439,7 +439,11 @@ dash.calc("weights", {
     lay.trades.filter((t) => lay.dates.find((v) => v >= String(t.date).slice(0, 10)) === d.date).forEach((t) => {
       if (t.side === "dividend") parts.push(tipLine("分红", f2(+t.amount) + (+t.tax ? "（扣税 " + f2(+t.tax) + "）" : ""), "kx-up"));
       else if (t.side === "split") parts.push(tipLine(LedgerCalc.ratio(t) < 1 ? "合股" : "拆股", shares(+t.from) + " → " + shares(+t.to), ""));
-      else parts.push(tipLine(t.side === "buy" ? "你买入" : "你卖出", shares(+t.shares) + " 股 @ " + f2(+t.price), t.side === "buy" ? "kx-up" : "kx-dn"));
+      else {
+        const k = LedgerCalc.factorAfter(String(t.date).slice(0, 10), (window.LEDGER_SPLITS || {})[t.symbol] || []);
+        parts.push(tipLine(t.side === "buy" ? "你买入" : "你卖出", shares(+t.shares) + " 股 @ " + f2(+t.price), t.side === "buy" ? "kx-up" : "kx-dn"));
+        if (k !== 1) parts.push(tipLine("按拆股调整", shares(+t.shares * k) + " 股 @ " + f2(+t.price / k), ""));
+      }
     });
     tip.replaceChildren(...parts);
     tip.hidden = false;
@@ -694,6 +698,16 @@ dash.calc("weights", {
         .attr("text-anchor", "middle").style("fill", color).text(buy ? "B" : "S");
     });
 
+    // Split days: a dashed line and the ratio. Prices before them are already divided by the ratio.
+    ((window.LEDGER_SPLITS || {})[h.symbol] || []).forEach(([day, k]) => {
+      const d = dates.find((v) => v >= day), bar = d && vis[dates.indexOf(d)];
+      if (!bar || day < dates[0]) return;
+      const X = cx(bar), label = k >= 1 ? "拆 1→" + +k.toFixed(4) : "合 " + +(1 / k).toFixed(4) + "→1";
+      g.append("line").attr("x1", X).attr("x2", X).attr("y1", 14).attr("y2", PH)
+        .style("stroke", "var(--cds-chart-reference)").style("stroke-dasharray", "3 3").style("stroke-width", 1);
+      g.append("text").attr("class", "kx-cost").attr("x", X + 4).attr("y", 12).text(label);
+    });
+
     // Date labels.
     const every = Math.max(1, Math.ceil(vis.length / (narrow ? 4 : 7)));
     const ticks = vis.filter((d, i) => i % every === 0);
@@ -790,7 +804,10 @@ dash.calc("weights", {
     return j;
   }
   async function load() {
-    const [c, t, cfg] = await Promise.all([api("GET", "/api/c/candles"), api("GET", "/api/c/trades"), api("GET", "/api/d/config/main")]);
+    const [c, t, cfg, ac] = await Promise.all([api("GET", "/api/c/candles"), api("GET", "/api/c/trades"), api("GET", "/api/d/config/main"),
+      api("GET", "/api/c/actions").catch(() => ({ docs: [] }))]);
+    const actions = {};
+    for (const d of ac.docs) actions[d.id] = d.data || {};
     const conf = cfg.data || {}, quotes = conf.quotes || {};
     const candles = [];
     for (const d of c.docs) {
@@ -803,6 +820,14 @@ dash.calc("weights", {
         amount: Number(x.amount) || 0, tax: Number(x.tax) || 0, from: Number(x.from) || 0, to: Number(x.to) || 0,
         currency: x.currency || (/^\d+$/.test(x.symbol) ? "HKD" : "USD"), created_at: x.createdAt || "", createdAt: x.createdAt || "" };
     });
+    // Bars before a split are divided by its ratio, so the chart, averages and 52-week range read as today's shares.
+    const splitsOf = {};
+    for (const sym of new Set(candles.map((b) => b.symbol))) splitsOf[sym] = LedgerCalc.splitList(sym, actions, trades);
+    for (const b of candles) {
+      const k = LedgerCalc.factorAfter(String(b.date).slice(0, 10), splitsOf[b.symbol]);
+      if (k !== 1) { b.open /= k; b.high /= k; b.low /= k; b.close /= k; b.volume *= k; }
+    }
+    window.LEDGER_SPLITS = splitsOf;
     const fx = [{ pair: "USDHKD", rate: Number(conf.fx) || 7.8 }];
     dash._set({ candles, trades, fx });
     await Promise.all(WATCH.map(async (w) => {

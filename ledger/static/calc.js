@@ -111,5 +111,30 @@
     return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
-  root.LedgerCalc = { SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions };
+  // Splits of one symbol as [date, ratio] oldest first, from market data and from the records; a record within
+  // 5 days of a market split is the same split.
+  function splitList(symbol, actions, records) {
+    const out = ((actions && actions[symbol] && actions[symbol].splits) || [])
+      .map(([d, from, to]) => [d, num(to) / num(from)]).filter(([, k]) => k > 0 && Number.isFinite(k));
+    for (const r of records || []) {
+      if (r.symbol === symbol && r.side === "split" && ratio(r) > 0 && !out.some(([d]) => Math.abs(days(d, r.date)) <= 5)) out.push([r.date, ratio(r)]);
+    }
+    return out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  }
+
+  // How many of today's shares one share held on `date` has become: the product of the ratios of later splits.
+  // A split dated on `date` has already happened, as for records.
+  const factorAfter = (date, splits) => splits.reduce((k, [d, r]) => (d > date ? k * r : k), 1);
+
+  // Daily bars { date, open, high, low, close, volume } as they read after every later split, so a split is not a
+  // cliff in a chart: prices divided by the factor, volume multiplied by it.
+  function splitAdjust(bars, splits) {
+    if (!splits.length) return bars;
+    return bars.map((b) => {
+      const k = factorAfter(b.date, splits);
+      return k === 1 ? b : Object.assign({}, b, { open: b.open / k, high: b.high / k, low: b.low / k, close: b.close / k, volume: b.volume * k });
+    });
+  }
+
+  root.LedgerCalc = { SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust };
 })(typeof window !== "undefined" ? window : globalThis);

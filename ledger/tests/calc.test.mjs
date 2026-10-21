@@ -129,3 +129,25 @@ test("after a recorded split, a later dividend is estimated on the split share c
   near(m[0].shares, 10);
   near(m[0].gross, 1);
 });
+
+test("split list: market data and records merged, a record near a market split is the same split", () => {
+  const actions = { NFLX: { dividends: [], splits: [["2015-07-15", 1, 7], ["2025-11-17", 1, 10]] } };
+  const records = [{ date: "2025-11-18", side: "split", symbol: "NFLX", from: 1, to: 10 }, { date: "2026-05-01", side: "split", symbol: "NFLX", from: 2, to: 1 }];
+  const s = C.splitList("NFLX", actions, records);
+  assert.equal(s.map(([d, k]) => d + ":" + k).join(), "2015-07-15:7,2025-11-17:10,2026-05-01:0.5");
+  assert.equal(C.splitList("VOO", actions, records).length, 0);
+});
+
+test("factor after a date and split-adjusted bars", () => {
+  const splits = [["2015-07-15", 7], ["2025-11-17", 10]];
+  near(C.factorAfter("2015-07-14", splits), 70);
+  near(C.factorAfter("2015-07-15", splits), 10); // the split day is already split
+  near(C.factorAfter("2025-11-17", splits), 1);
+  const bars = [{ date: "2025-11-14", open: 1110, high: 1120, low: 1100, close: 1112, volume: 3e6 },
+    { date: "2025-11-17", open: 111, high: 112, low: 109, close: 110.29, volume: 4e7 }];
+  const adj = C.splitAdjust(bars, [["2025-11-17", 10]]);
+  near(adj[0].close, 111.2);
+  near(adj[0].volume, 3e7);
+  assert.equal(adj[1], bars[1]); // after the split: untouched
+  assert.equal(C.splitAdjust(bars, []), bars);
+});
