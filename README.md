@@ -36,7 +36,7 @@
 ```
 ledger/      持仓账本：app.py（服务器和命令行）、static/（页面）、tests/（端到端测试）、deploy/
 quantlab/    量化分析：src/quantlab/（Python 包）、web/（React 工作台）、tests/、docs/、deploy/
-docs/        平台文档：路线图
+docs/        平台文档：路线图、市场调研
 ```
 
 ## 本机试用
@@ -49,7 +49,7 @@ cd ledger && python3 app.py serve
 cd quantlab && pip install -e ".[ml]" && python -m quantlab serve
 ```
 
-各模块的完整说明：[持仓账本](ledger/README.md) · [量化分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [路线图](docs/roadmap.md)
+各模块的完整说明：[持仓账本](ledger/README.md) · [量化分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [路线图](docs/roadmap.md) · [市场调研](docs/research/2026-10-market-research.md)
 
 ## 测试
 
