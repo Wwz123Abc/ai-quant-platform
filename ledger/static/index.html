@@ -192,6 +192,9 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .cap { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); font-family: var(--f-body); }
 
 .warn { margin: 0; font-size: 13px; color: var(--warn); }
+.check { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.check.bad { color: var(--warn); }
+.check ul { margin: 4px 0 0; padding-left: 18px; }
 .hints { margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; }
 .hints h3 { margin: 0 0 4px; font-size: 14px; }
 .hints .src { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
@@ -450,6 +453,7 @@ footer p { margin: 0 0 6px; }
       </table>
     </div>
     <p class="warn" id="warn" hidden></p>
+    <p class="check" id="checkLine" hidden></p>
     <div class="hints" id="actHints" hidden></div>
   </section>
 
@@ -910,7 +914,7 @@ TAL|好未来|TAL Education
   const EN = Object.fromEntries(LIST.map((x) => [x.c, x.en]));
   const DEFAULT_PICKS = ["QQQM", "VOO", "AAPL", "NVDA", "TSLA", "0700", "9988", "NIO"];
 
-  const state = { actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
+  const state = { checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
   let db = null;
   const $ = (s) => document.querySelector(s);
 
@@ -1295,7 +1299,8 @@ TAL|好未来|TAL Education
           ? '<span class="' + tone(s.unreal) + '">' + signed(s.unreal, s.ccy) + "<br><small>" + (s.cost > 0 ? pct(s.unreal / s.cost * 100) : "") + "</small></span>" + usdCap(s.unreal, s.ccy, true)
           : '<span class="muted">—</span>';
         const qt = state.quotes[s.symbol];
-        const cap = qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘")) : "";
+        const cap = qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘") +
+          (qt.source && qt.source !== "腾讯财经" ? " · " + esc(qt.source) : "") + (checkBad(s.symbol) ? " · 核对不一致" : "")) : "";
         const sym = esc(s.symbol), prev = prevClose(s.symbol, qt && qt.date ? qt.date : todayUS());
         const dayCell = px > 0 && prev > 0
           ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "<br><small>" + signed((px - prev) * s.shares, s.ccy) + "</small></span>"
@@ -1829,6 +1834,37 @@ TAL|好未来|TAL Education
     renderLog(list);
     renderSymList(c);
     renderHints();
+    renderChecks(c);
+  }
+
+  // ---------- closes cross-checked with a second source ----------
+  // The server compares Tencent's last five daily closes with Eastmoney's on every refresh (US stocks).
+  const checkBad = (sym) => { const k = state.checks[sym]; return !!(k && (k.unchecked || k.mismatches.length || k.missing.length || k.stale)); };
+  function renderChecks(c) {
+    const el = $("#checkLine"), held = c.syms.filter((x) => x.shares > 0 && state.checks[x.symbol]).map((x) => x.symbol);
+    el.hidden = !held.length;
+    if (!held.length) return;
+    const bad = held.filter(checkBad), latest = held.map((x) => state.checks[x].latest).sort().pop();
+    el.className = "check" + (bad.length ? " bad" : "");
+    if (!bad.length) {
+      el.textContent = "收盘价已和东方财富逐日核对：" + held.length + " 只股票最近 5 个交易日一致（最新 " + md(latest) + "）。";
+      return;
+    }
+    const lines = [];
+    for (const sym of bad) {
+      const k = state.checks[sym];
+      if (k.unchecked) lines.push(esc(sym) + "：腾讯取不到，已改用" + esc(k.source) + "，这次没有第二个来源可以核对");
+      for (const [d, a, b] of k.mismatches) lines.push(esc(sym) + " " + md(d) + " 收盘：腾讯 " + nf3.format(a) + "，东方财富 " + nf3.format(b) + "，差 " + nf2.format(Math.abs(a / b - 1) * 100) + "%");
+      if (k.missing.length) lines.push(esc(sym) + " 缺 " + k.missing.map(([d, who]) => md(d) + " 的" + who + "数据").join("、"));
+      if (k.stale) lines.push(esc(sym) + " 最新收盘停在 " + (k.latest ? md(k.latest) : "—") + "，数据可能没有更新");
+    }
+    el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（腾讯和东方财富对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
+  }
+  function applyChecks(snap) {
+    const k = {};
+    snap.docs.forEach((doc) => { const d = doc.data() || {}; k[doc.id] = { mismatches: d.mismatches || [], missing: d.missing || [], stale: !!d.stale, latest: d.latest || "", unchecked: !!d.unchecked, source: d.source || "" }; });
+    state.checks = k;
+    render();
   }
 
   // ---------- dividends and splits the records may be missing ----------
@@ -2503,6 +2539,7 @@ TAL|好未来|TAL Education
     db.collection("trades").onSnapshot(applyTrades, (err) => setStatus("读取交易记录出错（" + (err && err.code) + "），刷新页面试试。", "err"));
     db.collection("history").onSnapshot(applyHistory, () => { state.histReady = true; render(); });
     db.collection("actions").onSnapshot(applyActions, () => {});
+    db.collection("checks").onSnapshot(applyChecks, () => {});
     db.doc("config/actions").onSnapshot(applyDismissed, () => {});
     db.doc("config/main").onSnapshot(applyConfig, () => {});
     db.collection("fixed").onSnapshot(applyFixed, () => {});
@@ -2571,8 +2608,8 @@ TAL|好未来|TAL Education
     setStatus("正在从腾讯财经、新浪财经取最新价格和汇率…", "");
     try {
       const r = await window.ledgerApi("POST", "/api/refresh");
-      const [t, hi, c, fx, ac] = await Promise.all([db.collection("trades").get(), db.collection("history").get(), db.doc("config/main").get(), db.collection("fixed").get(), db.collection("actions").get()]);
-      applyTrades(t); applyHistory(hi); applyConfig(c); applyFixed(fx); applyActions(ac);
+      const [t, hi, c, fx, ac, ck] = await Promise.all([db.collection("trades").get(), db.collection("history").get(), db.doc("config/main").get(), db.collection("fixed").get(), db.collection("actions").get(), db.collection("checks").get()]);
+      applyTrades(t); applyHistory(hi); applyConfig(c); applyFixed(fx); applyActions(ac); applyChecks(ck);
       const errs = Object.keys(r.errors || {}), kept = r.kept_manual || [];
       setStatus("已更新 " + Object.keys(r.updated || {}).length + " 只股票的价格和汇率（" + stamp(state.updatedAt) + "，香港时间）" +
         (kept.length ? "；" + kept.join("、") + " 保留你手动填的价格" : "") + (errs.length ? "；没取到：" + errs.join("、") : "") + "。", errs.length ? "err" : "ok");

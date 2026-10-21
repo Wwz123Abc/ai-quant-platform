@@ -43,7 +43,7 @@ DATA = os.path.join(ROOT, "data")
 DB_PATH = os.path.join(DATA, "ledger.db")
 STATIC = os.path.join(ROOT, "static")
 USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
-SHARED_COLLS = {"history", "candles", "watch", "actions"}  # market data: written only by the server, uid 0
+SHARED_COLLS = {"history", "candles", "watch", "actions", "checks"}  # market data: written only by the server, uid 0
 PAGES = {"/": "index.html", "/index.html": "index.html", "/dashboard": "dashboard.html", "/reading": "reading.html", "/plan": "plan.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
 ASSETS = {"d3.min.js": "text/javascript; charset=utf-8", "calc.js": "text/javascript; charset=utf-8"}
@@ -492,6 +492,64 @@ def us_splits(sym):
     return out
 
 
+# Eastmoney's market id for a Tencent exchange suffix; unknown suffixes try all three
+EM_MARKET = {"OQ": "105", "N": "106", "AM": "107", "PS": "107"}
+CHECK_DAYS, CHECK_TOLERANCE, STALE_DAYS = 5, 0.002, 6
+
+
+def em_markets(code):
+    tail = code.rsplit(".", 1)[-1] if "." in code else ""
+    return [EM_MARKET[tail]] if tail in EM_MARKET else ["105", "106", "107"]
+
+
+def em_quote(sym, code):
+    """Latest US price from Eastmoney as {price, date, prev_close}, or None when it does not know the symbol."""
+    for m in em_markets(code):
+        url = "https://push2.eastmoney.com/api/qt/stock/get?secid=%s.%s&fltt=2&fields=f43,f60,f86" % (m, urllib.parse.quote(sym))
+        d = json.loads(fetch(url, referer="https://quote.eastmoney.com/", encoding="utf-8")).get("data") or {}
+        if isinstance(d.get("f43"), (int, float)) and d["f43"] > 0 and d.get("f86"):
+            day = dt.datetime.fromtimestamp(d["f86"], ZoneInfo("America/New_York")).date().isoformat()
+            return {"price": float(d["f43"]), "date": day, "prev_close": d.get("f60")}
+    return None
+
+
+def em_bars(sym, code, days=320):
+    """Unadjusted daily bars of a US stock from Eastmoney, in the same form as daily_bars."""
+    for m in em_markets(code):
+        url = ("https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s.%s&fields1=f1,f2,f3"
+               "&fields2=f51,f52,f53,f54,f55,f56&klt=101&fqt=0&lmt=%d&end=20500101") % (m, urllib.parse.quote(sym), days)
+        rows = (json.loads(fetch(url, referer="https://quote.eastmoney.com/", encoding="utf-8")).get("data") or {}).get("klines") or []
+        out = []
+        for r in rows:
+            day, o, c, hi, lo, v = r.split(",")[:6]  # Eastmoney order: date, open, close, high, low, volume
+            if min(float(o), float(c), float(hi), float(lo)) > 0:
+                out.append([day, round(float(o), 4), round(float(hi), 4), round(float(lo), 4), round(float(c), 4), int(float(v))])
+        if out:
+            return out
+    return []
+
+
+def cross_check(bars, other, today):
+    """Tencent's last CHECK_DAYS closes against Eastmoney's: {days, mismatches: [[date, tencent, eastmoney]],
+    missing: [[date, "腾讯" or "东方财富"]], latest, stale}. A close differing by more than CHECK_TOLERANCE is a
+    mismatch; a date one source has and the other lacks is missing; the latest close older than STALE_DAYS
+    calendar days is stale."""
+    a = {b[0]: b[4] for b in bars[-CHECK_DAYS:]}
+    b = {r[0]: r[4] for r in other[-CHECK_DAYS:]}
+    lo = max(min(a) if a else "", min(b) if b else "")
+    days, mismatches, missing = sorted(d for d in set(a) | set(b) if d >= lo), [], []
+    for d in days:
+        if d not in a:
+            missing.append([d, "腾讯"])
+        elif d not in b:
+            missing.append([d, "东方财富"])
+        elif abs(a[d] / b[d] - 1) > CHECK_TOLERANCE:
+            mismatches.append([d, a[d], b[d]])
+    latest = max(a) if a else ""
+    stale = not latest or (dt.date.fromisoformat(today) - dt.date.fromisoformat(latest)).days > STALE_DAYS
+    return {"days": days, "mismatches": mismatches, "missing": missing, "latest": latest, "stale": stale}
+
+
 def gold_bars():
     """COMEX gold futures (front month) daily bars from Sina since 2016, as [date, open, high, low, close]."""
     text = fetch("https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_GC=/GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=GC",
@@ -540,6 +598,15 @@ def refresh_market(uid):
     symbols = sorted(set(traded) | {s for s in (cfg.get("prices") or {}) if SYMBOL_RE.match(s)})
     report = {"updated": {}, "kept_manual": [], "errors": {}, "history": {}}
     q, errs = quotes(symbols)
+    for s in [s for s in errs if not is_hk(s)]:
+        try:
+            x = em_quote(s, s)
+        except Exception:
+            x = None
+        if x:
+            q[s] = {"price": x["price"], "date": x["date"], "currency": "USD", "name": "", "code": s, "kind": "live" if in_session(s) else "close",
+                    "source": "东方财富"}
+            del errs[s]
     report["errors"].update(errs)
     prices, quotes_meta = dict(cfg.get("prices") or {}), dict(cfg.get("quotes") or {})
     for s, x in q.items():
@@ -548,7 +615,8 @@ def refresh_market(uid):
             report["kept_manual"].append(s)
             continue
         prices[s] = x["price"]
-        quotes_meta[s] = {"date": x["date"], "kind": x["kind"], "source": "腾讯财经", "currency": x["currency"], "name": x["name"]}
+        quotes_meta[s] = {"date": x["date"], "kind": x["kind"], "source": x.get("source", "腾讯财经"), "currency": x["currency"],
+                          "name": x["name"] or (quotes_meta.get(s) or {}).get("name", "")}
         report["updated"][s] = {"price": x["price"], "date": x["date"], "kind": x["kind"]}
     patch = {"prices": prices, "quotes": quotes_meta, "updatedAt": now_iso(), "source": "腾讯财经、新浪财经"}
     try:
@@ -576,7 +644,26 @@ def refresh_market(uid):
     for s in traded:
         try:
             code = (q.get(s) or {}).get("code") or s
-            bars = daily_bars(s, code)
+            try:
+                bars, bar_source = daily_bars(s, code), "腾讯财经"
+            except Exception:
+                if is_hk(s):
+                    raise
+                bars, bar_source = [], "腾讯财经"
+            other = []
+            if not is_hk(s):
+                try:
+                    other = em_bars(s, code, CHECK_DAYS + 5)
+                except Exception as e:
+                    report["errors"][s + " 核对"] = "东方财富取不到：%s" % e
+                if not bars and other:
+                    bars, bar_source = em_bars(s, code), "东方财富"
+                today = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+                if bars and other and bar_source == "腾讯财经":
+                    put_doc(0, "checks", s, {"symbol": s, "source": bar_source, "against": "东方财富", "checkedAt": now_iso(), **cross_check(bars, other, today)})
+                elif bars:  # Eastmoney stood in: nothing independent to compare with, so say so instead of "consistent"
+                    put_doc(0, "checks", s, {"symbol": s, "source": bar_source, "against": "", "checkedAt": now_iso(), "unchecked": True,
+                                             **cross_check(bars, bars, today)})
             if bars:
                 ccy = "HKD" if is_hk(s) else "USD"
                 put_doc(0, "history", s, {"symbol": s, "currency": ccy, "closes": {b[0]: b[4] for b in bars}, "updatedAt": now_iso()})

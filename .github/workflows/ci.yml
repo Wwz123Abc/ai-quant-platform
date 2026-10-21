@@ -17,6 +17,8 @@ jobs:
           python-version: "3.12"  # the server's version; the ledger uses the standard library only
       - name: Bookkeeping rules (moving average cost, dividends, splits)
         run: node --test ledger/tests/calc.test.mjs
+      - name: Server unit tests (price cross-check)
+        run: python -m unittest discover -s ledger/tests -p "test_*.py"
       - name: Read-only key, end to end
         run: python ledger/tests/e2e_readtoken.py
       - name: Platform sign-in check, end to end
