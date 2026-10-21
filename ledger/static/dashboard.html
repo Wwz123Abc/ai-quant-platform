@@ -149,6 +149,7 @@ body { margin: 0; background: var(--color-bg); color: var(--color-fg); padding: 
 [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
 </style>
 <script src="/assets/d3.min.js"></script>
+<script src="/assets/calc.js?v=1"></script>
 </head>
 <body>
 
@@ -289,22 +290,13 @@ window.dash = (() => {
 <script>
 dash.calc("holdings", {
   title: "每只股票的持仓",
-  description: "按交易记录用移动平均法算持股和成本，再用最新一根日 K 线的收盘价算市值和盈亏。",
+  description: "按交易记录用移动平均法算持股和成本（含拆股、合股），再用最新一根日 K 线的收盘价算市值和盈亏。",
   inputs: ["trades", "candles"],
   fn: (trades, candles) => {
     const bars = {};
     for (const c of candles) (bars[c.symbol] = bars[c.symbol] || []).push(c);
-    const pos = {};
-    const ordered = trades.slice().sort((a, b) => (a.date + (a.created_at || "")).localeCompare(b.date + (b.created_at || "")));
-    for (const t of ordered) {
-      const q = Number(t.shares), p = Number(t.price), f = Number(t.fees) || 0;
-      const s = pos[t.symbol] = pos[t.symbol] || { shares: 0, cost: 0, realized: 0, currency: t.currency };
-      if (t.side === "buy") { s.shares += q; s.cost += q * p + f; continue; }
-      const sold = Math.min(q, s.shares), avg = s.shares > 0 ? s.cost / s.shares : 0;
-      s.realized += sold * p - f - avg * sold;
-      s.cost -= avg * sold; s.shares -= sold;
-      if (s.shares < 1e-9) { s.shares = 0; s.cost = 0; }
-    }
+    const pos = LedgerCalc.holdings(trades);
+    for (const t of trades) if (pos[t.symbol]) pos[t.symbol].currency = pos[t.symbol].currency || t.currency;
     return Object.keys(pos).map((symbol) => {
       const s = pos[symbol];
       const b = (bars[symbol] || []).slice().sort((x, y) => x.date.localeCompare(y.date));
@@ -445,7 +437,9 @@ dash.calc("weights", {
       tipLine("涨跌", pct(chg), chg > 0 ? "kx-up" : chg < 0 ? "kx-dn" : ""), tipLine("成交量", volume(d.volume))];
     lay.mas.forEach((arr, k) => { const v = arr[lay.start + i]; if (v != null) parts.push(tipLine(["MA5", "MA20", "MA60"][k], f2(v))); });
     lay.trades.filter((t) => lay.dates.find((v) => v >= String(t.date).slice(0, 10)) === d.date).forEach((t) => {
-      parts.push(tipLine(t.side === "buy" ? "你买入" : "你卖出", shares(+t.shares) + " 股 @ " + f2(+t.price), t.side === "buy" ? "kx-up" : "kx-dn"));
+      if (t.side === "dividend") parts.push(tipLine("分红", f2(+t.amount) + (+t.tax ? "（扣税 " + f2(+t.tax) + "）" : ""), "kx-up"));
+      else if (t.side === "split") parts.push(tipLine(LedgerCalc.ratio(t) < 1 ? "合股" : "拆股", shares(+t.from) + " → " + shares(+t.to), ""));
+      else parts.push(tipLine(t.side === "buy" ? "你买入" : "你卖出", shares(+t.shares) + " 股 @ " + f2(+t.price), t.side === "buy" ? "kx-up" : "kx-dn"));
     });
     tip.replaceChildren(...parts);
     tip.hidden = false;
@@ -688,7 +682,7 @@ dash.calc("weights", {
 
     // Buy and sell points, placed on the first trading day on or after the trade date.
     const dates = vis.map((d) => d.date);
-    trades.forEach((t) => {
+    trades.filter(LedgerCalc.isTrade).forEach((t) => {
       const d = dates.find((v) => v >= String(t.date).slice(0, 10));
       const bar = d && vis[dates.indexOf(d)];
       if (!bar || String(t.date).slice(0, 10) < dates[0]) return;
@@ -806,7 +800,8 @@ dash.calc("weights", {
     const trades = t.docs.map((d) => {
       const x = d.data || {};
       return { date: x.date, side: x.side, symbol: x.symbol, shares: Number(x.shares) || 0, price: Number(x.price) || 0, fees: Number(x.fees) || 0,
-        currency: x.currency || (/^\d+$/.test(x.symbol) ? "HKD" : "USD"), created_at: x.createdAt || "" };
+        amount: Number(x.amount) || 0, tax: Number(x.tax) || 0, from: Number(x.from) || 0, to: Number(x.to) || 0,
+        currency: x.currency || (/^\d+$/.test(x.symbol) ? "HKD" : "USD"), created_at: x.createdAt || "", createdAt: x.createdAt || "" };
     });
     const fx = [{ pair: "USDHKD", rate: Number(conf.fx) || 7.8 }];
     dash._set({ candles, trades, fx });

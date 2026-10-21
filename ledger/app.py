@@ -46,7 +46,7 @@ USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
 SHARED_COLLS = {"history", "candles", "watch"}  # market data: written only by the server, uid 0
 PAGES = {"/": "index.html", "/index.html": "index.html", "/dashboard": "dashboard.html", "/reading": "reading.html", "/plan": "plan.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
-ASSETS = {"d3.min.js": "text/javascript; charset=utf-8"}
+ASSETS = {"d3.min.js": "text/javascript; charset=utf-8", "calc.js": "text/javascript; charset=utf-8"}
 NAME_RE = re.compile(r"^[A-Za-z0-9_一-鿿]{2,20}$")
 SYMBOL_RE = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,11}$")
 SESSION_DAYS = 30
@@ -259,6 +259,34 @@ def delete_user(uid):
 def platform_owner(uid):
     """The one account that may open the quant platform at /lab/ (set with `app.py platform-owner NAME`)."""
     return bool(uid) and get_meta("platform_owner") == str(uid)
+
+
+def trades_for_programs(docs):
+    """Buys and sells as a program that knows only those should read them: dividends and splits left out, and every
+    split after a trade already applied to it (shares times the ratio, price divided by it), so positions and average
+    costs come out as they are today. A split takes effect on its date, so trades on that date are already split."""
+    splits = []
+    for d in docs:
+        x = d["data"]
+        try:
+            k = float(x.get("to")) / float(x.get("from"))
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
+        if x.get("side") == "split" and k > 0:
+            splits.append((x.get("symbol"), str(x.get("date", "")), k))
+    out = []
+    for d in docs:
+        t = {"id": d["id"], **d["data"]}
+        if t.get("side") not in ("buy", "sell"):
+            continue
+        k = 1.0
+        for sym, day, r in splits:
+            if sym == t.get("symbol") and str(t.get("date", "")) < day:
+                k *= r
+        if k != 1.0:
+            t["shares"], t["price"], t["split_factor"] = float(t["shares"]) * k, float(t["price"]) / k, k
+        out.append(t)
+    return out
 
 
 # ---------------------------------------------------------------- read-only keys
@@ -691,7 +719,8 @@ class Handler(BaseHTTPRequestHandler):
             if too_many(holdings_calls, ruid, 120, 3600):
                 return self.send_json(429, {"error": "读取太频繁，一小时最多 120 次。"})
             note(holdings_calls, ruid)
-            body = {c: [{"id": d["id"], **d["data"]} for d in list_docs(ruid, c)] for c in ("trades", "fixed", "cash")}
+            body = {c: [{"id": d["id"], **d["data"]} for d in list_docs(ruid, c)] for c in ("fixed", "cash")}
+            body["trades"] = trades_for_programs(list_docs(ruid, "trades"))
             return self.send_json(200, {"account": get_user_by_id(ruid)["name"], "generated": now_iso(), **body})
 
         if not uid:

@@ -160,6 +160,8 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .sw.bond { background: var(--c-bond); }
 .sw.dep { background: var(--c-dep); }
 .sw.cash { background: var(--c-cash); }
+/* class rules below set display; this keeps the hidden attribute meaning hidden for all of them */
+[hidden] { display: none !important; }
 .paycash { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .paycash input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); }
 td.fname { white-space: normal; min-width: 170px; font-weight: 500; }
@@ -227,6 +229,7 @@ form { display: grid; gap: 14px; background: var(--surface); border: 1px solid v
 .field { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .field > label, .field > .lbl { font-size: 13px; color: var(--muted); }
 .field.wide { grid-column: 1 / -1; }
+#f-side-row { grid-column: span 2; }
 .field .sub { font-size: 12px; color: var(--muted); min-height: 1.2em; }
 .combo { position: relative; display: grid; }
 .suggest { position: absolute; z-index: 5; top: 100%; left: 0; width: max(100%, 230px); margin: 4px 0 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .14); max-height: 320px; overflow-y: auto; }
@@ -253,6 +256,10 @@ form { display: grid; gap: 14px; background: var(--surface); border: 1px solid v
 .chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; border: 1px solid currentColor; }
 .chip.buy { color: var(--up); }
 .chip.sell { color: var(--down); }
+.chip.dividend { color: var(--accent); }
+.chip.split { color: var(--muted); }
+.ratio { display: flex; align-items: center; gap: 8px; }
+.ratio input { width: 100%; min-width: 0; }
 .acts { display: flex; gap: 6px; justify-content: flex-end; }
 .mini { font: inherit; font-size: 12px; background: none; border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; color: var(--muted); cursor: pointer; }
 .mini.danger { border-color: var(--warn); color: var(--warn); }
@@ -344,6 +351,9 @@ footer p { margin: 0 0 6px; }
   .mixbox { padding: 12px; }
   form { padding: 14px; }
   .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  #f-side-row { grid-column: 1 / -1; }
+  #f-side-row .seg { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #f-side-row .seg label { padding: 7px 4px; text-align: center; }
   .nav-x { display: none; }
   #entry, #importDlg { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 14px; }
   #impText { font-size: 16px; }
@@ -427,7 +437,7 @@ footer p { margin: 0 0 6px; }
     </div>
     <div class="table-wrap">
       <table id="holdings">
-        <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">市值</th><th class="num">浮动盈亏</th><th class="num">已实现盈亏</th></tr></thead>
+        <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">市值</th><th class="num">浮动盈亏</th><th class="num">已实现盈亏 · 分红</th></tr></thead>
         <tbody><tr><td colspan="8" class="empty">正在读取持仓…</td></tr></tbody>
       </table>
     </div>
@@ -477,14 +487,16 @@ footer p { margin: 0 0 6px; }
     <form id="tradeForm" novalidate>
       <div class="fields">
         <div class="field">
-          <label for="f-date">成交日期（美国东部时间，按成交记录上的日期）</label>
+          <label for="f-date" id="f-date-lbl">成交日期（美国东部时间，按成交记录上的日期）</label>
           <input id="f-date" type="date" required>
         </div>
-        <div class="field">
+        <div class="field" id="f-side-row">
           <span class="lbl" id="side-lbl">方向</span>
           <div class="seg" role="radiogroup" aria-labelledby="side-lbl">
             <input type="radio" name="side" id="side-buy" value="buy" checked><label class="b" for="side-buy">买入</label>
             <input type="radio" name="side" id="side-sell" value="sell"><label class="s" for="side-sell">卖出</label>
+            <input type="radio" name="side" id="side-div" value="dividend"><label for="side-div">分红</label>
+            <input type="radio" name="side" id="side-split" value="split"><label for="side-split">拆合股</label>
           </div>
         </div>
         <div class="field">
@@ -496,15 +508,20 @@ footer p { margin: 0 0 6px; }
           </div>
           <span class="sub" id="f-sym-sub">可搜代码、中文名或英文名。列表里没有的代码也能直接填。</span>
         </div>
-        <div class="field">
+        <div class="field" id="f-ratio-row" hidden>
+          <span class="lbl" id="ratio-lbl">比例：原来的股数 → 现在的股数</span>
+          <div class="ratio"><input id="f-from" type="number" inputmode="decimal" step="any" min="0" value="1" aria-label="原来的股数"><span aria-hidden="true">→</span><input id="f-to" type="number" inputmode="decimal" step="any" min="0" placeholder="例如 2" aria-label="现在的股数"></div>
+          <span class="sub">1 拆 2 填 1 → 2；10 合 1 填 10 → 1。日期填生效日（除权日），当天及以后的成交按新股数记。</span>
+        </div>
+        <div class="field" id="f-qty-row">
           <label for="f-qty">股数</label>
           <input id="f-qty" type="number" inputmode="decimal" step="any" min="0" placeholder="1">
         </div>
-        <div class="field">
+        <div class="field" id="f-price-row">
           <label for="f-price" id="f-price-lbl">成交价（美元）</label>
           <input id="f-price" type="number" inputmode="decimal" step="any" min="0" placeholder="成交单上的价格">
         </div>
-        <div class="field">
+        <div class="field" id="f-fee-row">
           <label for="f-fee" id="f-fee-lbl">费用（美元）</label>
           <input id="f-fee" type="number" inputmode="decimal" step="any" min="0" value="0">
         </div>
@@ -609,6 +626,7 @@ footer p { margin: 0 0 6px; }
         <input type="radio" name="lside" id="ls-all" value="all" checked><label for="ls-all">全部</label>
         <input type="radio" name="lside" id="ls-buy" value="buy"><label for="ls-buy">买入</label>
         <input type="radio" name="lside" id="ls-sell" value="sell"><label for="ls-sell">卖出</label>
+        <input type="radio" name="lside" id="ls-ev" value="events"><label for="ls-ev">分红·拆合股</label>
       </div>
       <label class="logsym" for="logSym">代码 <select id="logSym"><option value="">全部</option></select></label>
     </div>
@@ -626,6 +644,7 @@ footer p { margin: 0 0 6px; }
   </footer>
 </div>
 
+<script src="/assets/calc.js?v=1"></script>
 <script>
 (() => {
   const H = { "Content-Type": "application/json", "X-Requested-With": "ledger" };
@@ -953,32 +972,21 @@ TAL|好未来|TAL Education
   }
 
   // ---------- calculations ----------
-  function sortedTrades() {
-    return state.trades.slice().sort((a, b) =>
-      a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
-  }
+  // Trades, dividends and splits in the order they take effect (a split before the trades of its day).
+  const sortedTrades = () => LedgerCalc.sortRecords(state.trades);
   const tradeCcy = (t) => (t.currency === "HKD" || t.currency === "USD" ? t.currency : ccyOf(t.symbol));
 
   function compute(list) {
     const syms = new Map();
-    let feesUSD = 0, realizedUSD = 0;
+    let feesUSD = 0, realizedUSD = 0, divUSD = 0, taxUSD = 0;
     const warnings = [];
     for (const t of list) {
       const ccy = tradeCcy(t);
-      const s = syms.get(t.symbol) || { symbol: t.symbol, ccy, shares: 0, cost: 0, realized: 0 };
-      const q = Number(t.shares) || 0, p = Number(t.price) || 0, f = Number(t.fees) || 0;
-      feesUSD += toUSD(f, ccy);
-      if (t.side === "buy") {
-        s.shares += q; s.cost += q * p + f;
-      } else {
-        if (q > s.shares + 1e-9) warnings.push(md(t.date) + " 卖出 " + t.symbol + " " + nfQ.format(q) + " 股，超过当时持有的 " + nfQ.format(s.shares) + " 股，请检查是否漏记了买入");
-        const sellQ = Math.min(q, s.shares);
-        const avg = s.shares > 0 ? s.cost / s.shares : 0;
-        const r = sellQ * p - f - avg * sellQ;
-        s.realized += r; realizedUSD += toUSD(r, ccy);
-        s.cost -= avg * sellQ; s.shares -= sellQ;
-        if (s.shares < 1e-9) { s.shares = 0; s.cost = 0; }
-      }
+      const s = syms.get(t.symbol) || { symbol: t.symbol, ccy, shares: 0, cost: 0, realized: 0, dividends: 0 };
+      const held = s.shares, d = LedgerCalc.apply(s, t);
+      if (d.oversold) warnings.push(md(t.date) + " 卖出 " + t.symbol + " " + nfQ.format(Number(t.shares) || 0) + " 股，超过当时持有的 " + nfQ.format(held) + " 股，请检查是否漏记了买入");
+      s.realized += d.realized; s.dividends += d.dividend;
+      feesUSD += toUSD(d.fees, ccy); realizedUSD += toUSD(d.realized, ccy); divUSD += toUSD(d.dividend, ccy); taxUSD += toUSD(d.tax, ccy);
       syms.set(t.symbol, s);
     }
     let mv = 0, cost = 0, unreal = 0, priced = true, held = false;
@@ -991,7 +999,7 @@ TAL|好未来|TAL Education
         mv += toUSD(s.mv, s.ccy); unreal += toUSD(s.unreal, s.ccy);
       } else priced = false;
     }
-    return { syms: [...syms.values()], fees: feesUSD, realized: realizedUSD, mv, cost, unreal, priced, held, warnings };
+    return { syms: [...syms.values()], fees: feesUSD, realized: realizedUSD, dividends: divUSD, tax: taxUSD, mv, cost, unreal, priced, held, warnings };
   }
 
   // ---------- Treasuries and time deposits ----------
@@ -1054,7 +1062,9 @@ TAL|好未来|TAL Education
     const n = c.syms.filter((s) => s.shares > 0).length, parts = [];
     if (n) parts.push(n + " 只");
     if (c.held && c.priced) parts.push("市值 " + money(c.mv), '浮动盈亏 <span class="' + tone(c.unreal) + '">' + signed(c.unreal) + (c.cost > 0 ? "（" + pct(c.unreal / c.cost * 100) + "）" : "") + "</span>");
-    parts.push('已实现盈亏 <span class="' + tone(c.realized) + '">' + signed(c.realized) + "</span>", "累计费用 " + money(c.fees));
+    parts.push('已实现盈亏 <span class="' + tone(c.realized) + '">' + signed(c.realized) + "</span>");
+    if (Math.abs(c.dividends) >= 0.005) parts.push('分红 <span class="' + tone(c.dividends) + '">' + signed(c.dividends) + "</span>" + (c.tax >= 0.005 ? "（已扣税 " + money(c.tax) + "）" : ""));
+    parts.push("累计费用 " + money(c.fees));
     $("#holdSum").innerHTML = state.ready && (c.syms.length || c.fees) ? parts.join(" · ") : "";
   }
 
@@ -1262,7 +1272,8 @@ TAL|好未来|TAL Education
     } else {
       tb.innerHTML = rows.map((s) => {
         if (s.shares <= 0) {
-          return '<tr class="closed">' + symCell(s.symbol) + '<td class="num">0</td><td colspan="6" class="num">已清仓 · 已实现 <span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span></td></tr>";
+          return '<tr class="closed">' + symCell(s.symbol) + '<td class="num">0</td><td colspan="6" class="num">已清仓 · 已实现 <span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span>" +
+            (Math.abs(s.dividends) >= 0.005 ? " · 分红 " + signed(s.dividends, s.ccy) : "") + "</td></tr>";
         }
         const avg = s.cost / s.shares;
         const px = Number(state.prices[s.symbol]) || 0;
@@ -1276,7 +1287,8 @@ TAL|好未来|TAL Education
         const dayCell = px > 0 && prev > 0
           ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "<br><small>" + signed((px - prev) * s.shares, s.ccy) + "</small></span>"
           : '<span class="muted">—</span>';
-        const realCell = Math.abs(s.realized) >= 0.005 ? '<span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span>" : '<span class="muted">—</span>';
+        const realCell = (Math.abs(s.realized) >= 0.005 ? '<span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span>" : '<span class="muted">—</span>') +
+          (Math.abs(s.dividends) >= 0.005 ? "<br><small>分红 " + signed(s.dividends, s.ccy) + "</small>" : "");
         return "<tr>" + symCell(s.symbol) + '<td class="num">' + nfQ.format(s.shares) + '</td><td class="num">' + price(avg, s.ccy) +
           '</td><td class="num"><input class="px" type="number" inputmode="decimal" step="any" min="0" id="price-' + sym + '" data-sym="' + sym +
           '" value="' + (px > 0 ? px : "") + '" placeholder="' + (s.ccy === "HKD" ? "港元" : "美元") + '" aria-label="' + sym + " 现价（" + (s.ccy === "HKD" ? "港元" : "美元") + '）"' + (ro ? " disabled" : "") +
@@ -1314,17 +1326,15 @@ TAL|好未来|TAL Education
     if (state.fixed.length && todayUS() > (live || lastHist)) live = todayUS();
     if (live && live !== lastHist) sorted.push(live);
     const pos = {}, px = {};
-    let realized = 0, k = 0, prev = 0;
+    let realized = 0, dividends = 0, k = 0, prev = 0;
     return sorted.map((d) => {
       const isLive = d === live, trades = [];
       for (; k < list.length && list[k].date <= d; k++) {
-        const t = list[k], ccy = tradeCcy(t), q = Number(t.shares) || 0, p = Number(t.price) || 0, f = Number(t.fees) || 0;
+        const t = list[k], ccy = tradeCcy(t);
         trades.push(t);
         const s = pos[t.symbol] = pos[t.symbol] || { shares: 0, cost: 0, ccy };
-        if (t.side === "buy") { s.shares += q; s.cost += q * p + f; continue; }
-        const sold = Math.min(q, s.shares), avg = s.shares > 0 ? s.cost / s.shares : 0;
-        realized += toUSD(sold * p - f - avg * sold, ccy);
-        s.cost -= avg * sold; s.shares -= sold;
+        const ch = LedgerCalc.apply(s, t);
+        realized += toUSD(ch.realized, ccy); dividends += toUSD(ch.dividend, ccy);
       }
       let value = 0, cost = 0;
       const bySym = [];
@@ -1346,9 +1356,9 @@ TAL|好未来|TAL Education
         fixedValue += r.value; fixedCost += r.cost; fixedIncome += r.income;
         byFixed.push({ name: f.name, income: r.income });
       }
-      const total = value - cost + realized + fixedIncome, day = total - prev, base = cost + fixedCost;
+      const total = value - cost + realized + dividends + fixedIncome, day = total - prev, base = cost + fixedCost;
       prev = total;
-      return { date: d, live: isLive, value, cost, realized, total, day, pct: base > 0 ? total / base : null, bySym, trades, fixedValue, fixedCost, fixedIncome, byFixed };
+      return { date: d, live: isLive, value, cost, realized, dividends, total, day, pct: base > 0 ? total / base : null, bySym, trades, fixedValue, fixedCost, fixedIncome, byFixed };
     });
   }
   // ---------- money-weighted return ----------
@@ -1358,8 +1368,8 @@ TAL|好未来|TAL Education
     const cf = [];
     for (const t of list) {
       if (t.date > end) continue;
-      const ccy = tradeCcy(t), q = Number(t.shares) || 0, p = Number(t.price) || 0, f = Number(t.fees) || 0;
-      cf.push([t.date, t.side === "buy" ? -toUSD(q * p + f, ccy) : toUSD(q * p - f, ccy)]);
+      const v = LedgerCalc.cashFlow(t);
+      if (v) cf.push([t.date, toUSD(v, tradeCcy(t))]);
     }
     for (const f of state.fixed) {
       const c = f.currency || "USD", start = fixedStart(f);
@@ -1487,6 +1497,7 @@ TAL|好未来|TAL Education
   const pnlVal = (r) => (pnlMode === "pct" ? (r.pct == null ? 0 : r.pct * 100) : r.total);
   const pnlFmt = (v) => (pnlMode === "pct" ? pct(v) : signed(v));
 
+  const MARKS = { buy: ["B", "var(--up)"], sell: ["S", "var(--down)"], dividend: ["息", "var(--accent)"], split: ["拆", "var(--muted)"] };
   function renderPnl(list) {
     const box = $("#pnlChart"), empty = $("#pnlEmpty"), tot = $("#pnlTotal"), sub = $("#pnlSub"), stats = $("#pnlStats");
     box.querySelectorAll("svg").forEach((n) => n.remove());
@@ -1599,15 +1610,15 @@ TAL|好未来|TAL Education
       ? "fill: var(--surface); stroke-width: 2; stroke: " + (vs[vs.length - 1] >= 0 ? "var(--up)" : "var(--down)")
       : "fill: " + (vs[vs.length - 1] >= 0 ? "var(--up)" : "var(--down)") }, svg);
 
-    // Buy / sell markers in the strip between the main plot and the bars
+    // Buy, sell, dividend and split markers in the strip between the main plot and the bars
     rows.forEach((r, i) => {
       const sides = [...new Set(r.trades.map((t) => t.side))];
       sides.forEach((side, j) => {
-        const cy = PH + GAP / 2, cx = x(i) + (j - (sides.length - 1) / 2) * 14, color = side === "buy" ? "var(--up)" : "var(--down)";
+        const [mark, color] = MARKS[side] || MARKS.sell, cy = PH + GAP / 2, cx = x(i) + (j - (sides.length - 1) / 2) * 14;
         el("line", { x1: x(i), x2: cx, y1: y(vs[i]), y2: cy, style: "stroke: " + color + "; stroke-width: 1; opacity: .3" }, svg);
         el("circle", { cx, cy, r: 6.5, style: "fill: " + color }, svg);
         const t = el("text", { class: "pnl-mark", x: cx, y: cy, dy: "0.35em", "text-anchor": "middle" }, svg);
-        t.textContent = side === "buy" ? "B" : "S";
+        t.textContent = mark;
       });
     });
 
@@ -1655,12 +1666,12 @@ TAL|好未来|TAL Education
     html += r.bySym.slice().sort((p, q) => q.unreal - p.unreal).map((s) =>
       row(esc(s.sym) + "<i>" + (r.live ? "现 " : "收 ") + price(s.close, s.ccy) + "</i>", signed(s.unreal), tone(s.unreal))).join("");
     if (Math.abs(r.realized) >= 0.005) html += row("已实现", signed(r.realized), tone(r.realized));
+    if (Math.abs(r.dividends) >= 0.005) html += row("分红", signed(r.dividends), tone(r.dividends));
     html += r.byFixed.map((f) => row(esc(f.name), signed(f.income), tone(f.income))).join("");
     html += "<hr>" + row("股票市值", money(r.value)) + row("股票成本", money(r.cost));
     if (r.byFixed.length) html += row("国债和定存", money(r.fixedValue));
     if (r.trades.length) {
-      html += "<hr>" + r.trades.map((t) => '<div class="t ' + (t.side === "buy" ? "up" : "down") + '">' + md(t.date) + " " + (t.side === "buy" ? "买入 " : "卖出 ") +
-        esc(t.symbol) + " " + nfQ.format(Number(t.shares) || 0) + " 股 @ " + price(Number(t.price) || 0, tradeCcy(t)) + "</div>").join("");
+      html += "<hr>" + r.trades.map((t) => '<div class="t ' + (t.side === "sell" ? "down" : t.side === "split" ? "" : "up") + '">' + md(t.date) + " " + recordText(t) + "</div>").join("");
     }
     const tip = $("#pnlTip");
     tip.innerHTML = html;
@@ -1708,6 +1719,14 @@ TAL|好未来|TAL Education
 
   // ---------- trade log ----------
   const logView = { side: "all", sym: "" };
+  const sideName = (t) => ({ buy: "买入", sell: "卖出", dividend: "分红" })[t.side] || (LedgerCalc.ratio(t) < 1 ? "合股" : "拆股");
+  // One record in words, e.g. "买入 QQQM 2 股 @ $280.000", "分红 VOO $8.00（扣税 $0.80）", "拆股 NVDA 1 → 10".
+  function recordText(t) {
+    const ccy = tradeCcy(t), sym = esc(t.symbol);
+    if (t.side === "dividend") return "分红 " + sym + " " + money(Number(t.amount) || 0, ccy) + (Number(t.tax) > 0 ? "（扣税 " + money(Number(t.tax), ccy) + "）" : "");
+    if (t.side === "split") return sideName(t) + " " + sym + " " + nfQ.format(Number(t.from) || 0) + " → " + nfQ.format(Number(t.to) || 0);
+    return sideName(t) + " " + sym + " " + nfQ.format(Number(t.shares) || 0) + " 股 @ " + price(Number(t.price) || 0, ccy);
+  }
   function renderLog(list) {
     const tb = $("#log tbody"), ro = !db || state.canWrite === false, sel = $("#logSym");
     const syms = [...new Set(list.map((t) => t.symbol))].sort();
@@ -1715,11 +1734,14 @@ TAL|好未来|TAL Education
     const opts = '<option value="">全部</option>' + syms.map((s) => '<option value="' + esc(s) + '">' + esc(s) + (nameOf(s) ? " · " + esc(nameOf(s)) : "") + "</option>").join("");
     if (sel.innerHTML !== opts) sel.innerHTML = opts;
     sel.value = logView.sym;
-    const rows = list.filter((t) => (logView.side === "all" || t.side === logView.side) && (!logView.sym || t.symbol === logView.sym)).reverse();
+    const kindOk = (t) => logView.side === "all" || t.side === logView.side || (logView.side === "events" && !LedgerCalc.isTrade(t));
+    const rows = list.filter((t) => kindOk(t) && (!logView.sym || t.symbol === logView.sym)).reverse();
     const sumOf = (arr, side) => arr.filter((t) => t.side === side).reduce((s, t) => s + toUSD((Number(t.shares) || 0) * (Number(t.price) || 0), tradeCcy(t)), 0);
+    const divOf = (arr) => arr.reduce((s, t) => s + (t.side === "dividend" ? toUSD(LedgerCalc.cashFlow(t), tradeCcy(t)) : 0), 0);
     const fees = rows.reduce((s, t) => s + toUSD(Number(t.fees) || 0, tradeCcy(t)), 0);
     $("#logSum").textContent = rows.length
-      ? [rows.length + " 笔", sumOf(rows, "buy") && "买入 " + money(sumOf(rows, "buy")), sumOf(rows, "sell") && "卖出 " + money(sumOf(rows, "sell")), fees >= 0.005 && "费用 " + money(fees)].filter(Boolean).join(" · ") : "";
+      ? [rows.length + " 笔", sumOf(rows, "buy") && "买入 " + money(sumOf(rows, "buy")), sumOf(rows, "sell") && "卖出 " + money(sumOf(rows, "sell")),
+        divOf(rows) && "分红 " + money(divOf(rows)), fees >= 0.005 && "费用 " + money(fees)].filter(Boolean).join(" · ") : "";
     if (!rows.length) {
       tb.innerHTML = '<tr><td colspan="9" class="empty">' + (!state.ready ? "正在读取交易记录…" : list.length ? "没有符合筛选条件的记录。" : "还没有交易记录。点页面顶部的“＋ 记一笔”录入第一笔。") + "</td></tr>";
       return;
@@ -1729,22 +1751,36 @@ TAL|好未来|TAL Education
       const m = t.date.slice(0, 7);
       if (m !== month) {
         month = m;
-        const inM = rows.filter((x) => x.date.slice(0, 7) === m), b = sumOf(inM, "buy"), s = sumOf(inM, "sell");
+        const inM = rows.filter((x) => x.date.slice(0, 7) === m), b = sumOf(inM, "buy"), s = sumOf(inM, "sell"), dv = divOf(inM);
         html += '<tr class="mon"><td colspan="9"><b>' + m.slice(0, 4) + " 年 " + Number(m.slice(5)) + " 月</b>" + inM.length + " 笔" +
-          (b ? " · 买入 " + money(b) : "") + (s ? " · 卖出 " + money(s) : "") + "</td></tr>";
+          (b ? " · 买入 " + money(b) : "") + (s ? " · 卖出 " + money(s) : "") + (dv ? " · 分红 " + money(dv) : "") + "</td></tr>";
       }
       const ccy = tradeCcy(t), q = Number(t.shares) || 0, pr = Number(t.price) || 0, f = Number(t.fees) || 0, id = esc(t.id);
-      const chip = t.side === "buy" ? '<span class="chip buy">买入</span>' : '<span class="chip sell">卖出</span>';
+      const chip = '<span class="chip ' + esc(t.side) + '">' + sideName(t) + "</span>";
       let acts = "";
       if (!ro) {
         acts = state.pendingDelete === t.id
           ? '<button class="mini danger" type="button" data-act="confirm" data-id="' + id + '">确认删除</button><button class="mini" type="button" data-act="cancel">取消</button>'
           : '<button class="mini" type="button" data-act="del" data-id="' + id + '">删除</button>';
       }
-      html += '<tr><td class="num c-date">' + md(t.date) + '</td><td class="c-side">' + chip + "</td>" + symCell(t.symbol) +
-        '<td class="num c-qty">' + nfQ.format(q) + '</td><td class="num c-px">' + price(pr, ccy) + '</td><td class="num c-amt">' + money(q * pr, ccy) + usdCap(q * pr, ccy) +
-        '</td><td class="num c-fee">' + money(f, ccy) + '</td><td class="meta">' + chip + " " + esc(t.date) + " · " + nfQ.format(q) + " 股 × " + price(pr, ccy) +
-        (f ? " · 费用 " + money(f, ccy) : "") + '</td><td class="note">' + esc(t.note || "") + '</td><td class="c-act"><div class="acts">' + acts + "</div></td></tr>";
+      const dash = '<span class="muted">—</span>';
+      let cells, meta;
+      if (t.side === "dividend") {
+        const amt = Number(t.amount) || 0, tax = Number(t.tax) || 0;
+        cells = '<td class="num c-qty">' + dash + '</td><td class="num c-px">' + dash + '</td><td class="num c-amt">' + money(amt, ccy) + usdCap(amt, ccy) +
+          '</td><td class="num c-fee">' + (tax ? money(tax, ccy) + "<br><small>预扣税</small>" : money(0, ccy)) + "</td>";
+        meta = " · 税前 " + money(amt, ccy) + (tax ? " · 预扣税 " + money(tax, ccy) : "") + " · 到手 " + money(amt - tax, ccy);
+      } else if (t.side === "split") {
+        cells = '<td class="num c-qty">' + nfQ.format(Number(t.from) || 0) + " → " + nfQ.format(Number(t.to) || 0) + '</td><td class="num c-px">' + dash +
+          '</td><td class="num c-amt">' + dash + '</td><td class="num c-fee">' + dash + "</td>";
+        meta = " · 每 " + nfQ.format(Number(t.from) || 0) + " 股变成 " + nfQ.format(Number(t.to) || 0) + " 股";
+      } else {
+        cells = '<td class="num c-qty">' + nfQ.format(q) + '</td><td class="num c-px">' + price(pr, ccy) + '</td><td class="num c-amt">' + money(q * pr, ccy) + usdCap(q * pr, ccy) +
+          '</td><td class="num c-fee">' + money(f, ccy) + "</td>";
+        meta = " · " + nfQ.format(q) + " 股 × " + price(pr, ccy) + (f ? " · 费用 " + money(f, ccy) : "");
+      }
+      html += '<tr><td class="num c-date">' + md(t.date) + '</td><td class="c-side">' + chip + "</td>" + symCell(t.symbol) + cells +
+        '<td class="meta">' + chip + " " + esc(t.date) + meta + '</td><td class="note">' + esc(t.note || "") + '</td><td class="c-act"><div class="acts">' + acts + "</div></td></tr>";
     }
     tb.innerHTML = html;
   }
@@ -1866,8 +1902,9 @@ TAL|好未来|TAL Education
     const sym = resolveSym(raw);
     const hk = sym && isHK(sym);
     const unit = hk ? "港元" : "美元";
-    $("#f-price-lbl").textContent = "成交价（" + unit + "）";
-    $("#f-fee-lbl").textContent = "费用（" + unit + "）";
+    const div = $("#side-div").checked;
+    $("#f-price-lbl").textContent = (div ? "税前金额（" : "成交价（") + unit + "）";
+    $("#f-fee-lbl").textContent = (div ? "预扣税（" : "费用（") + unit + "）";
     const sub = $("#f-sym-sub");
     if (!raw.trim()) sub.textContent = "可搜代码、中文名或英文名。列表里没有的代码也能直接填。";
     else if (!sym) sub.textContent = "没找到。美股填代码如 AAPL、BRK.B，港股填数字如 0700，也可以从下拉里选。";
@@ -1875,15 +1912,35 @@ TAL|好未来|TAL Education
     if (state.cash) updatePay();
   }
 
+  // The stock form shows the fields of the chosen kind: trade, dividend or split.
+  const SIDE_HINT = {
+    buy: "美股佣金为 0 时费用填 0；港股买卖都有印花税等代收费，按成交单填。",
+    sell: "美股佣金为 0 时费用填 0；港股买卖都有印花税等代收费，按成交单填。",
+    dividend: "按券商的分红通知填：税前金额是“每股分红 × 股数”，预扣税是券商代扣的税（没有就填 0）。",
+    split: "拆股、合股后总成本不变，股数和平均成本按比例调整。零碎股换成现金的，另记一笔卖出。",
+  };
+  function updateSide() {
+    const side = document.querySelector('input[name="side"]:checked').value, div = side === "dividend", split = side === "split";
+    $("#f-date-lbl").textContent = div ? "到账日期" : split ? "生效日期（除权日）" : "成交日期（美国东部时间，按成交记录上的日期）";
+    $("#f-qty-row").hidden = div || split;
+    $("#f-ratio-row").hidden = !split;
+    $("#f-price-row").hidden = split;
+    $("#f-fee-row").hidden = split;
+    $("#f-price").placeholder = div ? "分红通知上的税前金额" : "成交单上的价格";
+    formMsg(SIDE_HINT[side], "");
+    updateSymHint();
+  }
+  document.querySelectorAll('input[name="side"]').forEach((r) => r.addEventListener("change", updateSide));
+
   // ---------- paying from cash ----------
   const payAccount = (ccy) => state.cash.find((k) => k.currency === ccy) || null;
   function updatePay() {
-    const sym = resolveSym(symIn.value), sell = $("#side-sell").checked;
-    const rows = [["#f-pay-row", "#f-pay-txt", payAccount(sym && isHK(sym) ? "HKD" : "USD"), sell],
+    const sym = resolveSym(symIn.value), side = (document.querySelector('input[name="side"]:checked') || {}).value;
+    const rows = [["#f-pay-row", "#f-pay-txt", side === "split" ? null : payAccount(sym && isHK(sym) ? "HKD" : "USD"), side === "sell" || side === "dividend"],
       ["#x-pay-row", "#x-pay-txt", payAccount($("#ek-bond").checked ? "USD" : $("#d-ccy").value), false]];
     for (const [row, txt, acc, into] of rows) {
       $(row).hidden = !acc;
-      if (acc) $(txt).textContent = (into ? "卖出所得存入 " + acc.name : "从 " + acc.name + " 扣款") + "（余额 " + money(acc.amount, acc.currency) + "）";
+      if (acc) $(txt).textContent = (into ? ($("#side-div").checked && row === "#f-pay-row" ? "分红到手金额存入 " : "卖出所得存入 ") + acc.name : "从 " + acc.name + " 扣款") + "（余额 " + money(acc.amount, acc.currency) + "）";
     }
   }
   // Moves money in or out of a cash account; returns a line for the status message.
@@ -1942,24 +1999,38 @@ TAL|好未来|TAL Education
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { formMsg("请选择成交日期。", "err"); return; }
     if (!symbol) { formMsg("认不出这个股票。美股填 AAPL、BRK.B 这样的代码，港股填 0700 这样的数字，或者从下拉列表里选。", "err"); return; }
     symIn.value = symbol;
-    if (!(shares > 0)) { formMsg("股数要大于 0。", "err"); return; }
-    const ccy = ccyOf(symbol);
-    if (!(px > 0)) { formMsg("成交价要大于 0，单位是" + (ccy === "HKD" ? "港元" : "美元") + "。", "err"); return; }
-    if (!(fees >= 0)) { formMsg("费用不能是负数，没有就填 0。", "err"); return; }
-    const acc = !$("#f-pay-row").hidden && $("#f-pay").checked ? payAccount(ccy) : null;
-    const delta = r2(side === "buy" ? -(shares * px + fees) : shares * px - fees);
+    const ccy = ccyOf(symbol), unit = ccy === "HKD" ? "港元" : "美元";
+    const base = { date, side, symbol, market: isHK(symbol) ? "HK" : "US", currency: ccy, note, createdAt: new Date().toISOString() };
+    let rec;
+    if (side === "dividend") {
+      if (!(px > 0)) { formMsg("税前金额要大于 0，单位是" + unit + "。", "err"); return; }
+      if (!(fees >= 0 && fees < px)) { formMsg("预扣税要大于等于 0、小于税前金额，没有就填 0。", "err"); return; }
+      rec = Object.assign(base, { amount: px, tax: fees });
+    } else if (side === "split") {
+      const from = parseFloat($("#f-from").value), to = parseFloat($("#f-to").value);
+      if (!(from > 0 && to > 0) || from === to) { formMsg("比例要填两个大于 0 且不相等的数，例如 1 拆 2 填 1 → 2。", "err"); return; }
+      const held = LedgerCalc.holdings(state.trades.filter((t) => t.symbol === symbol && t.date < date))[symbol];
+      if (!held || !(held.shares > 0)) { formMsg(md(date) + " 之前没有持有 " + symbol + "，拆股、合股不会影响账本。请检查代码和日期。", "err"); return; }
+      rec = Object.assign(base, { from, to });
+    } else {
+      if (!(shares > 0)) { formMsg("股数要大于 0。", "err"); return; }
+      if (!(px > 0)) { formMsg("成交价要大于 0，单位是" + unit + "。", "err"); return; }
+      if (!(fees >= 0)) { formMsg("费用不能是负数，没有就填 0。", "err"); return; }
+      rec = Object.assign(base, { shares, price: px, fees });
+    }
+    const acc = side !== "split" && !$("#f-pay-row").hidden && $("#f-pay").checked ? payAccount(ccy) : null;
+    const delta = r2(LedgerCalc.cashFlow(rec));
     if (acc && acc.amount + delta < -0.005) { formMsg(acc.name + "余额不够（" + money(acc.amount, acc.currency) + "）。先在现金表里更新余额，或者取消勾选扣款。", "err"); return; }
     const btn = $("#saveBtn");
     btn.disabled = true;
     try {
-      const trade = { date, side, symbol, market: isHK(symbol) ? "HK" : "US", currency: ccy, shares, price: px, fees, note, createdAt: new Date().toISOString() };
-      if (acc) trade.cash = { id: acc.id, delta };
-      await db.collection("trades").add(trade);
+      if (acc) rec.cash = { id: acc.id, delta };
+      await db.collection("trades").add(rec);
       const paid = acc ? await moveCash(acc, delta) : "";
-      const fresh = !(Number(state.prices[symbol]) > 0);
-      formMsg("已保存：" + md(date) + " " + (side === "buy" ? "买入" : "卖出") + " " + symbol + " " + nfQ.format(shares) + " 股。" + paid +
+      const fresh = LedgerCalc.isTrade(rec) && !(Number(state.prices[symbol]) > 0);
+      formMsg("已保存：" + md(date) + " " + recordText(rec) + "。" + paid +
         (fresh ? "点“刷新数据”后这只股票会有价格，也可以先在持仓表里手动填。" : ""), "ok");
-      $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = "0"; $("#f-note").value = "";
+      $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = "0"; $("#f-note").value = ""; $("#f-to").value = "";
     } catch (err) {
       formMsg(errText(err), "err");
     } finally {

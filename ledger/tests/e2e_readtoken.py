@@ -68,6 +68,15 @@ try:
     check(st == 200 and h["account"] == "tester" and h["trades"][0]["symbol"] == "MCD" and h["cash"][0]["amount"] == 2265,
           "the key reads trades and cash")
     check(set(h) == {"account", "generated", "trades", "fixed", "cash"}, "and nothing else (no settings, notes or plans)")
+    call("POST", "/api/c/trades", {"date": "2026-10-16", "side": "dividend", "symbol": "MCD", "amount": 3.54, "tax": 0.35}, sid)
+    call("POST", "/api/c/trades", {"date": "2026-10-20", "side": "split", "symbol": "MCD", "from": 1, "to": 2}, sid)
+    call("POST", "/api/c/trades", {"date": "2026-10-20", "side": "buy", "symbol": "MCD", "shares": 1, "price": 125}, sid)
+    st, h, _ = call("GET", "/api/holdings", auth=tok)
+    by_price = {t["price"]: t for t in h["trades"]}
+    check(st == 200 and len(h["trades"]) == 2 and all(t["side"] in ("buy", "sell") for t in h["trades"]),
+          "programs get buys and sells only, no dividends or splits")
+    check(by_price[122]["shares"] == 4 and by_price[122]["split_factor"] == 2 and by_price[125]["shares"] == 1,
+          "a buy before a split comes split-adjusted; one on the split day does not")
     st, _, _ = call("GET", "/api/c/trades", auth=tok)
     check(st == 401, "the key cannot use the normal record API")
     st, _, _ = call("POST", "/api/c/trades", {"symbol": "X"}, auth=tok)
