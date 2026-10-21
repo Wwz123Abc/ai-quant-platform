@@ -557,21 +557,28 @@ SECRETS = ("DEEPSEEK_API_KEY", "FRED_API_KEY", "SEC_EDGAR_USER_AGENT", "ALPHA_VA
 
 
 def cmd_secrets_set(a):
-    """Asks for a key without echoing it and writes it into .env in the working directory (owner-only)."""
+    """Asks for each key without echoing it and writes it into .env in the working directory (owner-only).
+    An empty answer leaves that key as it was."""
     import getpass
     import os
     import stat
     from pathlib import Path
 
-    value = getpass.getpass("%s（输入时不显示）：" % a.name).strip()
-    if not value or any(c in value for c in "\r\n"):
-        raise SystemExit("没有输入，未修改")
     path = Path(".env")
-    lines = [ln for ln in (path.read_text(encoding="utf-8").splitlines() if path.exists() else [])
-             if not ln.startswith(a.name + "=")]
-    path.write_text("\n".join(lines + ["%s=%s" % (a.name, value)]) + "\n", encoding="utf-8")
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    written = []
+    for name in a.names:
+        value = getpass.getpass("%s（输入时不显示，直接回车跳过）：" % name).strip()
+        if not value or any(c in value for c in "\r\n"):
+            print("跳过 %s" % name)
+            continue
+        lines = [ln for ln in lines if not ln.startswith(name + "=")] + ["%s=%s" % (name, value)]
+        written.append(name)
+    if not written:
+        raise SystemExit("没有输入，未修改")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
-    print("已写入 %s 的 %s，重启服务后生效" % (path.resolve(), a.name))
+    print("已写入 %s：%s。重启服务后生效" % (path.resolve(), "、".join(written)))
 
 
 def cmd_secrets_status(a):
@@ -766,7 +773,7 @@ def build_parser():
     sesub = se.add_subparsers(dest="secrets_cmd", required=True)
     sesub.add_parser("status", help="哪些密钥已配置").set_defaults(fn=cmd_secrets_status)
     ss = sesub.add_parser("set", help="输入一个密钥，写进当前文件夹的 .env")
-    ss.add_argument("name", choices=SECRETS)
+    ss.add_argument("names", nargs="+", choices=SECRETS, metavar="NAME", help="一个或多个：" + "、".join(SECRETS))
     ss.set_defaults(fn=cmd_secrets_set)
 
     sv = sub.add_parser("serve", help="启动接口服务和网页工作台")

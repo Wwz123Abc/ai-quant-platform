@@ -25,11 +25,21 @@ QuantLab 和美股账本放在同一台服务器、同一个域名下：账本�
 6. 其他密钥自己在服务器上输入（输入时不显示）：
 
 ```bash
-cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set SEC_EDGAR_USER_AGENT
+cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set DEEPSEEK_API_KEY SEC_EDGAR_USER_AGENT FRED_API_KEY ALPHA_VANTAGE_API_KEY
 ```
 
 `quantlab secrets status` 只显示每个密钥是否已配置。改完 `sudo systemctl restart quantlab`。
 
-## 已知限制
+## AI 研报的数据来源
 
-- TradingAgents 的行情来自 Yahoo（yfinance），服务器上会被限流（429），所以 AI 研报暂时只能在本地电脑上运行。
+服务器访问不了 Yahoo，所以 `QUANTLAB_PRICE_SOURCE=cn` 时，TradingAgents 改用国内能访问的数据（[ai/cn_vendor.py](../src/quantlab/ai/cn_vendor.py)，不修改 TradingAgents 本身）：
+
+| 数据 | 来源 |
+| --- | --- |
+| 日线、技术指标、核实快照 | 腾讯 K 线 + 新浪复权因子（和回测用的是同一份） |
+| 公司简介、基本面概况 | SEC 登记信息和财报数据（需要 `SEC_EDGAR_USER_AGENT`） |
+| 三张财务报表 | TradingAgents 自带的 SEC EDGAR 数据源 |
+| 宏观数据 | FRED（需要 `FRED_API_KEY`） |
+| 新闻、内部人交易 | Alpha Vantage（需要免费的 `ALPHA_VANTAGE_API_KEY`）；没有时报告里写明“无新闻数据” |
+
+缺少的数据一律明确告诉模型“数据不可用，不要编造”，分析照常完成。

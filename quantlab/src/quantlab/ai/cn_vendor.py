@@ -94,17 +94,20 @@ def get_company_profile(ticker):
     sym = _symbol(ticker)
     fields = cn_data.tencent_quote(sym)
     reg = {}
-    cik = sec.cik_map().get(sym)
-    if cik:
-        try:
-            reg = sec.submissions(cik)
-        except QuantLabError as e:
-            log.warning("SEC registrant details for %s: %s", sym, e)
+    try:  # without SEC the names and exchange still come from Tencent
+        cik = sec.cik_map().get(sym)
+        reg = sec.submissions(cik) if cik else {}
+    except QuantLabError as e:
+        log.warning("SEC registrant details for %s: %s", sym, e)
     operating = reg.get("entityType") == "operating"
     english = fields[46].strip() if len(fields) > 46 else ""
+    if reg:
+        kind = "EQUITY" if operating else "ETF"
+    else:  # SEC unreachable or not a filer: only a fund's name says what it is
+        kind = "ETF" if "ETF" in (fields[1] + " " + english).upper() else ""
     profile = {
         "longName": reg.get("name") if operating else (english or fields[1]),
-        "quoteType": "EQUITY" if operating else "ETF",
+        "quoteType": kind,
         "exchange": EXCHANGES.get(fields[2].rsplit(".", 1)[-1], ""),
     }
     if operating and reg.get("sicDescription"):
@@ -115,11 +118,19 @@ def get_company_profile(ticker):
 def get_fundamentals(ticker, curr_date=None):
     """A company overview from SEC company facts and the latest close, in the shape of TradingAgents' overview."""
     from ..holdings.signals import fundamentals
+    from ..ml import sec
+    _, VendorUnavailableError = _errors()
     bars = _bars(ticker)
     if curr_date:
         bars = bars[bars.index <= pd.Timestamp(curr_date)]
     sym, close, day = _symbol(ticker), float(bars["close"].iloc[-1]), bars.index[-1].date()
-    f = fundamentals(sym, close)
+    try:
+        filer = sym in sec.cik_map()
+    except QuantLabError as e:  # SEC unreachable says nothing about the company
+        raise VendorUnavailableError("SEC EDGAR unreachable: %s" % e) from e
+    f = fundamentals(sym, close) if filer else None
+    if filer and not f:
+        raise VendorUnavailableError("SEC company facts for %s could not be read" % sym)
     if not f:
         return ("# Company fundamentals for %s\n\nNot available: SEC EDGAR has no company financials for %s (for "
                 "example an ETF, a fund or a foreign filer). Do not estimate these figures.\n" % (sym, sym))

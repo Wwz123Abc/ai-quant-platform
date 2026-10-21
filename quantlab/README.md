@@ -287,7 +287,7 @@ python scripts/export_openapi.py && cd web && npm run gen:api
 
 线上版本和美股账本在同一个域名下：账本是首页，量化平台在 `/lab/`，用账本的登录，只有指定的一个账号能进。nginx 先问账本“这是平台所有者吗”，通过后才转发给 QuantLab。步骤和原理见 [docs/deploy.md](docs/deploy.md)。
 
-密钥在服务器上自己输入，输入时不显示：`quantlab secrets set SEC_EDGAR_USER_AGENT`；`quantlab secrets status` 只显示是否已配置。
+密钥在服务器上自己输入，输入时不显示，可以一次填几个：`quantlab secrets set DEEPSEEK_API_KEY SEC_EDGAR_USER_AGENT`；`quantlab secrets status` 只显示是否已配置。
 
 ## 部署（Docker）
 

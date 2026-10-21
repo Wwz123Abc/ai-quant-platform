@@ -66,9 +66,11 @@ def test_secrets_set_writes_env_without_echo(tmp_path, monkeypatch, capsys):
     from quantlab import cli
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".env").write_text("FRED_API_KEY=old\nOTHER=1\n", encoding="utf-8")
-    monkeypatch.setattr(getpass, "getpass", lambda prompt: "new-value ")
-    cli.main(["secrets", "set", "FRED_API_KEY"])
-    assert (tmp_path / ".env").read_text(encoding="utf-8") == "OTHER=1\nFRED_API_KEY=new-value\n"
-    assert "new-value" not in capsys.readouterr().out
+    answers = iter(["new-value ", "", "av-key"])
+    monkeypatch.setattr(getpass, "getpass", lambda prompt: next(answers))
+    cli.main(["secrets", "set", "FRED_API_KEY", "DEEPSEEK_API_KEY", "ALPHA_VANTAGE_API_KEY"])
+    assert (tmp_path / ".env").read_text(encoding="utf-8") == "OTHER=1\nFRED_API_KEY=new-value\nALPHA_VANTAGE_API_KEY=av-key\n"
+    out = capsys.readouterr().out
+    assert "new-value" not in out and "av-key" not in out and "跳过 DEEPSEEK_API_KEY" in out
     with pytest.raises(SystemExit):
         cli.main(["secrets", "set", "NOT_A_KEY"])

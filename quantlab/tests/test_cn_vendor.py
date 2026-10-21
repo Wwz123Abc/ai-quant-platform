@@ -134,6 +134,23 @@ def test_fundamentals(cn, monkeypatch):
     f = {"market_cap": 3.5e12, "pe": 33.0, "pb": 50.1, "revenue_ttm": 4.1e11, "rev_growth": 0.06, "net_income_ttm": 1.1e11,
          "op_margin": 0.31, "roa": 0.29, "cfo_to_ni": 1.1, "sue": 1.4}
     monkeypatch.setattr(signals, "fundamentals", lambda sym, close: f if sym == "AAPL" else None)
+    monkeypatch.setattr(sec, "cik_map", lambda: {"AAPL": 320193})
     out = router.route_to_vendor("get_fundamentals", "AAPL", DAY)
     assert "Market Cap: $3500.00B" in out and "PE Ratio (TTM): 33.00" in out and "Operating Margin (TTM): 31.0%" in out
     assert "Not available" in router.route_to_vendor("get_fundamentals", "QQQM", DAY)
+
+
+def test_sec_outage_is_unavailable_not_absent(cn, monkeypatch):
+    """A blocked SEC request must not read as "this company has no financials", and the profile keeps Tencent's part."""
+    from tradingagents.agents import context
+
+    def blocked():
+        raise DataSourceError("SEC 返回错误 403")
+    monkeypatch.setattr(sec, "cik_map", blocked)
+    assert router.route_to_vendor("get_fundamentals", "AAPL", DAY).startswith("DATA_UNAVAILABLE")
+    monkeypatch.setattr(cn_data, "tencent_quote", lambda s: ["200", "苹果", "AAPL.OQ"] + [""] * 43 + ["Apple Inc."])
+    context._identity.cache_clear()
+    assert context.resolve_instrument_identity("AAPL") == {"company_name": "Apple Inc.", "exchange": "NASDAQ"}
+    monkeypatch.setattr(cn_data, "tencent_quote", lambda s: ["200", "纳斯达克100指数ETF-Invesco", "QQQM.OQ"])
+    context._identity.cache_clear()
+    assert context.resolve_instrument_identity("QQQM")["quote_type"] == "ETF"
