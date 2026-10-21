@@ -1,0 +1,5513 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuantLab API",
+    "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
+    "version": "0.9.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "检查访问令牌",
+        "operationId": "session_api_session_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/{symbol}/bars": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "复权日线",
+        "operationId": "bars_api_market__symbol__bars_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bars"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/signals": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "最新的均线信号",
+        "operationId": "signals_api_signals_get",
+        "parameters": [
+          {
+            "name": "symbols",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "QQQM,VOO"
+              ],
+              "title": "Symbols"
+            }
+          },
+          {
+            "name": "fast",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 400,
+              "minimum": 2,
+              "default": 50,
+              "title": "Fast"
+            }
+          },
+          {
+            "name": "slow",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 3,
+              "default": 200,
+              "title": "Slow"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SignalItem"
+                  },
+                  "title": "Response Signals Api Signals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtests": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "均线交叉回测",
+        "operationId": "run_backtest_api_backtests_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scans": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "参数扫描与样本外检验",
+        "operationId": "run_scan_api_scans_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/accounts": {
+      "get": {
+        "tags": [
+          "paper"
+        ],
+        "summary": "全部模拟账户",
+        "operationId": "list_accounts_api_paper_accounts_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Account"
+                  },
+                  "title": "Response List Accounts Api Paper Accounts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "paper"
+        ],
+        "summary": "创建模拟账户",
+        "operationId": "create_account_api_paper_accounts_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/accounts/{name}": {
+      "get": {
+        "tags": [
+          "paper"
+        ],
+        "summary": "模拟账户详情",
+        "operationId": "get_account_api_paper_accounts__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "paper"
+        ],
+        "summary": "删除模拟账户",
+        "operationId": "delete_account_api_paper_accounts__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/accounts/{name}/record": {
+      "post": {
+        "tags": [
+          "paper"
+        ],
+        "summary": "记录最新的决定",
+        "operationId": "record_account_api_paper_accounts__name__record_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/status": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "AI 组件、预算和定时任务的状态",
+        "operationId": "ai_status_api_ai_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/runs": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "AI 分析记录",
+        "operationId": "ai_runs_api_ai_runs_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiRun"
+                  },
+                  "title": "Response Ai Runs Api Ai Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "提交一次 AI 分析（最近一个收盘日）",
+        "operationId": "ai_create_run_api_ai_runs_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiRunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "AI 分析详情和报告",
+        "operationId": "ai_get_run_api_ai_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/schedule/run": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "立即运行每日任务（AI 分析 + 记录模拟账户）",
+        "operationId": "schedule_run_api_schedule_run_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ml/backtests": {
+      "post": {
+        "tags": [
+          "ml"
+        ],
+        "summary": "机器学习选股：滚动训练 + 组合回测（约一分钟）",
+        "operationId": "ml_backtest_api_ml_backtests_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Study"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ml/signal": {
+      "get": {
+        "tags": [
+          "ml"
+        ],
+        "summary": "最近一次算出的目标组合",
+        "operationId": "ml_signal_latest_api_ml_signal_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Signal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ml"
+        ],
+        "summary": "按最新收盘价重新计算目标组合（约一分钟）",
+        "operationId": "ml_signal_compute_api_ml_signal_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Signal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/limits": {
+      "get": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "风控上限",
+        "operationId": "trading_limits_api_trading_limits_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Limits"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/accounts": {
+      "get": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "交易账户",
+        "operationId": "trading_accounts_api_trading_accounts_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TradingAccount"
+                  },
+                  "title": "Response Trading Accounts Api Trading Accounts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "创建交易账户",
+        "operationId": "trading_create_api_trading_accounts_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradingAccountCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccount"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/accounts/{name}": {
+      "get": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "交易账户详情",
+        "operationId": "trading_account_api_trading_accounts__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccount"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/accounts/{name}/halt": {
+      "post": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "暂停交易",
+        "operationId": "trading_halt_api_trading_accounts__name__halt_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HaltRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccount"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/accounts/{name}/resume": {
+      "post": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "恢复交易",
+        "operationId": "trading_resume_api_trading_accounts__name__resume_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccount"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/accounts/{name}/mode": {
+      "post": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "切换模式",
+        "operationId": "trading_mode_api_trading_accounts__name__mode_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradingAccount"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trading/run": {
+      "post": {
+        "tags": [
+          "trading"
+        ],
+        "summary": "运行一次交易步骤（后台执行）",
+        "operationId": "trading_run_api_trading_run_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/status": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "账本同步状态",
+        "operationId": "holdings_status_api_holdings_status_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/review": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "最近一次持仓检查",
+        "operationId": "holdings_review_api_holdings_review_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "同步账本并按你的规则检查持仓",
+        "operationId": "holdings_review_now_api_holdings_review_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/policy": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "你的规则",
+        "operationId": "get_policy_api_holdings_policy_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "修改你的规则",
+        "operationId": "put_policy_api_holdings_policy_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Policy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/proposals/{pid}/approve": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "确认一条建议订单（你会自己去券商下单）",
+        "operationId": "approve_api_holdings_proposals__pid__approve_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/proposals/{pid}/reject": {
+      "post": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "拒绝一条建议订单",
+        "operationId": "reject_api_holdings_proposals__pid__reject_post",
+        "parameters": [
+          {
+            "name": "pid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analyze/{symbol}": {
+      "get": {
+        "tags": [
+          "holdings"
+        ],
+        "summary": "个股分析：趋势、基本面、AI 评级、和持仓的关系、你的规则允许买多少",
+        "operationId": "analyze_api_analyze__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "amount",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 100000000.0,
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Amount"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Account": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "strategy": {
+            "type": "string",
+            "title": "Strategy"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Symbols"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "fee": {
+            "type": "number",
+            "title": "Fee"
+          },
+          "slippage": {
+            "type": "number",
+            "title": "Slippage"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "return": {
+            "type": "number",
+            "title": "Return"
+          },
+          "benchmark_return": {
+            "type": "number",
+            "title": "Benchmark Return"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/Position"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "pending": {
+            "items": {
+              "$ref": "#/components/schemas/PendingOrder"
+            },
+            "type": "array",
+            "title": "Pending"
+          },
+          "fills": {
+            "items": {
+              "$ref": "#/components/schemas/Fill"
+            },
+            "type": "array",
+            "title": "Fills"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EquitySeries"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "strategy",
+          "params",
+          "symbols",
+          "start",
+          "cash",
+          "fee",
+          "slippage",
+          "value",
+          "return",
+          "benchmark_return",
+          "days",
+          "positions",
+          "pending",
+          "fills"
+        ],
+        "title": "Account"
+      },
+      "AccountCreate": {
+        "properties": {
+          "cash": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cash",
+            "description": "初始资金（美元）",
+            "default": 10000
+          },
+          "fee": {
+            "type": "number",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Fee",
+            "description": "每笔手续费（美元）",
+            "default": 0
+          },
+          "slippage": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Slippage",
+            "description": "滑点（基点）",
+            "default": 5
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "examples": [
+              "核心"
+            ]
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Symbols",
+            "examples": [
+              [
+                "QQQM",
+                "VOO"
+              ]
+            ]
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "ma_cross",
+              "ai_rating"
+            ],
+            "title": "Strategy",
+            "default": "ma_cross"
+          },
+          "fast": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 2.0,
+            "title": "Fast",
+            "description": "均线账户：短均线天数",
+            "default": 50
+          },
+          "slow": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 3.0,
+            "title": "Slow",
+            "description": "均线账户：长均线天数",
+            "default": 200
+          },
+          "every_days": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "Every Days",
+            "description": "AI 账户：每隔多少天重新分析一次",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "symbols"
+        ],
+        "title": "AccountCreate"
+      },
+      "AiBudget": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "budget_cny": {
+            "type": "number",
+            "title": "Budget Cny"
+          },
+          "usd_cny": {
+            "type": "number",
+            "title": "Usd Cny"
+          },
+          "spent_cny": {
+            "type": "number",
+            "title": "Spent Cny"
+          },
+          "estimate_cny": {
+            "type": "number",
+            "title": "Estimate Cny"
+          },
+          "committed_cny": {
+            "type": "number",
+            "title": "Committed Cny"
+          },
+          "remaining_cny": {
+            "type": "number",
+            "title": "Remaining Cny"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "budget_cny",
+          "usd_cny",
+          "spent_cny",
+          "estimate_cny",
+          "committed_cny",
+          "remaining_cny",
+          "queued",
+          "running"
+        ],
+        "title": "AiBudget"
+      },
+      "AiInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "trade_date": {
+            "type": "string",
+            "title": "Trade Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rating",
+          "trade_date"
+        ],
+        "title": "AiInfo"
+      },
+      "AiRun": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "trade_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Trade Date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "quick_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quick Model"
+          },
+          "deep_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deep Model"
+          },
+          "llm_calls": {
+            "type": "integer",
+            "title": "Llm Calls"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_cached": {
+            "type": "integer",
+            "title": "Tokens Cached"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "cost_cny": {
+            "type": "number",
+            "title": "Cost Cny"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created"
+          },
+          "started": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started"
+          },
+          "finished": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "reports": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Report"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "trade_date",
+          "status",
+          "source",
+          "rating",
+          "quick_model",
+          "deep_model",
+          "llm_calls",
+          "tokens_in",
+          "tokens_cached",
+          "tokens_out",
+          "cost_usd",
+          "cost_cny",
+          "created",
+          "started",
+          "finished",
+          "error"
+        ],
+        "title": "AiRun"
+      },
+      "AiRunCreate": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Symbol",
+            "examples": [
+              "QQQM"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "title": "AiRunCreate"
+      },
+      "AiStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "是否安装了 AI 组件"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "description": "是否配置了大模型密钥（只检查是否存在）"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "quick_model": {
+            "type": "string",
+            "title": "Quick Model"
+          },
+          "deep_model": {
+            "type": "string",
+            "title": "Deep Model"
+          },
+          "analysts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analysts"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/AiBudget"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "configured",
+          "provider",
+          "quick_model",
+          "deep_model",
+          "analysts",
+          "language",
+          "budget",
+          "schedule"
+        ],
+        "title": "AiStatus"
+      },
+      "Analysis": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "technical": {
+            "$ref": "#/components/schemas/Technical"
+          },
+          "fundamentals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Fundamentals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ai": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelRank"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioFit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "technical",
+          "fundamentals",
+          "ai",
+          "model",
+          "portfolio",
+          "checks",
+          "allowed",
+          "verdict",
+          "notes",
+          "disclaimer"
+        ],
+        "title": "Analysis"
+      },
+      "BacktestRequest": {
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "rf": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.1,
+            "title": "Rf",
+            "description": "无风险年利率，用于夏普比率",
+            "default": 0
+          },
+          "refresh": {
+            "type": "boolean",
+            "title": "Refresh",
+            "default": false
+          },
+          "cash": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cash",
+            "description": "初始资金（美元）",
+            "default": 10000
+          },
+          "fee": {
+            "type": "number",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Fee",
+            "description": "每笔手续费（美元）",
+            "default": 0
+          },
+          "slippage": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Slippage",
+            "description": "滑点（基点）",
+            "default": 5
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Symbol",
+            "examples": [
+              "QQQM"
+            ]
+          },
+          "fast": {
+            "type": "integer",
+            "maximum": 400.0,
+            "minimum": 2.0,
+            "title": "Fast",
+            "default": 50
+          },
+          "slow": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 3.0,
+            "title": "Slow",
+            "default": 200
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "title": "BacktestRequest"
+      },
+      "BacktestResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "fast": {
+            "type": "integer",
+            "title": "Fast"
+          },
+          "slow": {
+            "type": "integer",
+            "title": "Slow"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "benchmark": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "series": {
+            "$ref": "#/components/schemas/BacktestSeries"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/Trade"
+            },
+            "type": "array",
+            "title": "Trades"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "fast",
+          "slow",
+          "summary",
+          "benchmark",
+          "series",
+          "trades"
+        ],
+        "title": "BacktestResponse"
+      },
+      "BacktestSeries": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "close": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Close"
+          },
+          "fast": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Fast"
+          },
+          "slow": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Slow"
+          },
+          "equity": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Equity"
+          },
+          "benchmark": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Benchmark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dates",
+          "close",
+          "fast",
+          "slow",
+          "equity",
+          "benchmark"
+        ],
+        "title": "BacktestSeries",
+        "description": "Columns of equal length, one value per trading day."
+      },
+      "Bars": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "open": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Open"
+          },
+          "high": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "High"
+          },
+          "low": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Low"
+          },
+          "close": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Close"
+          },
+          "volume": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Volume"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "dates",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "title": "Bars"
+      },
+      "Check": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "ok",
+          "text"
+        ],
+        "title": "Check"
+      },
+      "Decision": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "Decision"
+      },
+      "EquitySeries": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "strategy": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Strategy"
+          },
+          "benchmark": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Benchmark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dates",
+          "strategy",
+          "benchmark"
+        ],
+        "title": "EquitySeries"
+      },
+      "Fill": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "shares": {
+            "type": "integer",
+            "title": "Shares"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "side",
+          "symbol",
+          "shares",
+          "price"
+        ],
+        "title": "Fill"
+      },
+      "Fundamentals": {
+        "properties": {
+          "revenue_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Ttm"
+          },
+          "net_income_ttm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Income Ttm"
+          },
+          "op_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Op Margin"
+          },
+          "rev_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rev Growth"
+          },
+          "roa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roa"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "sue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sue"
+          },
+          "cfo_to_ni": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfo To Ni"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revenue_ttm",
+          "net_income_ttm",
+          "op_margin",
+          "rev_growth",
+          "roa",
+          "pe",
+          "pb",
+          "market_cap",
+          "sue",
+          "cfo_to_ni"
+        ],
+        "title": "Fundamentals"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HaltRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Reason",
+            "default": "手动暂停"
+          }
+        },
+        "type": "object",
+        "title": "HaltRequest"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "auth": {
+            "type": "string",
+            "enum": [
+              "token",
+              "proxy"
+            ],
+            "title": "Auth",
+            "default": "token"
+          },
+          "home_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "Health"
+      },
+      "Holding": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "weight",
+          "score"
+        ],
+        "title": "Holding"
+      },
+      "HoldingPosition": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "shares": {
+            "type": "number",
+            "title": "Shares"
+          },
+          "avg_cost": {
+            "type": "number",
+            "title": "Avg Cost"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "gain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "currency",
+          "shares",
+          "avg_cost",
+          "price",
+          "value",
+          "gain",
+          "weight"
+        ],
+        "title": "HoldingPosition"
+      },
+      "HoldingsStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "description": "是否配置了账本的只读访问密钥（只检查是否存在）"
+          },
+          "synced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured",
+          "synced",
+          "account"
+        ],
+        "title": "HoldingsStatus"
+      },
+      "Limits": {
+        "properties": {
+          "capital": {
+            "type": "number",
+            "title": "Capital"
+          },
+          "top_n": {
+            "type": "integer",
+            "title": "Top N"
+          },
+          "max_weight": {
+            "type": "number",
+            "title": "Max Weight"
+          },
+          "max_order_usd": {
+            "type": "number",
+            "title": "Max Order Usd"
+          },
+          "max_daily_usd": {
+            "type": "number",
+            "title": "Max Daily Usd"
+          },
+          "max_orders_per_day": {
+            "type": "integer",
+            "title": "Max Orders Per Day"
+          },
+          "min_order_usd": {
+            "type": "number",
+            "title": "Min Order Usd"
+          },
+          "max_drawdown": {
+            "type": "number",
+            "title": "Max Drawdown"
+          },
+          "max_data_age_days": {
+            "type": "integer",
+            "title": "Max Data Age Days"
+          },
+          "live_enabled": {
+            "type": "boolean",
+            "title": "Live Enabled"
+          },
+          "paper_weeks_before_live": {
+            "type": "integer",
+            "title": "Paper Weeks Before Live"
+          },
+          "busy": {
+            "type": "boolean",
+            "title": "Busy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "capital",
+          "top_n",
+          "max_weight",
+          "max_order_usd",
+          "max_daily_usd",
+          "max_orders_per_day",
+          "min_order_usd",
+          "max_drawdown",
+          "max_data_age_days",
+          "live_enabled",
+          "paper_weeks_before_live",
+          "busy"
+        ],
+        "title": "Limits"
+      },
+      "ModeRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "paper",
+              "live"
+            ],
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ModeRequest"
+      },
+      "ModelRank": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "of": {
+            "type": "integer",
+            "title": "Of"
+          },
+          "signal_date": {
+            "type": "string",
+            "title": "Signal Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "of",
+          "signal_date"
+        ],
+        "title": "ModelRank"
+      },
+      "Note": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "Note"
+      },
+      "PendingOrder": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side"
+          },
+          "decision_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Decision Date"
+          },
+          "affordable": {
+            "type": "boolean",
+            "title": "Affordable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "side",
+          "decision_date",
+          "affordable"
+        ],
+        "title": "PendingOrder"
+      },
+      "Period": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "years": {
+            "type": "number",
+            "title": "Years"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "years"
+        ],
+        "title": "Period"
+      },
+      "Policy": {
+        "properties": {
+          "targets": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Targets",
+            "description": "股票 -> 目标仓位（占股票加现金的比例）"
+          },
+          "band": {
+            "type": "number",
+            "title": "Band",
+            "description": "偏离目标超过这么多（绝对值）才再平衡",
+            "default": 0.05
+          },
+          "max_position": {
+            "type": "number",
+            "title": "Max Position",
+            "description": "单只股票上限",
+            "default": 0.3
+          },
+          "cash_reserve": {
+            "type": "number",
+            "title": "Cash Reserve",
+            "description": "现金储备下限",
+            "default": 0.1
+          },
+          "min_trade_usd": {
+            "type": "number",
+            "title": "Min Trade Usd",
+            "default": 50.0
+          },
+          "whole_shares": {
+            "type": "boolean",
+            "title": "Whole Shares",
+            "default": true
+          },
+          "alert_drawdown_from_cost": {
+            "type": "number",
+            "title": "Alert Drawdown From Cost",
+            "default": 0.2
+          },
+          "alert_drawdown_from_high": {
+            "type": "number",
+            "title": "Alert Drawdown From High",
+            "default": 0.25
+          }
+        },
+        "type": "object",
+        "title": "Policy"
+      },
+      "PortfolioFit": {
+        "properties": {
+          "investable": {
+            "type": "number",
+            "title": "Investable"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "held_value": {
+            "type": "number",
+            "title": "Held Value"
+          },
+          "max_buy": {
+            "type": "number",
+            "title": "Max Buy"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "weight_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight After"
+          },
+          "correlations": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Correlations"
+          },
+          "avg_correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Correlation"
+          },
+          "shares_at_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares At Close"
+          }
+        },
+        "type": "object",
+        "required": [
+          "investable",
+          "cash",
+          "held_value",
+          "max_buy",
+          "amount",
+          "weight_after",
+          "correlations",
+          "avg_correlation",
+          "shares_at_close"
+        ],
+        "title": "PortfolioFit"
+      },
+      "Position": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision",
+            "description": "最新决定：持有、空仓，或还在等待第一个决定（null）"
+          },
+          "decision_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Date"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "shares": {
+            "type": "integer",
+            "title": "Shares"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "return": {
+            "type": "number",
+            "title": "Return"
+          },
+          "benchmark_return": {
+            "type": "number",
+            "title": "Benchmark Return"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "decision",
+          "decision_date",
+          "held",
+          "shares",
+          "value",
+          "cash",
+          "return",
+          "benchmark_return"
+        ],
+        "title": "Position"
+      },
+      "Proposal": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side"
+          },
+          "shares": {
+            "type": "number",
+            "title": "Shares"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "side",
+          "shares",
+          "price",
+          "value",
+          "reason",
+          "status",
+          "decided_at",
+          "note"
+        ],
+        "title": "Proposal"
+      },
+      "RecordResult": {
+        "properties": {
+          "recorded": {
+            "type": "integer",
+            "title": "Recorded"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "account": {
+            "$ref": "#/components/schemas/Account"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recorded",
+          "latest",
+          "account"
+        ],
+        "title": "RecordResult"
+      },
+      "Reminder": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warn"
+            ],
+            "title": "Level"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "level",
+          "kind",
+          "text"
+        ],
+        "title": "Reminder"
+      },
+      "Report": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "text"
+        ],
+        "title": "Report"
+      },
+      "Review": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "synced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/Policy"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/Valuation"
+          },
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "type": "array",
+            "title": "Proposals"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "reminders": {
+            "items": {
+              "$ref": "#/components/schemas/Reminder"
+            },
+            "type": "array",
+            "title": "Reminders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "at",
+          "synced",
+          "account",
+          "policy",
+          "valuation",
+          "proposals",
+          "notes",
+          "reminders"
+        ],
+        "title": "Review"
+      },
+      "RunRequest": {
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "不等月末，按最新收盘价立刻调仓",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RunRequest"
+      },
+      "ScanRequest": {
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "rf": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": -0.1,
+            "title": "Rf",
+            "description": "无风险年利率，用于夏普比率",
+            "default": 0
+          },
+          "refresh": {
+            "type": "boolean",
+            "title": "Refresh",
+            "default": false
+          },
+          "cash": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cash",
+            "description": "初始资金（美元）",
+            "default": 10000
+          },
+          "fee": {
+            "type": "number",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Fee",
+            "description": "每笔手续费（美元）",
+            "default": 0
+          },
+          "slippage": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Slippage",
+            "description": "滑点（基点）",
+            "default": 5
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Symbol",
+            "examples": [
+              "QQQM"
+            ]
+          },
+          "fasts": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Fasts",
+            "default": [
+              5,
+              10,
+              15,
+              20,
+              30,
+              40,
+              50,
+              75,
+              100
+            ]
+          },
+          "slows": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Slows",
+            "default": [
+              50,
+              75,
+              100,
+              125,
+              150,
+              175,
+              200,
+              250,
+              300
+            ]
+          },
+          "split": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split",
+            "description": "样本外从这天开始；不填则留出最后 30% 的交易日"
+          },
+          "by": {
+            "type": "string",
+            "enum": [
+              "sharpe",
+              "cagr"
+            ],
+            "title": "By",
+            "default": "sharpe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "title": "ScanRequest"
+      },
+      "ScanResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "in_sample": {
+            "$ref": "#/components/schemas/Period"
+          },
+          "out_sample": {
+            "$ref": "#/components/schemas/Period"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ScanRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "benchmark_in": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "benchmark_out": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "rank_corr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank Corr"
+          },
+          "median_out": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Out"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "by",
+          "in_sample",
+          "out_sample",
+          "rows",
+          "benchmark_in",
+          "benchmark_out",
+          "rank_corr",
+          "median_out"
+        ],
+        "title": "ScanResponse"
+      },
+      "ScanRow": {
+        "properties": {
+          "fast": {
+            "type": "integer",
+            "title": "Fast"
+          },
+          "slow": {
+            "type": "integer",
+            "title": "Slow"
+          },
+          "is_rank": {
+            "type": "integer",
+            "title": "Is Rank"
+          },
+          "oos_rank": {
+            "type": "integer",
+            "title": "Oos Rank"
+          },
+          "is_sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Sharpe"
+          },
+          "oos_sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oos Sharpe"
+          },
+          "is_cagr": {
+            "type": "number",
+            "title": "Is Cagr"
+          },
+          "oos_cagr": {
+            "type": "number",
+            "title": "Oos Cagr"
+          },
+          "is_mdd": {
+            "type": "number",
+            "title": "Is Mdd"
+          },
+          "oos_mdd": {
+            "type": "number",
+            "title": "Oos Mdd"
+          },
+          "is_trades": {
+            "type": "integer",
+            "title": "Is Trades"
+          },
+          "oos_trades": {
+            "type": "integer",
+            "title": "Oos Trades"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fast",
+          "slow",
+          "is_rank",
+          "oos_rank",
+          "is_sharpe",
+          "oos_sharpe",
+          "is_cagr",
+          "oos_cagr",
+          "is_mdd",
+          "oos_mdd",
+          "is_trades",
+          "oos_trades"
+        ],
+        "title": "ScanRow"
+      },
+      "Schedule": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "last_result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Result"
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "time",
+          "last_run",
+          "last_result",
+          "running"
+        ],
+        "title": "Schedule"
+      },
+      "Signal": {
+        "properties": {
+          "signal_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Signal Date"
+          },
+          "trained_to": {
+            "type": "string",
+            "title": "Trained To"
+          },
+          "samples": {
+            "type": "integer",
+            "title": "Samples"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "type": "array",
+            "title": "Holdings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "signal_date",
+          "trained_to",
+          "samples",
+          "holdings"
+        ],
+        "title": "Signal"
+      },
+      "SignalItem": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "fast": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast"
+          },
+          "slow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slow"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          },
+          "hold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "since_is_cross": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since Is Cross"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "flipped": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "ok"
+        ],
+        "title": "SignalItem"
+      },
+      "StrategyResult": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "turnover": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover"
+          },
+          "costs": {
+            "type": "number",
+            "title": "Costs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "summary",
+          "turnover",
+          "costs"
+        ],
+        "title": "StrategyResult"
+      },
+      "Study": {
+        "properties": {
+          "universe": {
+            "type": "string",
+            "title": "Universe"
+          },
+          "universe_as_of": {
+            "type": "string",
+            "title": "Universe As Of"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyResult"
+            },
+            "type": "array",
+            "title": "Strategies"
+          },
+          "dates": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "equity": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Equity"
+          },
+          "ic_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ic Mean"
+          },
+          "ic_std": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ic Std"
+          },
+          "ic_positive": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ic Positive"
+          },
+          "ic_months": {
+            "type": "integer",
+            "title": "Ic Months"
+          },
+          "ic_by_year": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Ic By Year"
+          },
+          "deciles": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Deciles"
+          },
+          "importance": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Importance"
+          },
+          "feature_names": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Feature Names"
+          },
+          "fits": {
+            "type": "integer",
+            "title": "Fits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "universe",
+          "universe_as_of",
+          "size",
+          "skipped",
+          "start",
+          "end",
+          "strategies",
+          "dates",
+          "equity",
+          "ic_mean",
+          "ic_std",
+          "ic_positive",
+          "ic_months",
+          "ic_by_year",
+          "deciles",
+          "importance",
+          "feature_names",
+          "fits"
+        ],
+        "title": "Study"
+      },
+      "StudyRequest": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start",
+            "default": "2012-01-01"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "top": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 3.0,
+            "title": "Top",
+            "default": 10
+          },
+          "max_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Weight",
+            "default": 0.2
+          },
+          "cash": {
+            "type": "number",
+            "maximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Cash",
+            "default": 10000
+          },
+          "slippage": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Slippage",
+            "default": 5
+          },
+          "fee": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Fee",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "StudyRequest"
+      },
+      "Summary": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "years": {
+            "type": "number",
+            "title": "Years"
+          },
+          "final": {
+            "type": "number",
+            "title": "Final"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "cagr": {
+            "type": "number",
+            "title": "Cagr"
+          },
+          "vol": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vol"
+          },
+          "sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe"
+          },
+          "mdd": {
+            "type": "number",
+            "title": "Mdd"
+          },
+          "mdd_peak": {
+            "type": "string",
+            "format": "date",
+            "title": "Mdd Peak"
+          },
+          "mdd_trough": {
+            "type": "string",
+            "format": "date",
+            "title": "Mdd Trough"
+          },
+          "exposure": {
+            "type": "number",
+            "title": "Exposure"
+          },
+          "trades": {
+            "type": "integer",
+            "title": "Trades"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
+          },
+          "avg_trade": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Trade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "years",
+          "final",
+          "total",
+          "cagr",
+          "vol",
+          "sharpe",
+          "mdd",
+          "mdd_peak",
+          "mdd_trough",
+          "exposure",
+          "trades",
+          "win_rate",
+          "avg_trade"
+        ],
+        "title": "Summary"
+      },
+      "Technical": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "r1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R1M"
+          },
+          "r3m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R3M"
+          },
+          "r6m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R6M"
+          },
+          "r1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R1Y"
+          },
+          "mom_12_1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mom 12 1"
+          },
+          "vol": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vol"
+          },
+          "from_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From High"
+          },
+          "max_dd_1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Dd 1Y"
+          },
+          "ma50": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma50"
+          },
+          "ma200": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma200"
+          },
+          "uptrend": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptrend"
+          },
+          "last_cross": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Cross"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "date",
+          "close"
+        ],
+        "title": "Technical"
+      },
+      "Trade": {
+        "properties": {
+          "entry_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Entry Date"
+          },
+          "entry_price": {
+            "type": "number",
+            "title": "Entry Price"
+          },
+          "exit_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Exit Date"
+          },
+          "exit_price": {
+            "type": "number",
+            "title": "Exit Price"
+          },
+          "shares": {
+            "type": "integer",
+            "title": "Shares"
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl"
+          },
+          "return": {
+            "type": "number",
+            "title": "Return"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_date",
+          "entry_price",
+          "exit_date",
+          "exit_price",
+          "shares",
+          "pnl",
+          "return",
+          "open"
+        ],
+        "title": "Trade"
+      },
+      "TradingAccount": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "broker": {
+            "type": "string",
+            "title": "Broker"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "capital": {
+            "type": "number",
+            "title": "Capital"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "peak_equity": {
+            "type": "number",
+            "title": "Peak Equity"
+          },
+          "drawdown": {
+            "type": "number",
+            "title": "Drawdown"
+          },
+          "halted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Halted"
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/TradingPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "orders": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TradingOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orders"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TradingEvent"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {},
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "broker",
+          "mode",
+          "capital",
+          "cash",
+          "value",
+          "peak_equity",
+          "drawdown",
+          "halted",
+          "created",
+          "positions"
+        ],
+        "title": "TradingAccount"
+      },
+      "TradingAccountCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "paper"
+            ],
+            "title": "Mode",
+            "default": "paper"
+          },
+          "capital": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capital"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TradingAccountCreate"
+      },
+      "TradingEvent": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "kind",
+          "message"
+        ],
+        "title": "TradingEvent"
+      },
+      "TradingOrder": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "signal_date": {
+            "type": "string",
+            "title": "Signal Date"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "qty": {
+            "type": "number",
+            "title": "Qty"
+          },
+          "est_price": {
+            "type": "number",
+            "title": "Est Price"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created": {
+            "type": "string",
+            "title": "Created"
+          },
+          "filled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled At"
+          },
+          "fill_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Price"
+          },
+          "fee": {
+            "type": "number",
+            "title": "Fee"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_id",
+          "signal_date",
+          "symbol",
+          "side",
+          "qty",
+          "est_price",
+          "status",
+          "reason",
+          "created",
+          "filled_at",
+          "fill_price",
+          "fee"
+        ],
+        "title": "TradingOrder"
+      },
+      "TradingPosition": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "qty": {
+            "type": "number",
+            "title": "Qty"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "qty",
+          "price",
+          "value",
+          "weight"
+        ],
+        "title": "TradingPosition"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Valuation": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "cash": {
+            "type": "number",
+            "title": "Cash"
+          },
+          "stocks": {
+            "type": "number",
+            "title": "Stocks"
+          },
+          "investable": {
+            "type": "number",
+            "title": "Investable"
+          },
+          "fixed": {
+            "type": "number",
+            "title": "Fixed"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "cash_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "cash",
+          "stocks",
+          "investable",
+          "fixed",
+          "total",
+          "cash_weight"
+        ],
+        "title": "Valuation"
+      }
+    }
+  }
+}

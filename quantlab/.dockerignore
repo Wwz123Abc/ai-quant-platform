@@ -1,0 +1,8 @@
+.git
+data
+reports
+web/node_modules
+src/quantlab/web
+**/__pycache__
+*.egg-info
+.env
