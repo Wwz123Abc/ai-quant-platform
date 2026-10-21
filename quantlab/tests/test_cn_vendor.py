@@ -146,8 +146,10 @@ def test_global_news_and_insiders_stay_inside_the_window(cn, monkeypatch):
                  {"headline": "Old", "source": "AP", "datetime": ts("2026-09-01")},
                  {"headline": "Tomorrow", "source": "AP", "datetime": ts("2026-10-17")}],
         "stock/insider-transactions": {"data": [
-            {"name": "Tim Cook", "filingDate": "2026-10-10", "transactionDate": "2026-10-08", "transactionCode": "S", "change": -1000, "share": 3000000, "transactionPrice": 250},
-            {"name": "Later Filer", "filingDate": "2026-10-20", "transactionDate": "2026-10-15", "transactionCode": "S", "change": -5, "share": 5, "transactionPrice": 251}]},
+            {"name": "Tim Cook", "filingDate": "2026-10-10", "transactionDate": "2026-10-08", "transactionCode": "S",
+             "change": -1000, "share": 3000000, "transactionPrice": 250},
+            {"name": "Later Filer", "filingDate": "2026-10-20", "transactionDate": "2026-10-15", "transactionCode": "S",
+             "change": -5, "share": 5, "transactionPrice": 251}]},
     }[path])
     out = router.route_to_vendor("get_global_news", DAY, 7, 5)
     assert "Fed holds" in out and "Old" not in out and "Tomorrow" not in out
