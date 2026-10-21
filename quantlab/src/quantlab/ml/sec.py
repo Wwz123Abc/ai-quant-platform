@@ -15,6 +15,7 @@ from ..errors import DataSourceError, NotFound
 log = logging.getLogger(__name__)
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK%010d.json"
+SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK%010d.json"
 MAX_AGE = 7 * 86400
 _last_call = [0.0]
 
@@ -64,4 +65,14 @@ def company_facts(cik, refresh=False):
     p = _cache("CIK%010d.json" % cik)
     if refresh or not p.exists() or time.time() - p.stat().st_mtime > MAX_AGE:
         p.write_text(json.dumps(_get(FACTS_URL % cik)), encoding="utf-8")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def submissions(cik, refresh=False):
+    """Who the registrant is: name, entity type ("operating" for companies, "investment" for funds), industry and
+    exchanges. The filing lists in the same document are not kept."""
+    p = _cache("submissions-CIK%010d.json" % cik)
+    if refresh or not p.exists() or time.time() - p.stat().st_mtime > MAX_AGE:
+        d = _get(SUBMISSIONS_URL % cik)
+        p.write_text(json.dumps({k: d.get(k) for k in ("name", "entityType", "sicDescription", "exchanges", "tickers")}), encoding="utf-8")
     return json.loads(p.read_text(encoding="utf-8"))

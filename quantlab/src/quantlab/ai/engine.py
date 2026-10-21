@@ -141,6 +141,11 @@ def build_config(s=None):
         "output_language": s.ai_language, "results_dir": str(home / "results"), "data_cache_dir": str(home / "cache"),
         "memory_log_path": str(home / "memory" / "trading_memory.md"), "checkpoint_enabled": False,
     })
+    if s.price_source == "cn":  # Yahoo is out of reach: prices, profiles, fundamentals and news from domestic sources
+        from . import cn_vendor
+        cn_vendor.install()
+        cfg["data_vendors"] = {**cfg["data_vendors"], **cn_vendor.DATA_VENDORS}
+        cfg["tool_vendors"] = {**cfg.get("tool_vendors", {}), **cn_vendor.TOOL_VENDORS}
     return cfg
 
 

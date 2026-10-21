@@ -39,15 +39,21 @@ def _get(url, referer, encoding="utf-8"):
         raise DataSourceError("连不上国内行情接口：%s" % getattr(e, "reason", e)) from e
 
 
+def tencent_quote(sym):
+    """The fields of Tencent's quote: [1] Chinese name, [2] code with exchange suffix, [46] English name."""
+    text = _get(QUOTE % sym, "https://gu.qq.com/", "gbk")
+    m = re.search(r'="([^"]*)"', text)
+    fields = m.group(1).split("~") if m else []
+    if len(fields) < 3 or not fields[2]:
+        raise NotFound("腾讯行情找不到 %s" % sym)
+    _codes[sym] = fields[2]
+    return fields
+
+
 def tencent_code(sym):
     """Tencent's code with the exchange suffix, e.g. MCD -> MCD.N, NVDA -> NVDA.OQ."""
     if sym not in _codes:
-        text = _get(QUOTE % sym, "https://gu.qq.com/", "gbk")
-        m = re.search(r'="([^"]*)"', text)
-        fields = m.group(1).split("~") if m else []
-        if len(fields) < 3 or not fields[2]:
-            raise NotFound("腾讯行情找不到 %s" % sym)
-        _codes[sym] = fields[2]
+        tencent_quote(sym)
     return _codes[sym]
 
 
