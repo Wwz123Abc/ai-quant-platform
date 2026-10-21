@@ -83,3 +83,49 @@ test("record kinds", () => {
   near(C.ratio({ from: 1, to: 4 }), 4);
   near(C.ratio({ from: 10, to: 1 }), 0.1);
 });
+
+const TODAY = "2026-10-21";
+const voo = (extra = []) => [{ date: "2025-10-01", side: "buy", symbol: "VOO", shares: 2, price: 600 }, ...extra];
+const VOO_ACTIONS = { VOO: { dividends: [["2025-09-29", "2025-10-01", 1.74], ["2025-12-22", "2025-12-24", 1.771], ["2026-03-27", "2026-03-31", 1.8724]], splits: [] } };
+
+test("missing dividends: only while held, estimated from the shares held before the ex-date", () => {
+  const m = C.missingActions(voo(), VOO_ACTIONS, TODAY);
+  // 2025-09-29 was before the first buy; the other two are missing, newest first
+  assert.equal(m.map((x) => x.date).join(), "2026-03-27,2025-12-22");
+  near(m[0].gross, 1.8724 * 2);
+  assert.equal(m[0].pay, "2026-03-31");
+});
+
+test("a dividend record near the pay date ticks one dividend off, and only one", () => {
+  const m = C.missingActions(voo([{ date: "2025-12-24", side: "dividend", symbol: "VOO", amount: 3.54, tax: 0.35 }]), VOO_ACTIONS, TODAY);
+  assert.equal(m.map((x) => x.date).join(), "2026-03-27");
+  // monthly payer: one record must not answer for two dividends a month apart
+  const monthly = { SGOV: { dividends: [["2026-08-01", "2026-08-05", 0.4], ["2026-09-01", "2026-09-05", 0.4]], splits: [] } };
+  const recs = [{ date: "2026-07-01", side: "buy", symbol: "SGOV", shares: 10, price: 100 },
+    { date: "2026-08-20", side: "dividend", symbol: "SGOV", amount: 4, tax: 0 }];
+  assert.equal(C.missingActions(recs, monthly, TODAY).length, 1);
+});
+
+test("future dividends and stocks never bought are not suggested", () => {
+  const a = { VOO: { dividends: [["2026-12-20", "2026-12-24", 1.9]], splits: [] }, KO: { dividends: [["2026-09-15", "2026-10-01", 0.53]], splits: [] } };
+  assert.equal(C.missingActions(voo(), a, TODAY).length, 0);
+});
+
+test("missing splits, and a recorded one within five days counts", () => {
+  const a = { NFLX: { dividends: [], splits: [["2015-07-15", 1, 7], ["2025-11-17", 1, 10]] } };
+  const buy = { date: "2025-10-01", side: "buy", symbol: "NFLX", shares: 1, price: 1170.9 };
+  const m = C.missingActions([buy], a, TODAY);
+  assert.equal(m.length, 1);
+  assert.equal(m[0].kind, "split");
+  assert.equal(m[0].to, 10);
+  assert.equal(C.missingActions([buy, { date: "2025-11-18", side: "split", symbol: "NFLX", from: 1, to: 10 }], a, TODAY).length, 0);
+});
+
+test("after a recorded split, a later dividend is estimated on the split share count", () => {
+  const a = { NFLX: { dividends: [["2026-01-10", "2026-01-20", 0.1]], splits: [["2025-11-17", 1, 10]] } };
+  const recs = [{ date: "2025-10-01", side: "buy", symbol: "NFLX", shares: 1, price: 1170.9 }, { date: "2025-11-17", side: "split", symbol: "NFLX", from: 1, to: 10 }];
+  const m = C.missingActions(recs, a, TODAY);
+  assert.equal(m.length, 1);
+  near(m[0].shares, 10);
+  near(m[0].gross, 1);
+});

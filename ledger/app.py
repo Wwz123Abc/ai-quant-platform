@@ -43,10 +43,26 @@ DATA = os.path.join(ROOT, "data")
 DB_PATH = os.path.join(DATA, "ledger.db")
 STATIC = os.path.join(ROOT, "static")
 USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
-SHARED_COLLS = {"history", "candles", "watch"}  # market data: written only by the server, uid 0
+SHARED_COLLS = {"history", "candles", "watch", "actions"}  # market data: written only by the server, uid 0
 PAGES = {"/": "index.html", "/index.html": "index.html", "/dashboard": "dashboard.html", "/reading": "reading.html", "/plan": "plan.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
 ASSETS = {"d3.min.js": "text/javascript; charset=utf-8", "calc.js": "text/javascript; charset=utf-8"}
+ASSET_LINK_RE = re.compile(rb"/assets/([A-Za-z0-9_.-]+\.js)(?:\?v=[A-Za-z0-9]*)?")
+_asset_versions = {}
+
+
+def asset_version(name):
+    """A fingerprint of an asset's content, so a page asks for a new URL whenever the file changes: assets are
+    cached for a year, and a fixed URL would keep serving the old copy."""
+    path = os.path.join(STATIC, name)
+    try:
+        stamp = os.stat(path).st_mtime_ns
+    except OSError:
+        return "0"
+    if _asset_versions.get(name, (None,))[0] != stamp:
+        with open(path, "rb") as f:
+            _asset_versions[name] = (stamp, hashlib.sha256(f.read()).hexdigest()[:10])
+    return _asset_versions[name][1]
 NAME_RE = re.compile(r"^[A-Za-z0-9_一-鿿]{2,20}$")
 SYMBOL_RE = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,11}$")
 SESSION_DAYS = 30
@@ -365,10 +381,10 @@ def locked_out(ip):
 
 
 # ---------------------------------------------------------------- market data
-def fetch(url, referer="https://gu.qq.com/"):
+def fetch(url, referer="https://gu.qq.com/", encoding="gbk"):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
     with urllib.request.urlopen(req, timeout=15) as r:
-        return r.read().decode("gbk", errors="replace")
+        return r.read().decode(encoding, errors="replace")
 
 
 def is_hk(sym):
@@ -427,6 +443,52 @@ def daily_bars(sym, code, days=320):
         o, c, hi, lo, v = (float(x) for x in r[1:6])  # Tencent order: date, open, close, high, low, volume
         if min(o, c, hi, lo) > 0:
             out.append([r[0], round(o, 4), round(hi, 4), round(lo, 4), round(c, 4), int(v)])
+    return out
+
+
+# Eastmoney's market suffix for a Tencent exchange suffix (OQ Nasdaq, N NYSE, AM and PS NYSE Arca / American)
+EM_SUFFIX = {"OQ": "O", "N": "N", "AM": "A", "PS": "A"}
+DIVIDEND_RE = re.compile(r"每\s*(\d+(?:\.\d+)?)\s*[股份]派\s*(\d+(?:\.\d+)?)\s*美元")
+
+
+def us_dividends(sym, code):
+    """Cash dividends of a US stock or ETF from Eastmoney's company data, as [ex_date, pay_date, per_share] oldest
+    first; [] when Eastmoney has none (some stocks never pay, and some funds are not covered)."""
+    tail = code.rsplit(".", 1)[-1] if "." in code else ""
+    rows = []
+    for sfx in ([EM_SUFFIX[tail]] if tail in EM_SUFFIX else ["O", "N", "A"]):
+        url = ("https://datacenter.eastmoney.com/securities/api/data/v1/get?reportName=RPT_USF10_INFO_DIVIDEND"
+               "&columns=EX_DIVIDEND_DATE,BONUS_PAY_DATE,ASSIGN_TYPE,PLAN_EXPLAIN&pageSize=500"
+               "&sortColumns=EX_DIVIDEND_DATE&sortTypes=-1&filter=(SECUCODE%3D%22" + urllib.parse.quote(sym + "." + sfx) + "%22)")
+        rows = (json.loads(fetch(url, referer="https://emweb.eastmoney.com/", encoding="utf-8")).get("result") or {}).get("data") or []
+        if rows:
+            break
+    out = []
+    for r in rows:
+        m = DIVIDEND_RE.search(r.get("PLAN_EXPLAIN") or "")
+        ex, pay = str(r.get("EX_DIVIDEND_DATE") or "")[:10], str(r.get("BONUS_PAY_DATE") or "")[:10]
+        if "cash" in str(r.get("ASSIGN_TYPE", "")).lower() and m and DATE_RE.match(ex):
+            out.append([ex, pay if DATE_RE.match(pay) else "", round(float(m.group(2)) / float(m.group(1)), 6)])
+    return sorted(out)
+
+
+def us_splits(sym):
+    """Share splits and reverse splits from Sina's adjustment factors, as [date, from, to] oldest first: the split
+    factor steps by the split ratio on the date it takes effect."""
+    try:
+        text = fetch("https://finance.sina.com.cn/us_stock/company/reinstatement/%s_qfq.js" % sym.replace(".", "_"),
+                     referer="https://finance.sina.com.cn/")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:  # no factors: never split or paid
+            return []
+        raise
+    m = re.search(r"=\s*(\{.*\})", text, re.S)
+    rows = sorted((d["d"], float(d["f"])) for d in (json.loads(m.group(1)).get("data") or [])) if m else []
+    out = []
+    for (_, f0), (day, f1) in zip(rows, rows[1:]):
+        if f0 > 0 and f1 > 0 and abs(f1 / f0 - 1) > 0.01:
+            k = f1 / f0
+            out.append([day, 1, round(k, 4)] if k > 1 else [day, round(1 / k, 4), 1])
     return out
 
 
@@ -523,6 +585,13 @@ def refresh_market(uid):
                 report["history"][s] = len(bars)
         except Exception as e:
             report["errors"][s + " 历史"] = str(e)
+        if is_hk(s):
+            continue
+        try:  # what the records may be missing; the page compares
+            put_doc(0, "actions", s, {"symbol": s, "dividends": us_dividends(s, code), "splits": us_splits(s),
+                                      "source": "东方财富（分红）、新浪财经（拆股、合股）", "updatedAt": now_iso()})
+        except Exception as e:
+            report["errors"][s + " 分红拆股"] = str(e)
     return report
 
 
@@ -619,6 +688,8 @@ class Handler(BaseHTTPRequestHandler):
         path = os.path.join(STATIC, name)
         with open(path, "rb") as f:
             body = f.read()
+        if ctype.startswith("text/html"):  # point pages at the current version of each long-cached asset
+            body = ASSET_LINK_RE.sub(lambda m: b"/assets/" + m.group(1) + b"?v=" + asset_version(m.group(1).decode()).encode(), body)
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", cache)
