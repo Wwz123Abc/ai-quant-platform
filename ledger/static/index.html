@@ -314,7 +314,7 @@ footer p { margin: 0 0 6px; }
   #holdings tr:not(.closed) td:nth-child(4)::before { content: "现价"; }
   #holdings tr:not(.closed) td:nth-child(5)::before { content: "当日涨跌"; }
   #holdings tr:not(.closed) td:nth-child(6)::before { content: "市值"; }
-  #holdings tr:not(.closed) td:nth-child(8)::before { content: "已实现盈亏"; }
+  #holdings tr:not(.closed) td:nth-child(8)::before { content: "总收益"; }
   #holdings tr.closed { grid-template-areas: "sym pnl"; }
   #holdings tr.closed td:nth-child(2) { display: none; }
   #holdings tr.closed td:nth-child(3) { grid-area: pnl; text-align: right; }
@@ -399,8 +399,9 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="pnl-h">
     <div class="head-row">
-      <div class="title"><h2 id="pnl-h">收益走势</h2><details class="help"><summary aria-label="收益走势说明">?</summary><div class="help-body"><p>累计收益 = 股票浮动盈亏 + 已实现盈亏 + 国债和定存已计收益，从第一笔买入或存款起按每天收盘价计算，单位美元（港股按当前汇率折算）。最后的“最新”点用今天的日期和持仓表里的现价，和总览对得上。</p><p>收益率 = 累计收益 ÷ 当天的投入成本（股票成本 + 国债买入成本 + 定存本金），加仓那天成本变大，收益率会跳低。</p><p>下方柱子是每天的盈亏变动，B / S 是买入和卖出。鼠标移动或点按查看当天明细，选中图表后可用方向键逐日查看。</p></div></details></div>
+      <div class="title"><h2 id="pnl-h">收益走势</h2><details class="help"><summary aria-label="收益走势说明">?</summary><div class="help-body"><p>累计收益 = 股票浮动盈亏 + 已实现盈亏 + 分红（扣税后）+ 国债和定存已计收益，从第一笔买入或存款起按每天收盘价计算，单位美元（港股按当前汇率折算）。最后的“最新”点用今天的日期和持仓表里的现价，和总览对得上。</p><p>收益构成：股价涨跌（浮动盈亏加已实现盈亏，已扣费用）+ 分红（扣税后）+ 国债和定存利息，三者相加等于累计收益。</p><p>收益率 = 累计收益 ÷ 当天的投入成本（股票成本 + 国债买入成本 + 定存本金），加仓那天成本变大，收益率会跳低。</p><p>下方柱子是每天的盈亏变动，B / S 是买入和卖出。鼠标移动或点按查看当天明细，选中图表后可用方向键逐日查看。</p></div></details></div>
       <p class="hint">累计收益 <span class="pnl-total" id="pnlTotal">—</span><span class="pnl-sub" id="pnlSub"></span></p>
+      <p class="hint" id="pnlParts"></p>
     </div>
     <div class="pnl-bar">
       <div class="pnl-mode" role="group" aria-label="纵轴显示"><button type="button" data-mode="usd" aria-pressed="true">金额</button><button type="button" data-mode="pct" aria-pressed="false">收益率</button></div>
@@ -437,7 +438,7 @@ footer p { margin: 0 0 6px; }
     </div>
     <div class="table-wrap">
       <table id="holdings">
-        <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">市值</th><th class="num">浮动盈亏</th><th class="num">已实现盈亏 · 分红</th></tr></thead>
+        <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">市值</th><th class="num">浮动盈亏</th><th class="num">总收益</th></tr></thead>
         <tbody><tr><td colspan="8" class="empty">正在读取持仓…</td></tr></tbody>
       </table>
     </div>
@@ -1064,6 +1065,10 @@ TAL|好未来|TAL Education
     if (c.held && c.priced) parts.push("市值 " + money(c.mv), '浮动盈亏 <span class="' + tone(c.unreal) + '">' + signed(c.unreal) + (c.cost > 0 ? "（" + pct(c.unreal / c.cost * 100) + "）" : "") + "</span>");
     parts.push('已实现盈亏 <span class="' + tone(c.realized) + '">' + signed(c.realized) + "</span>");
     if (Math.abs(c.dividends) >= 0.005) parts.push('分红 <span class="' + tone(c.dividends) + '">' + signed(c.dividends) + "</span>" + (c.tax >= 0.005 ? "（已扣税 " + money(c.tax) + "）" : ""));
+    if (c.held && c.priced) {
+      const total = c.unreal + c.realized + c.dividends;
+      parts.push('股票总收益 <span class="' + tone(total) + '">' + signed(total) + "</span>");
+    }
     parts.push("累计费用 " + money(c.fees));
     $("#holdSum").innerHTML = state.ready && (c.syms.length || c.fees) ? parts.join(" · ") : "";
   }
@@ -1273,7 +1278,7 @@ TAL|好未来|TAL Education
       tb.innerHTML = rows.map((s) => {
         if (s.shares <= 0) {
           return '<tr class="closed">' + symCell(s.symbol) + '<td class="num">0</td><td colspan="6" class="num">已清仓 · 已实现 <span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span>" +
-            (Math.abs(s.dividends) >= 0.005 ? " · 分红 " + signed(s.dividends, s.ccy) : "") + "</td></tr>";
+            (Math.abs(s.dividends) >= 0.005 ? " · 分红 " + signed(s.dividends, s.ccy) + ' · 总收益 <span class="' + tone(s.realized + s.dividends) + '">' + signed(s.realized + s.dividends, s.ccy) + "</span>" : "") + "</td></tr>";
         }
         const avg = s.cost / s.shares;
         const px = Number(state.prices[s.symbol]) || 0;
@@ -1287,8 +1292,11 @@ TAL|好未来|TAL Education
         const dayCell = px > 0 && prev > 0
           ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "<br><small>" + signed((px - prev) * s.shares, s.ccy) + "</small></span>"
           : '<span class="muted">—</span>';
-        const realCell = (Math.abs(s.realized) >= 0.005 ? '<span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span>" : '<span class="muted">—</span>') +
-          (Math.abs(s.dividends) >= 0.005 ? "<br><small>分红 " + signed(s.dividends, s.ccy) + "</small>" : "");
+        // total = unrealized + realized + dividends; the small line shows its parts: price change and dividends
+        const gain = s.unreal + s.realized, total = gain + s.dividends, hasReal = Math.abs(s.realized) >= 0.005, hasDiv = Math.abs(s.dividends) >= 0.005;
+        const partsLine = hasReal || hasDiv ? "<br><small>股价 " + signed(gain, s.ccy) + (hasReal ? "（含已实现 " + signed(s.realized, s.ccy) + "）" : "") +
+          (hasDiv ? " · 分红 " + signed(s.dividends, s.ccy) : "") + "</small>" : "";
+        const realCell = px > 0 ? '<span class="' + tone(total) + '">' + signed(total, s.ccy) + partsLine + "</span>" + usdCap(total, s.ccy, true) : '<span class="muted">—</span>';
         return "<tr>" + symCell(s.symbol) + '<td class="num">' + nfQ.format(s.shares) + '</td><td class="num">' + price(avg, s.ccy) +
           '</td><td class="num"><input class="px" type="number" inputmode="decimal" step="any" min="0" id="price-' + sym + '" data-sym="' + sym +
           '" value="' + (px > 0 ? px : "") + '" placeholder="' + (s.ccy === "HKD" ? "港元" : "美元") + '" aria-label="' + sym + " 现价（" + (s.ccy === "HKD" ? "港元" : "美元") + '）"' + (ro ? " disabled" : "") +
@@ -1497,6 +1505,14 @@ TAL|好未来|TAL Education
   const pnlVal = (r) => (pnlMode === "pct" ? (r.pct == null ? 0 : r.pct * 100) : r.total);
   const pnlFmt = (v) => (pnlMode === "pct" ? pct(v) : signed(v));
 
+  // The parts of a day's total profit; they add up to it exactly: price change of stocks (unrealized and realized,
+  // after fees), dividends after tax, and interest of Treasuries and deposits. Parts that never occurred are left out.
+  function returnParts(r) {
+    const parts = [["股价涨跌", r.value - r.cost + r.realized]];
+    if (Math.abs(r.dividends) >= 0.005) parts.push(["分红", r.dividends]);
+    if (state.fixed.length) parts.push(["国债和定存", r.fixedIncome]);
+    return parts;
+  }
   const MARKS = { buy: ["B", "var(--up)"], sell: ["S", "var(--down)"], dividend: ["息", "var(--accent)"], split: ["拆", "var(--muted)"] };
   function renderPnl(list) {
     const box = $("#pnlChart"), empty = $("#pnlEmpty"), tot = $("#pnlTotal"), sub = $("#pnlSub"), stats = $("#pnlStats");
@@ -1508,7 +1524,7 @@ TAL|好未来|TAL Education
       empty.hidden = false;
       empty.textContent = !state.ready || !state.histReady ? "正在读取收盘价…"
         : list.length || state.fixed.length ? "还没有收盘价数据，点“刷新数据”后显示。" : "录入第一笔买入后，这里会画出每天的累计收益。";
-      tot.textContent = "—"; tot.className = "pnl-total"; sub.innerHTML = ""; stats.hidden = true;
+      tot.textContent = "—"; tot.className = "pnl-total"; sub.innerHTML = ""; stats.hidden = true; $("#pnlParts").innerHTML = "";
       return;
     }
     empty.hidden = true;
@@ -1516,6 +1532,7 @@ TAL|好未来|TAL Education
     tot.textContent = signed(last.total); tot.className = "pnl-total " + tone(last.total);
     sub.innerHTML = (last.pct == null ? "" : '收益率 <span class="' + tone(last.total) + '">' + pct(last.pct * 100) + "</span> · ") +
       (last.live ? "较上一收盘 " : md(last.date) + " 当日 ") + '<span class="' + tone(last.day) + '">' + signed(last.day) + "</span>";
+    $("#pnlParts").innerHTML = "收益构成：" + returnParts(last).map(([k, v]) => k + ' <span class="' + tone(v) + '">' + signed(v) + "</span>").join(" · ");
 
     // Stats (always in USD): high, low, largest peak-to-trough drop, up days.
     let hiI = 0, loI = 0, peak = -Infinity, peakI = 0, dd = 0, ddA = 0, ddB = 0, upDays = 0;
