@@ -553,7 +553,7 @@ def cmd_holdings_decide(a):
                                   "已确认，请自己去券商下单，成交后在账本记一笔" if o["status"] == "approved" else "已拒绝"))
 
 
-SECRETS = ("DEEPSEEK_API_KEY", "FRED_API_KEY", "SEC_EDGAR_USER_AGENT", "ALPHA_VANTAGE_API_KEY", "LEDGER_TOKEN")
+SECRETS = ("DEEPSEEK_API_KEY", "FRED_API_KEY", "SEC_EDGAR_USER_AGENT", "FINNHUB_API_KEY", "LEDGER_TOKEN")
 
 
 def cmd_secrets_set(a):

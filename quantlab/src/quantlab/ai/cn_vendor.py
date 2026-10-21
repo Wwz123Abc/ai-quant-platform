@@ -8,8 +8,9 @@ QuantLab's own data; DATA_VENDORS and TOOL_VENDORS select it in the config. Trad
 - Prices: QuantLab's Tencent bars with Sina's adjustment factors, the same series the backtests use.
 - Profile and fundamentals: SEC EDGAR (registrant details and company facts as first reported).
 - Statements: TradingAgents' own SEC EDGAR vendor.
-- News and insider trades: Alpha Vantage when ALPHA_VANTAGE_API_KEY is set. Otherwise the call reports the data as
-  unavailable, which TradingAgents passes to the agents with an instruction not to make anything up.
+- News: Finnhub articles and the company's SEC filings; market news and insider trades from Finnhub (see news.py).
+  Without FINNHUB_API_KEY those calls report the data as unavailable, which TradingAgents passes to the agents
+  with an instruction not to make anything up.
 
 QuantLab analyses only the latest close, so the profile and fundamentals are today's; prices are cut at the
 analysis date like TradingAgents' own loader does."""
@@ -153,16 +154,6 @@ def get_fundamentals(ticker, curr_date=None):
             "months; market values use the close above\n\n" % sym) + "".join("%s: %s\n" % r for r in rows)
 
 
-def _with_key(env, method, fn):
-    """fn when the key is set; otherwise report the data as unavailable rather than failing the run."""
-    def call(*args, **kwargs):
-        if not os.environ.get(env):
-            _, VendorUnavailableError = _errors()
-            raise VendorUnavailableError("%s has no source on this server (%s is not set)" % (method, env))
-        return fn(*args, **kwargs)
-    return call
-
-
 def _unreachable(what):
     def call(*args, **kwargs):
         _, VendorUnavailableError = _errors()
@@ -181,15 +172,16 @@ def install():
         from tradingagents.dataflows.vendors.yahoo import market, snapshot
         from tradingagents.memory import settlement
 
+        from . import news
+
         methods = router.VENDOR_METHODS
         own = {
             "get_stock_data": get_stock_data,
             "get_indicators": market.get_stock_stats_indicators_window,  # TradingAgents' indicators on our prices
             "get_fundamentals": get_fundamentals,
-            "get_news": _with_key("ALPHA_VANTAGE_API_KEY", "news", methods["get_news"]["alpha_vantage"]),
-            "get_global_news": _with_key("ALPHA_VANTAGE_API_KEY", "global news", methods["get_global_news"]["alpha_vantage"]),
-            "get_insider_transactions": _with_key("ALPHA_VANTAGE_API_KEY", "insider transactions",
-                                                  methods["get_insider_transactions"]["alpha_vantage"]),
+            "get_news": news.get_news,
+            "get_global_news": news.get_global_news,
+            "get_insider_transactions": news.get_insider_transactions,
             "get_prediction_markets": _unreachable("Polymarket"),
         }
         for method, fn in own.items():
@@ -200,4 +192,4 @@ def install():
         context._identity.cache_clear()
         _installed = True
         log.info("TradingAgents uses domestic data: Tencent/Sina prices, SEC fundamentals, news %s",
-                 "from Alpha Vantage" if os.environ.get("ALPHA_VANTAGE_API_KEY") else "unavailable")
+                 "from Finnhub and SEC" if os.environ.get("FINNHUB_API_KEY") else "from SEC filings only")

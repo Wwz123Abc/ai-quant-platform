@@ -25,7 +25,7 @@ QuantLab 和美股账本放在同一台服务器、同一个域名下：账本�
 6. 其他密钥自己在服务器上输入（输入时不显示）：
 
 ```bash
-cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set DEEPSEEK_API_KEY SEC_EDGAR_USER_AGENT FRED_API_KEY ALPHA_VANTAGE_API_KEY
+cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set DEEPSEEK_API_KEY SEC_EDGAR_USER_AGENT FRED_API_KEY FINNHUB_API_KEY
 ```
 
 `quantlab secrets status` 只显示每个密钥是否已配置。改完 `sudo systemctl restart quantlab`。
@@ -40,6 +40,7 @@ cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set
 | 公司简介、基本面概况 | SEC 登记信息和财报数据（需要 `SEC_EDGAR_USER_AGENT`） |
 | 三张财务报表 | TradingAgents 自带的 SEC EDGAR 数据源 |
 | 宏观数据 | FRED（需要 `FRED_API_KEY`） |
-| 新闻、内部人交易 | Alpha Vantage（需要免费的 `ALPHA_VANTAGE_API_KEY`）；没有时报告里写明“无新闻数据” |
+| 个股新闻 | Finnhub 新闻（需要免费的 `FINNHUB_API_KEY`）+ 公司在 SEC 的公告（8-K 重大事件、季报年报，不需要 key） |
+| 市场新闻、内部人交易 | Finnhub；只用分析日期之前发布或申报的内容 |
 
 缺少的数据一律明确告诉模型“数据不可用，不要编造”，分析照常完成。

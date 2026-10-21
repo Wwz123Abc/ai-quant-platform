@@ -70,9 +70,14 @@ def company_facts(cik, refresh=False):
 
 def submissions(cik, refresh=False):
     """Who the registrant is: name, entity type ("operating" for companies, "investment" for funds), industry and
-    exchanges. The filing lists in the same document are not kept."""
+    exchanges, plus its most recent filings ("recent": form, date, 8-K items, document) newest first."""
     p = _cache("submissions-CIK%010d.json" % cik)
-    if refresh or not p.exists() or time.time() - p.stat().st_mtime > MAX_AGE:
+    if refresh or not p.exists() or time.time() - p.stat().st_mtime > MAX_AGE / 7:  # filings change daily
         d = _get(SUBMISSIONS_URL % cik)
-        p.write_text(json.dumps({k: d.get(k) for k in ("name", "entityType", "sicDescription", "exchanges", "tickers")}), encoding="utf-8")
+        keep = {k: d.get(k) for k in ("name", "entityType", "sicDescription", "exchanges", "tickers")}
+        r = (d.get("filings") or {}).get("recent") or {}
+        cols = ("accessionNumber", "filingDate", "form", "items", "primaryDocument", "primaryDocDescription")
+        # SEC's columns are parallel lists of one length; a missing one would end the table early rather than shift it
+        keep["recent"] = [dict(zip(cols, row, strict=True)) for row in zip(*(r.get(c) or [] for c in cols), strict=False)][:200]
+        p.write_text(json.dumps(keep), encoding="utf-8")
     return json.loads(p.read_text(encoding="utf-8"))
