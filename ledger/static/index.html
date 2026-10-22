@@ -1961,18 +1961,21 @@ TAL|好未来|TAL Education
     const bad = held.filter(checkBad), latest = held.map((x) => state.checks[x].latest).sort().pop();
     el.className = "check" + (bad.length ? " bad" : "");
     if (!bad.length) {
-      el.textContent = "收盘价已和东方财富逐日核对：" + held.length + " 只股票最近 5 个交易日一致（最新 " + md(latest) + "）。";
+      const against = [...new Set(held.map((x) => state.checks[x].against).filter(Boolean))].join("、") || "第二个来源";
+      const days = Math.min(...held.map((x) => state.checks[x].days || 0));
+      el.textContent = "收盘价已和" + against + "逐日核对：" + held.length + " 只股票最近 " + days + " 个交易日一致（最新 " + md(latest) + "）。";
       return;
     }
     const lines = [];
     for (const sym of bad) {
       const k = state.checks[sym];
-      if (k.unchecked) lines.push(esc(sym) + "：腾讯取不到，已改用" + esc(k.source) + "，这次没有第二个来源可以核对");
-      for (const [d, a, b] of k.mismatches) lines.push(esc(sym) + " " + md(d) + " 收盘：腾讯 " + nf3.format(a) + "，东方财富 " + nf3.format(b) + "，差 " + nf2.format(Math.abs(a / b - 1) * 100) + "%");
+      if (k.unchecked) lines.push(esc(sym) + (k.reason === "fallback" ? "：腾讯取不到，已改用" + esc(k.source) + "，这次没有第二个来源可以核对"
+        : "：新浪财经和东方财富这次都取不到，没有完成核对（价格仍来自腾讯）"));
+      for (const [d, a, b] of k.mismatches) lines.push(esc(sym) + " " + md(d) + " 收盘：腾讯 " + nf3.format(a) + "，" + esc(k.against) + " " + nf3.format(b) + "，差 " + nf2.format(Math.abs(a / b - 1) * 100) + "%");
       if (k.missing.length) lines.push(esc(sym) + " 缺 " + k.missing.map(([d, who]) => md(d) + " 的" + who + "数据").join("、"));
       if (k.stale) lines.push(esc(sym) + " 最新收盘停在 " + (k.latest ? md(k.latest) : "—") + "，数据可能没有更新");
     }
-    el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（腾讯和东方财富对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
+    el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（腾讯和第二个来源对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
   }
   // ---------- reconciliation with the broker ----------
   const reconDlg = $("#reconDlg");
@@ -2062,7 +2065,8 @@ TAL|好未来|TAL Education
 
   function applyChecks(snap) {
     const k = {};
-    snap.docs.forEach((doc) => { const d = doc.data() || {}; k[doc.id] = { mismatches: d.mismatches || [], missing: d.missing || [], stale: !!d.stale, latest: d.latest || "", unchecked: !!d.unchecked, source: d.source || "" }; });
+    snap.docs.forEach((doc) => { const d = doc.data() || {}; k[doc.id] = { mismatches: d.mismatches || [], missing: d.missing || [], stale: !!d.stale, latest: d.latest || "", unchecked: !!d.unchecked, source: d.source || "",
+      against: d.against || "", reason: d.reason || "", days: (d.days || []).length }; });
     state.checks = k;
     render();
   }

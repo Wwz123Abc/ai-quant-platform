@@ -47,5 +47,33 @@ class CrossCheck(unittest.TestCase):
         self.assertEqual(app.em_markets("VOO"), ["105", "106", "107"])
 
 
+class SecondSource(unittest.TestCase):
+    def test_parse_sina_daily(self):
+        text = ('var _QQQM=([{"d":"2026-10-20","o":"294.54","h":"297.56","l":"292.52","c":"295.59","v":"3664385"},'
+                '{"d":"bad"},{"d":"2026-10-21","o":"297.44","h":"299.74","l":"296.50","c":"298.64","v":"2476663"}]);')
+        self.assertEqual(app.parse_sina_daily(text), [["2026-10-20", 294.54, 297.56, 292.52, 295.59, 3664385],
+                                                      ["2026-10-21", 297.44, 299.74, 296.5, 298.64, 2476663]])
+        self.assertEqual(app.parse_sina_daily("<html>blocked</html>"), [])
+
+    def test_sina_first_then_eastmoney(self):
+        real = app.sina_bars, app.em_bars
+        try:
+            app.sina_bars = lambda sym, days: bars([1, 2, 3])
+            app.em_bars = lambda sym, code, days: self.fail("Eastmoney asked although Sina answered")
+            self.assertEqual(app.second_source("X", "X", 5)[0], "新浪财经")
+
+            def down(*a):
+                raise OSError("Remote end closed connection")
+            app.sina_bars = down
+            app.em_bars = lambda sym, code, days: bars([1, 2, 3])
+            name, got, problems = app.second_source("X", "X", 5)
+            self.assertEqual((name, len(got)), ("东方财富", 3))
+            self.assertIn("新浪财经：Remote end closed connection", problems[0])
+            app.em_bars = lambda sym, code, days: []
+            self.assertEqual(app.second_source("X", "X", 5)[:2], ("", []))
+        finally:
+            app.sina_bars, app.em_bars = real
+
+
 if __name__ == "__main__":
     unittest.main()

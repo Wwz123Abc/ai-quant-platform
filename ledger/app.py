@@ -558,6 +558,45 @@ def em_bars(sym, code, days=320):
     return []
 
 
+def parse_sina_daily(text):
+    """Sina's US daily K-line JSONP (var _X=([{"d":..,"o":..,"h":..,"l":..,"c":..,"v":..}, ...]);) as daily_bars rows."""
+    start, end = text.find("("), text.rfind(")")
+    rows = json.loads(text[start + 1:end]) if 0 <= start < end else []
+    out = []
+    for r in rows or []:
+        try:
+            o, hi, lo, c, v = (float(r[k]) for k in ("o", "h", "l", "c", "v"))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if DATE_RE.match(str(r.get("d", ""))) and min(o, hi, lo, c) > 0:
+            out.append([r["d"], round(o, 4), round(hi, 4), round(lo, 4), round(c, 4), int(v)])
+    return out
+
+
+def sina_bars(sym, days=320):
+    """Unadjusted daily bars of a US stock from Sina, in the same form as daily_bars."""
+    name = re.sub(r"[^A-Za-z0-9]", "_", sym)
+    url = "https://stock.finance.sina.com.cn/usstock/api/jsonp.php/var%%20_%s=/US_MinKService.getDailyK?symbol=%s&type=daily" % (
+        name, urllib.parse.quote(sym))
+    return parse_sina_daily(fetch(url, referer="https://finance.sina.com.cn/", encoding="utf-8"))[-days:]
+
+
+def second_source(sym, code, days):
+    """Daily bars from a source other than Tencent: Sina, else Eastmoney. Returns (name, bars, problems), where
+    problems says what failed on the way; bars is [] when neither answered."""
+    problems = []
+    for name, get in (("新浪财经", lambda: sina_bars(sym, days)), ("东方财富", lambda: em_bars(sym, code, days))):
+        try:
+            bars = get()
+        except Exception as e:
+            problems.append("%s：%s" % (name, e))
+            continue
+        if bars:
+            return name, bars, problems
+        problems.append("%s：没有数据" % name)
+    return "", [], problems
+
+
 def cross_check(bars, other, today):
     """Tencent's last CHECK_DAYS closes against Eastmoney's: {days, mismatches: [[date, tencent, eastmoney]],
     missing: [[date, "腾讯" or "东方财富"]], latest, stale}. A close differing by more than CHECK_TOLERANCE is a
@@ -636,6 +675,11 @@ def refresh_market(uid):
             q[s] = {"price": x["price"], "date": x["date"], "currency": "USD", "name": "", "code": s, "kind": "live" if in_session(s) else "close",
                     "source": "东方财富"}
             del errs[s]
+            continue
+        name, bars, _ = second_source(s, s, 3)
+        if bars:
+            q[s] = {"price": bars[-1][4], "date": bars[-1][0], "currency": "USD", "name": "", "code": s, "kind": "close", "source": name}
+            del errs[s]
     report["errors"].update(errs)
     prices, quotes_meta = dict(cfg.get("prices") or {}), dict(cfg.get("quotes") or {})
     for s, x in q.items():
@@ -679,20 +723,20 @@ def refresh_market(uid):
                 if is_hk(s):
                     raise
                 bars, bar_source = [], "腾讯财经"
-            other = []
             if not is_hk(s):
-                try:
-                    other = em_bars(s, code, CHECK_DAYS + 5)
-                except Exception as e:
-                    report["errors"][s + " 核对"] = "东方财富取不到：%s" % e
+                # Tencent failed: the second source stands in for it, and nothing independent is left to compare with
+                other_name, other, problems = second_source(s, code, 320 if not bars else CHECK_DAYS + 5)
                 if not bars and other:
-                    bars, bar_source = em_bars(s, code), "东方财富"
+                    bars, bar_source = other, other_name
                 today = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
+                base = {"symbol": s, "source": bar_source, "checkedAt": now_iso()}
                 if bars and other and bar_source == "腾讯财经":
-                    put_doc(0, "checks", s, {"symbol": s, "source": bar_source, "against": "东方财富", "checkedAt": now_iso(), **cross_check(bars, other, today)})
-                elif bars:  # Eastmoney stood in: nothing independent to compare with, so say so instead of "consistent"
-                    put_doc(0, "checks", s, {"symbol": s, "source": bar_source, "against": "", "checkedAt": now_iso(), "unchecked": True,
-                                             **cross_check(bars, bars, today)})
+                    put_doc(0, "checks", s, {**base, "against": other_name, **cross_check(bars, other, today)})
+                elif bars:  # say why there was no check, never "consistent"
+                    put_doc(0, "checks", s, {**base, "against": "", "unchecked": True, "reason": "fallback" if bar_source != "腾讯财经" else "no_second",
+                                             "detail": "；".join(problems)[:200], **cross_check(bars, bars, today)})
+                if problems and not other:
+                    report["errors"][s + " 核对"] = "；".join(problems)[:200]
             if bars:
                 ccy = "HKD" if is_hk(s) else "USD"
                 put_doc(0, "history", s, {"symbol": s, "currency": ccy, "closes": {b[0]: b[4] for b in bars}, "updatedAt": now_iso()})
