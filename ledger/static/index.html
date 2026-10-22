@@ -61,6 +61,17 @@ h2 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 20px
 .navlink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .navrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .navrow .navlink { margin-top: 0; }
+.nav-more { display: none; }
+.today { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.today-head { margin: 0; font-size: 15px; }
+.today-head b { font-size: 20px; margin-right: 6px; }
+.today-head small { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.today-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+.today-list li { padding: 6px 0; border-top: 1px solid var(--line); }
+.today-list a { color: var(--ink); text-decoration: none; display: flex; justify-content: space-between; gap: 8px; }
+.today-list a::after { content: "→"; color: var(--muted); }
+.today-list .ok { color: var(--muted); }
+.today-list .warn-item a { color: var(--warn); }
 button.navlink { font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
 .navlink[hidden] { display: none; }
 button.navlink:disabled { opacity: .6; cursor: default; }
@@ -367,6 +378,10 @@ footer p { margin: 0 0 6px; }
   form { padding: 14px; }
   .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   #f-side-row { grid-column: 1 / -1; }
+  .nav-more { display: inline-flex; }
+  .navrow .nav2 { display: none; }
+  .navrow.open .nav2 { display: inline-flex; }
+  .navrow.open .nav2[hidden] { display: none; }
   #reconTable { min-width: 0; }
   #reconTable thead { display: none; }
   #reconTable tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lbl lbl" "led inp" "res res"; gap: 6px 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
@@ -390,18 +405,23 @@ footer p { margin: 0 0 6px; }
   <header>
     <p class="eyebrow">美股和港股 · 国债 · 定期存款 · 移动平均成本</p>
     <div class="title"><h1>持仓账本</h1><details class="help"><summary aria-label="这个页面怎么用">?</summary><div class="help-body"><p>每一笔买卖记在这里，持仓成本和盈亏自动算好。</p><p>默认以美元记账（港股成交按港元记，再折成美元）。绿涨红跌。</p><p>点“刷新数据”会从腾讯财经和新浪财经取最新价格、收盘价和汇率，几秒完成。</p></div></details></div>
-    <div class="navrow">
+    <div class="navrow" id="navRow">
       <button class="navlink primary" type="button" id="entryBtn">＋ 记一笔</button>
       <button class="navlink" type="button" id="refreshBtn">↻ 刷新数据</button>
       <button class="navlink" type="button" id="reconBtn">对账</button>
-      <a class="navlink" href="/dashboard">打开股票看板<span class="nav-x">（K 线、金价）</span>→</a>
-      <a class="navlink" href="/reading">读书清单</a>
-      <a class="navlink" href="/plan">学习计划</a>
-      <a class="navlink" href="/lab/" id="labLink" hidden>量化分析 →</a>
-      <a class="navlink" href="/account">账号</a>
-      <button class="navlink" type="button" id="logoutBtn">退出登录</button>
+      <button class="navlink nav-more" type="button" id="navMore" aria-expanded="false" aria-controls="navRow">更多 ▾</button>
+      <a class="navlink nav2" href="/dashboard">打开股票看板<span class="nav-x">（K 线、金价）</span>→</a>
+      <a class="navlink nav2" href="/reading">读书清单</a>
+      <a class="navlink nav2" href="/plan">学习计划</a>
+      <a class="navlink nav2" href="/lab/" id="labLink" hidden>量化分析 →</a>
+      <a class="navlink nav2" href="/account">账号</a>
+      <button class="navlink nav2" type="button" id="logoutBtn">退出登录</button>
     </div>
     <p class="status" id="status">正在读取记录…</p>
+    <div class="today" id="today" hidden>
+      <p class="today-head" id="todayHead"></p>
+      <ul class="today-list" id="todayList"></ul>
+    </div>
   </header>
 
   <section aria-labelledby="mix-h">
@@ -954,7 +974,7 @@ TAL|好未来|TAL Education
   const EN = Object.fromEntries(LIST.map((x) => [x.c, x.en]));
   const DEFAULT_PICKS = ["QQQM", "VOO", "AAPL", "NVDA", "TSLA", "0700", "9988", "NIO"];
 
-  const state = { recon: [], checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
+  const state = { sysBad: 0, recon: [], checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
   let db = null;
   const $ = (s) => document.querySelector(s);
 
@@ -1881,7 +1901,55 @@ TAL|好未来|TAL Education
     renderSymList(c);
     renderHints();
     renderChecks(c);
+    renderToday(c, list);
   }
+
+  // ---------- today: the first thing on the page ----------
+  // Total assets and the latest day's change, then everything elsewhere on the page that wants attention, each
+  // linking to where it is. Only what applies is listed.
+  function renderToday(c, list) {
+    const box = $("#today");
+    if (!state.ready || (!c.held && !state.fixed.length && !state.cash.length)) { box.hidden = true; return; }
+    const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0);
+    const rows = pnlSeries(list), last = rows[rows.length - 1], prev = rows[rows.length - 2];
+    const base = prev ? prev.value + prev.fixedValue : 0;
+    $("#todayHead").innerHTML = "总资产 <b>" + money(total) + "</b>" +
+      (last ? '今日 <span class="' + tone(last.day) + '">' + signed(last.day) + (base > 0 ? "（" + pct(last.day / base * 100) + "）" : "") + "</span>" +
+        "<small>" + md(last.date) + (last.live ? " 最新价" : " 收盘") + "</small>" : "");
+    const todo = [], item = (text, href, warn) => todo.push('<li class="' + (warn ? "warn-item" : "") + '"><a href="' + href + '">' + text + "</a></li>");
+    if (hints.length) item(hints.length + " 条可能漏记的分红和拆合股", "#actHints", true);
+    const badChecks = c.syms.filter((x) => x.shares > 0 && checkBad(x.symbol)).length;
+    if (badChecks) item(badChecks + " 只股票的价格核对需要留意", "#checkLine", true);
+    if (c.warnings.length) item(c.warnings.length + " 条卖出超过当时持有的股数", "#warn", true);
+    const r = state.recon[0];
+    if (!r) item("还没有和券商对过账", "#recon", false);
+    else if (!r.matched) item(md(r.date) + " 对账有 " + r.off + " 项不一致", "#recon", true);
+    else if (dayDiff(r.date, todayUS()) > 35) item("上次对账已经是 " + dayDiff(r.date, todayUS()) + " 天前", "#recon", false);
+    if (state.sysBad) item("系统状态有 " + state.sysBad + " 项需要留意", "#sysSec", true);
+    for (const f of state.fixed) {
+      const left = dayDiff(todayUS(), f.maturity);
+      if (left >= 0 && left <= 30) item(esc(f.name) + " " + (left ? left + " 天后" : "今天") + "到期（" + md(f.maturity) + "）", "#fix-h", false);
+    }
+    const age = state.updatedAt ? (Date.now() - Date.parse(state.updatedAt)) / 36e5 : Infinity;
+    if (c.held && age > 24) item(state.updatedAt ? "价格是 " + Math.round(age / 24) + " 天前取的，点“刷新数据”更新" : "还没有取过价格，点“刷新数据”", "#refreshBtn", false);
+    $("#todayList").innerHTML = todo.length ? todo.join("") : '<li class="ok">✓ 今天没有需要处理的事</li>';
+    box.hidden = false;
+  }
+  $("#todayList").addEventListener("click", (e) => {
+    const a = e.target.closest("a");
+    if (!a) return;
+    e.preventDefault();
+    const href = a.getAttribute("href");
+    if (href === "#recon") { $("#reconBtn").click(); return; }
+    if (href === "#refreshBtn") { $("#refreshBtn").click(); return; }
+    const el = $(href);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  $("#navMore").addEventListener("click", () => {
+    const open = $("#navRow").classList.toggle("open");
+    $("#navMore").setAttribute("aria-expanded", String(open));
+    $("#navMore").textContent = open ? "收起 ▴" : "更多 ▾";
+  });
 
   // ---------- closes cross-checked with a second source ----------
   // The server compares Tencent's last five daily closes with Eastmoney's on every refresh (US stocks).
@@ -1988,6 +2056,8 @@ TAL|好未来|TAL Education
       item("恢复演练", d && d.ok && hours(d.time) < 24 * 90, d ? when(d.time) + (d.ok ? " 通过" : " 没通过") : "还没做过", d ? "恢复后的记录：" + esc(d.restored || "") : "运行 ledger/deploy/restore-drill.sh") +
       item("运行版本", !!st.deployed, st.deployed || "未记录", "服务启动于 " + when(st.started));
     $("#sysSec").hidden = false;
+    state.sysBad = $("#sysStats").querySelectorAll("dd.down").length;
+    render();
   }
 
   function applyChecks(snap) {
