@@ -272,6 +272,35 @@ def delete_user(uid):
         con.execute("DELETE FROM meta WHERE k='platform_owner' AND v=?", (str(uid),))
 
 
+STARTED = time.time()
+
+
+def system_status():
+    """What the owner's status panel shows: the newest local backup, the off-site copy and the last restore drill
+    (as the backup scripts recorded them), the deployed commit and when the service started."""
+    def stamp(t):
+        return dt.datetime.fromtimestamp(t, dt.timezone.utc).isoformat(timespec="seconds")
+
+    def read_json(name):
+        try:
+            with open(os.path.join(DATA, name), encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+    d = os.path.join(DATA, "backups")
+    files = sorted(f for f in os.listdir(d) if f.startswith("ledger-")) if os.path.isdir(d) else []
+    try:
+        with open(os.path.join(ROOT, ".deployed"), encoding="utf-8") as f:
+            deployed = f.read().strip()[:7]
+    except OSError:
+        deployed = ""
+    return {
+        "backup": {"file": files[-1], "time": stamp(os.path.getmtime(os.path.join(d, files[-1]))), "count": len(files)} if files else None,
+        "offsite": read_json("offsite.json"), "drill": read_json("drill.json"),
+        "deployed": deployed, "started": stamp(STARTED), "now": stamp(time.time()),
+    }
+
+
 def platform_owner(uid):
     """The one account that may open the quant platform at /lab/ (set with `app.py platform-owner NAME`)."""
     return bool(uid) and get_meta("platform_owner") == str(uid)
@@ -885,6 +914,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(401, {"error": "请先登录。"})
 
         # ---- nginx's check before every request to the quant platform (auth_request): 200 for its owner only
+        if parts == ["status"] and method == "GET":
+            if not platform_owner(uid):
+                return self.send_json(403, {"error": "只有平台所有者能看系统状态。"})
+            return self.send_json(200, system_status())
         if parts == ["sso"] and method == "GET":
             if not platform_owner(uid):
                 return self.send_json(403, {"error": "这个账号不能使用量化分析。"})
