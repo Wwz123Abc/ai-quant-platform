@@ -475,32 +475,6 @@ def daily_bars(sym, code, days=320):
     return out
 
 
-# Eastmoney's market suffix for a Tencent exchange suffix (OQ Nasdaq, N NYSE, AM and PS NYSE Arca / American)
-EM_SUFFIX = {"OQ": "O", "N": "N", "AM": "A", "PS": "A"}
-DIVIDEND_RE = re.compile(r"每\s*(\d+(?:\.\d+)?)\s*[股份]派\s*(\d+(?:\.\d+)?)\s*美元")
-
-
-def us_dividends(sym, code):
-    """Cash dividends of a US stock or ETF from Eastmoney's company data, as [ex_date, pay_date, per_share] oldest
-    first; [] when Eastmoney has none (some stocks never pay, and some funds are not covered)."""
-    tail = code.rsplit(".", 1)[-1] if "." in code else ""
-    rows = []
-    for sfx in ([EM_SUFFIX[tail]] if tail in EM_SUFFIX else ["O", "N", "A"]):
-        url = ("https://datacenter.eastmoney.com/securities/api/data/v1/get?reportName=RPT_USF10_INFO_DIVIDEND"
-               "&columns=EX_DIVIDEND_DATE,BONUS_PAY_DATE,ASSIGN_TYPE,PLAN_EXPLAIN&pageSize=500"
-               "&sortColumns=EX_DIVIDEND_DATE&sortTypes=-1&filter=(SECUCODE%3D%22" + urllib.parse.quote(sym + "." + sfx) + "%22)")
-        rows = (json.loads(fetch(url, referer="https://emweb.eastmoney.com/", encoding="utf-8")).get("result") or {}).get("data") or []
-        if rows:
-            break
-    out = []
-    for r in rows:
-        m = DIVIDEND_RE.search(r.get("PLAN_EXPLAIN") or "")
-        ex, pay = str(r.get("EX_DIVIDEND_DATE") or "")[:10], str(r.get("BONUS_PAY_DATE") or "")[:10]
-        if "cash" in str(r.get("ASSIGN_TYPE", "")).lower() and m and DATE_RE.match(ex):
-            out.append([ex, pay if DATE_RE.match(pay) else "", round(float(m.group(2)) / float(m.group(1)), 6)])
-    return sorted(out)
-
-
 def us_splits(sym):
     """Share splits and reverse splits from Sina's adjustment factors, as [date, from, to] oldest first: the split
     factor steps by the split ratio on the date it takes effect."""
@@ -747,9 +721,8 @@ def refresh_market(uid):
             report["errors"][s + " 历史"] = str(e)
         if is_hk(s):
             continue
-        try:  # what the records may be missing; the page compares
-            put_doc(0, "actions", s, {"symbol": s, "dividends": us_dividends(s, code), "splits": us_splits(s),
-                                      "source": "东方财富（分红）、新浪财经（拆股、合股）", "updatedAt": now_iso()})
+        try:  # splits the records may be missing; the page compares
+            put_doc(0, "actions", s, {"symbol": s, "splits": us_splits(s), "source": "新浪财经（拆股、合股）", "updatedAt": now_iso()})
         except Exception as e:
             report["errors"][s + " 分红拆股"] = str(e)
     return report

@@ -392,7 +392,7 @@ footer p { margin: 0 0 6px; }
   #reconTable td:nth-child(3) { grid-area: inp; }
   #reconTable td:nth-child(4) { grid-area: res; font-size: 13px; }
   #reconTable td.empty { grid-column: 1 / -1; }
-  #f-side-row .seg { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #f-side-row .seg { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #f-side-row .seg label { padding: 7px 4px; text-align: center; }
   .nav-x { display: none; }
   #entry, #importDlg, #reconDlg { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 14px; }
@@ -544,7 +544,6 @@ footer p { margin: 0 0 6px; }
           <div class="seg" role="radiogroup" aria-labelledby="side-lbl">
             <input type="radio" name="side" id="side-buy" value="buy" checked><label class="b" for="side-buy">买入</label>
             <input type="radio" name="side" id="side-sell" value="sell"><label class="s" for="side-sell">卖出</label>
-            <input type="radio" name="side" id="side-div" value="dividend"><label for="side-div">分红</label>
             <input type="radio" name="side" id="side-split" value="split"><label for="side-split">拆合股</label>
           </div>
         </div>
@@ -692,7 +691,7 @@ footer p { margin: 0 0 6px; }
         <input type="radio" name="lside" id="ls-all" value="all" checked><label for="ls-all">全部</label>
         <input type="radio" name="lside" id="ls-buy" value="buy"><label for="ls-buy">买入</label>
         <input type="radio" name="lside" id="ls-sell" value="sell"><label for="ls-sell">卖出</label>
-        <input type="radio" name="lside" id="ls-ev" value="events"><label for="ls-ev">分红·拆合股</label>
+        <input type="radio" name="lside" id="ls-ev" value="events"><label for="ls-ev">拆合股</label>
       </div>
       <label class="logsym" for="logSym">代码 <select id="logSym"><option value="">全部</option></select></label>
     </div>
@@ -1917,7 +1916,7 @@ TAL|好未来|TAL Education
       (last ? '今日 <span class="' + tone(last.day) + '">' + signed(last.day) + (base > 0 ? "（" + pct(last.day / base * 100) + "）" : "") + "</span>" +
         "<small>" + md(last.date) + (last.live ? " 最新价" : " 收盘") + "</small>" : "");
     const todo = [], item = (text, href, warn) => todo.push('<li class="' + (warn ? "warn-item" : "") + '"><a href="' + href + '">' + text + "</a></li>");
-    if (hints.length) item(hints.length + " 条可能漏记的分红和拆合股", "#actHints", true);
+    if (hints.length) item(hints.length + " 条可能漏记的拆股和合股", "#actHints", true);
     const badChecks = c.syms.filter((x) => x.shares > 0 && checkBad(x.symbol)).length;
     if (badChecks) item(badChecks + " 只股票的价格核对需要留意", "#checkLine", true);
     if (c.warnings.length) item(c.warnings.length + " 条卖出超过当时持有的股数", "#warn", true);
@@ -2071,20 +2070,18 @@ TAL|好未来|TAL Education
     render();
   }
 
-  // ---------- dividends and splits the records may be missing ----------
-  // Market data (Eastmoney dividends, Sina splits) for held stocks, compared with the records by LedgerCalc.
+  // ---------- splits the records may be missing ----------
+  // Sina's splits of held stocks, compared with the records by LedgerCalc. Dividends are not recorded (the owner's
+  // choice), so they are not reminded of either.
   let hints = [];
   function renderHints() {
     const box = $("#actHints"), ro = !db || state.canWrite === false;
-    hints = state.ready ? LedgerCalc.missingActions(state.trades, state.actions, todayUS()).filter((h) => !state.dismissed.has(h.key)) : [];
+    hints = state.ready ? LedgerCalc.missingActions(state.trades, state.actions, todayUS()).filter((h) => h.kind === "split" && !state.dismissed.has(h.key)) : [];
     box.hidden = !hints.length || ro;
     if (box.hidden) return;
-    const line = (h) => h.kind === "dividend"
-      ? esc(h.symbol) + " · " + esc(h.date) + " 除息，每股 $" + h.perShare + " × 当时持有 " + nfQ.format(h.shares) + " 股，约税前 " + money(h.gross) +
-        (h.pay ? "（" + md(h.pay) + " 派息）" : "")
-      : esc(h.symbol) + " · " + esc(h.date) + (h.to > h.from ? " 拆股 " : " 合股 ") + nfQ.format(h.from) + " → " + nfQ.format(h.to) + "（当时持有 " + nfQ.format(h.shares) + " 股）";
-    box.innerHTML = "<h3>可能漏记的分红和拆合股（" + hints.length + "）</h3>" +
-      '<p class="src">按东方财富（分红）、新浪财经（拆股、合股）的公开数据和你的交易记录估算，金额以汇丰的通知为准；查不到的股票不会提示。</p><ul>' +
+    const line = (h) => esc(h.symbol) + " · " + esc(h.date) + (h.to > h.from ? " 拆股 " : " 合股 ") + nfQ.format(h.from) + " → " + nfQ.format(h.to) + "（当时持有 " + nfQ.format(h.shares) + " 股）";
+    box.innerHTML = "<h3>可能漏记的拆股和合股（" + hints.length + "）</h3>" +
+      '<p class="src">按新浪财经的拆股、合股记录和你的交易记录对照，以券商的通知为准；查不到的股票不会提示。</p><ul>' +
       hints.map((h, i) => "<li><span>" + line(h) + '</span><span class="acts"><button class="mini" type="button" data-hint="add" data-i="' + i +
         '">记一笔</button><button class="mini" type="button" data-hint="skip" data-i="' + i + '">不用提示</button></span></li>').join("") + "</ul>";
   }
@@ -2097,24 +2094,16 @@ TAL|好未来|TAL Education
       try { await db.doc("config/actions").set({ dismissed: [...state.dismissed] }); } catch (err) { setStatus(errText(err), "err"); }
       return;
     }
-    // Open the entry form filled in; the amounts are estimates to correct from the broker's notice.
+    // Open the entry form filled in, to check against the broker's notice before saving.
     $("#ek-stk").click();
-    $(h.kind === "dividend" ? "#side-div" : "#side-split").click();
+    $("#side-split").click();
     symIn.value = h.symbol;
     updateSymHint();
-    if (h.kind === "dividend") {
-      $("#f-date").value = h.pay || h.date;
-      $("#f-price").value = r2(h.gross);
-      $("#f-fee").value = "0";
-      $("#f-note").value = "除息日 " + h.date + "，每股 " + h.perShare;
-      formMsg("已按除息日持股估算税前金额。请按汇丰的分红通知改成实际的税前金额和预扣税，再保存。", "");
-    } else {
-      $("#f-date").value = h.date;
-      $("#f-from").value = h.from;
-      $("#f-to").value = h.to;
-      $("#f-note").value = "";
-      formMsg("请核对比例和生效日，再保存。", "");
-    }
+    $("#f-date").value = h.date;
+    $("#f-from").value = h.from;
+    $("#f-to").value = h.to;
+    $("#f-note").value = "";
+    formMsg("请核对比例和生效日，再保存。", "");
     entryDlg.showModal();
   });
   function applyActions(snap) {
@@ -2225,9 +2214,8 @@ TAL|好未来|TAL Education
     const sym = resolveSym(raw);
     const hk = sym && isHK(sym);
     const unit = hk ? "港元" : "美元";
-    const div = $("#side-div").checked;
-    $("#f-price-lbl").textContent = (div ? "税前金额（" : "成交价（") + unit + "）";
-    $("#f-fee-lbl").textContent = (div ? "预扣税（" : "费用（") + unit + "）";
+    $("#f-price-lbl").textContent = "成交价（" + unit + "）";
+    $("#f-fee-lbl").textContent = "费用（" + unit + "）";
     const sub = $("#f-sym-sub");
     if (!raw.trim()) sub.textContent = "可搜代码、中文名或英文名。列表里没有的代码也能直接填。";
     else if (!sym) sub.textContent = "没找到。美股填代码如 AAPL、BRK.B，港股填数字如 0700，也可以从下拉里选。";
@@ -2235,21 +2223,19 @@ TAL|好未来|TAL Education
     if (state.cash) updatePay();
   }
 
-  // The stock form shows the fields of the chosen kind: trade, dividend or split.
+  // The stock form shows the fields of the chosen kind: a trade or a split.
   const SIDE_HINT = {
     buy: "美股佣金为 0 时费用填 0；港股买卖都有印花税等代收费，按成交单填。",
     sell: "美股佣金为 0 时费用填 0；港股买卖都有印花税等代收费，按成交单填。",
-    dividend: "按券商的分红通知填：税前金额是“每股分红 × 股数”，预扣税是券商代扣的税（没有就填 0）。",
     split: "拆股、合股后总成本不变，股数和平均成本按比例调整。零碎股换成现金的，另记一笔卖出。",
   };
   function updateSide() {
-    const side = document.querySelector('input[name="side"]:checked').value, div = side === "dividend", split = side === "split";
-    $("#f-date-lbl").textContent = div ? "到账日期" : split ? "生效日期（除权日）" : "成交日期（美国东部时间，按成交记录上的日期）";
-    $("#f-qty-row").hidden = div || split;
+    const side = document.querySelector('input[name="side"]:checked').value, split = side === "split";
+    $("#f-date-lbl").textContent = split ? "生效日期（除权日）" : "成交日期（美国东部时间，按成交记录上的日期）";
+    $("#f-qty-row").hidden = split;
     $("#f-ratio-row").hidden = !split;
     $("#f-price-row").hidden = split;
     $("#f-fee-row").hidden = split;
-    $("#f-price").placeholder = div ? "分红通知上的税前金额" : "成交单上的价格";
     formMsg(SIDE_HINT[side], "");
     updateSymHint();
   }
@@ -2259,11 +2245,11 @@ TAL|好未来|TAL Education
   const payAccount = (ccy) => state.cash.find((k) => k.currency === ccy) || null;
   function updatePay() {
     const sym = resolveSym(symIn.value), side = (document.querySelector('input[name="side"]:checked') || {}).value;
-    const rows = [["#f-pay-row", "#f-pay-txt", side === "split" ? null : payAccount(sym && isHK(sym) ? "HKD" : "USD"), side === "sell" || side === "dividend"],
+    const rows = [["#f-pay-row", "#f-pay-txt", side === "split" ? null : payAccount(sym && isHK(sym) ? "HKD" : "USD"), side === "sell"],
       ["#x-pay-row", "#x-pay-txt", payAccount($("#ek-bond").checked ? "USD" : $("#d-ccy").value), false]];
     for (const [row, txt, acc, into] of rows) {
       $(row).hidden = !acc;
-      if (acc) $(txt).textContent = (into ? ($("#side-div").checked && row === "#f-pay-row" ? "分红到手金额存入 " : "卖出所得存入 ") + acc.name : "从 " + acc.name + " 扣款") + "（余额 " + money(acc.amount, acc.currency) + "）";
+      if (acc) $(txt).textContent = (into ? "卖出所得存入 " + acc.name : "从 " + acc.name + " 扣款") + "（余额 " + money(acc.amount, acc.currency) + "）";
     }
   }
   // Moves money in or out of a cash account; returns a line for the status message.
@@ -2325,11 +2311,7 @@ TAL|好未来|TAL Education
     const ccy = ccyOf(symbol), unit = ccy === "HKD" ? "港元" : "美元";
     const base = { date, side, symbol, market: isHK(symbol) ? "HK" : "US", currency: ccy, note, createdAt: new Date().toISOString() };
     let rec;
-    if (side === "dividend") {
-      if (!(px > 0)) { formMsg("税前金额要大于 0，单位是" + unit + "。", "err"); return; }
-      if (!(fees >= 0 && fees < px)) { formMsg("预扣税要大于等于 0、小于税前金额，没有就填 0。", "err"); return; }
-      rec = Object.assign(base, { amount: px, tax: fees });
-    } else if (side === "split") {
+    if (side === "split") {
       const from = parseFloat($("#f-from").value), to = parseFloat($("#f-to").value);
       if (!(from > 0 && to > 0) || from === to) { formMsg("比例要填两个大于 0 且不相等的数，例如 1 拆 2 填 1 → 2。", "err"); return; }
       const held = LedgerCalc.holdings(state.trades.filter((t) => t.symbol === symbol && t.date < date))[symbol];
