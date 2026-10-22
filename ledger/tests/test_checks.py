@@ -75,5 +75,51 @@ class SecondSource(unittest.TestCase):
             app.sina_bars, app.em_bars = real
 
 
+class SourceCheck(unittest.TestCase):
+    def setUp(self):
+        names = ("quotes", "daily_bars", "sina_bars", "us_splits", "fx_rates", "usdcny_bars", "gold_bars", "em_bars", "em_quote")
+        self.real = {n: getattr(app, n) for n in names}
+        today = "2026-10-21"
+        app.quotes = lambda syms: ({s: {"price": 1.0, "date": today} for s in syms}, {})
+        app.daily_bars = lambda sym, code, days=320: bars([1, 2, 3])
+        app.sina_bars = lambda sym, days=320: bars([1, 2, 3])
+        app.us_splits = lambda sym: [["2015-07-15", 1, 7.0], ["2025-11-17", 1, 10.0]]
+        app.fx_rates = lambda: {"USDHKD": 7.8}
+        app.usdcny_bars = lambda since="": [[today, 7, 7, 7, 7]]
+        app.gold_bars = lambda: [[today, 1, 1, 1, 1]]
+        app.em_bars = lambda sym, code, days=320: bars([1, 2, 3])
+        app.em_quote = lambda sym, code: {"price": 1.0, "date": today}
+
+    def tearDown(self):
+        for n, f in self.real.items():
+            setattr(app, n, f)
+
+    def by_name(self, today="2026-10-21"):
+        return {r["name"]: r for r in app.check_sources(today)}
+
+    def test_all_sources_answering(self):
+        self.assertTrue(all(r["ok"] for r in self.by_name().values()))
+
+    def test_a_failing_source_and_a_stale_one_are_reported(self):
+        def down(*a):
+            raise OSError("Remote end closed connection")
+        app.sina_bars = down
+        app.gold_bars = lambda: [["2026-09-01", 1, 1, 1, 1]]
+        r = self.by_name()
+        self.assertFalse(r["新浪日 K 线"]["ok"])
+        self.assertIn("Remote end closed connection", r["新浪日 K 线"]["detail"])
+        self.assertFalse(r["新浪黄金期货"]["ok"])  # a month old
+        self.assertTrue(r["腾讯日 K 线"]["ok"])
+
+    def test_a_split_missing_from_the_list_is_caught(self):
+        app.us_splits = lambda sym: [["2015-07-15", 1, 7.0]]
+        self.assertFalse(self.by_name()["新浪拆股记录"]["ok"])
+
+    def test_stand_ins_are_marked(self):
+        roles = {n: r["role"] for n, r in self.by_name().items()}
+        self.assertEqual(roles["东方财富日 K 线"], "备用")
+        self.assertEqual(roles["新浪日 K 线"], "核对")
+
+
 if __name__ == "__main__":
     unittest.main()

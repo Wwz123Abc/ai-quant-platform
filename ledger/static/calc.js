@@ -136,20 +136,5 @@
     });
   }
 
-  // Shares held as of a date (records on or before it) against what the broker shows. broker: { SYMBOL: shares }
-  // for the symbols filled in. One row per symbol held on that date or named by the broker:
-  // { symbol, ledger, broker, diff, ok } with diff = broker - ledger (positive: the records are short of shares);
-  // broker, diff and ok are null where nothing was filled in.
-  function reconcile(records, asOf, broker) {
-    const held = holdings(records.filter((r) => r.date <= asOf));
-    const syms = new Set(Object.keys(held).filter((s) => held[s].shares > 1e-9).concat(Object.keys(broker || {})));
-    return [...syms].sort().map((symbol) => {
-      const ledger = held[symbol] ? held[symbol].shares : 0, b = broker && broker[symbol];
-      if (b == null || b === "" || !Number.isFinite(Number(b))) return { symbol, ledger, broker: null, diff: null, ok: null };
-      const diff = Number(b) - ledger;
-      return { symbol, ledger, broker: Number(b), diff, ok: Math.abs(diff) < 1e-6 };
-    });
-  }
-
-  root.LedgerCalc = { SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust, reconcile };
+  root.LedgerCalc = { SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust };
 })(typeof window !== "undefined" ? window : globalThis);

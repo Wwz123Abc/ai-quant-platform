@@ -42,7 +42,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(ROOT, "data")
 DB_PATH = os.path.join(DATA, "ledger.db")
 STATIC = os.path.join(ROOT, "static")
-USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan", "recon"}
+USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
 SHARED_COLLS = {"history", "candles", "watch", "actions", "checks"}  # market data: written only by the server, uid 0
 PAGES = {"/": "index.html", "/index.html": "index.html", "/dashboard": "dashboard.html", "/reading": "reading.html", "/plan": "plan.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
@@ -296,7 +296,7 @@ def system_status():
         deployed = ""
     return {
         "backup": {"file": files[-1], "time": stamp(os.path.getmtime(os.path.join(d, files[-1]))), "count": len(files)} if files else None,
-        "offsite": read_json("offsite.json"), "drill": read_json("drill.json"),
+        "offsite": read_json("offsite.json"), "drill": read_json("drill.json"), "sources": read_json("sources.json"),
         "deployed": deployed, "started": stamp(STARTED), "now": stamp(time.time()),
     }
 
@@ -630,6 +630,67 @@ def fx_rates():
             f = line.split('="', 1)[1].rstrip('"').split(",")
             rates[name.upper()] = float(f[1])
     return rates
+
+
+def check_sources(today=None):
+    """Calls every outside data source once with a known stock and checks the answer is there, well formed and
+    fresh (a close no older than STALE_DAYS). Main and cross-check sources must work; a stand-in that fails is
+    noted but is not a problem while the main ones work. Returns [{name, role, ok, detail, ms}]."""
+    today = today or dt.datetime.now(NY).date().isoformat()
+
+    def fresh(day):
+        return bool(day) and (dt.date.fromisoformat(today) - dt.date.fromisoformat(day[:10])).days <= STALE_DAYS
+
+    def tencent_quote():
+        q, errs = quotes(["QQQM", "0700"])
+        bad = [s for s in ("QQQM", "0700") if s not in q or not fresh(q[s]["date"])]
+        assert not bad, "没有拿到或不是最新：%s %s" % (bad, errs)
+        return "QQQM %.2f（%s），腾讯控股 %.2f 港元" % (q["QQQM"]["price"], q["QQQM"]["date"], q["0700"]["price"])
+
+    def bars_check(get, label):
+        b = get()
+        assert b and fresh(b[-1][0]), "最新一根是 %s" % (b[-1][0] if b else "没有数据")
+        return "%s 收盘 %.2f（%s）" % (label, b[-1][4], b[-1][0])
+
+    def splits():
+        got = us_splits("NFLX")
+        assert ["2025-11-17", 1, 10.0] in got, "NFLX 2025-11-17 一拆十不在结果里：%s" % got[-3:]
+        return "NFLX 共 %d 次拆股，含 2025-11-17 一拆十" % len(got)
+
+    def hkd():
+        r = fx_rates().get("USDHKD", 0)
+        assert 7.7 <= r <= 7.9, "美元兑港元 %s 不在 7.7～7.9" % r
+        return "美元兑港元 %.4f" % r
+
+    checks = [
+        ("腾讯实时报价", "主", tencent_quote),
+        ("腾讯日 K 线", "主", lambda: bars_check(lambda: daily_bars("QQQM", "QQQM.OQ", 10), "QQQM")),
+        ("新浪日 K 线", "核对", lambda: bars_check(lambda: sina_bars("QQQM", 10), "QQQM")),
+        ("新浪拆股记录", "主", splits),
+        ("新浪美元兑港元", "主", hkd),
+        ("新浪美元兑人民币", "主", lambda: bars_check(lambda: [[b[0], 0, 0, 0, b[4]] for b in usdcny_bars("2026-01-01")], "美元兑人民币")),
+        ("新浪黄金期货", "主", lambda: bars_check(lambda: [[b[0], 0, 0, 0, b[4]] for b in gold_bars()], "黄金")),
+        ("东方财富日 K 线", "备用", lambda: bars_check(lambda: em_bars("QQQM", "QQQM.OQ", 10), "QQQM")),
+        ("东方财富报价", "备用", lambda: "QQQM %.2f" % (em_quote("QQQM", "QQQM.OQ") or {})["price"]),
+    ]
+    out = []
+    for name, role, run in checks:
+        t0 = time.time()
+        try:
+            detail, ok = run(), True
+        except Exception as e:
+            detail, ok = str(e) or e.__class__.__name__, False
+        out.append({"name": name, "role": role, "ok": ok, "detail": str(detail)[:160], "ms": int((time.time() - t0) * 1000)})
+    return out
+
+
+def record_sources():
+    results = check_sources()
+    path = os.path.join(DATA, "sources.json")
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump({"time": now_iso(), "results": results}, f, ensure_ascii=False)
+    os.replace(path + ".tmp", path)
+    return results
 
 
 def refresh_market(uid):
@@ -1162,6 +1223,12 @@ def main():
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write("\n".join(lines + ["LEDGER_TOKEN=" + create_read_token(u["id"])]) + "\n")
         print("wrote a new read-only key for %s into %s (any earlier key of this account no longer works)" % (u["name"], path))
+    elif cmd == "check-sources":  # every outside data source, once; the result also goes to data/sources.json
+        results = record_sources()
+        for r in results:
+            print("%s %-14s %-4s %5dms  %s" % ("ok  " if r["ok"] else "FAIL", r["name"], r["role"], r["ms"], r["detail"]))
+        if not all(r["ok"] for r in results if r["role"] != "备用"):
+            sys.exit(1)
     elif cmd == "platform-owner":
         v = arg(2, "platform-owner NAME|off")
         if v == "off":

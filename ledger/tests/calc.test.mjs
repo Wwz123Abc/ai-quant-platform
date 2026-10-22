@@ -151,22 +151,3 @@ test("factor after a date and split-adjusted bars", () => {
   assert.equal(adj[1], bars[1]); // after the split: untouched
   assert.equal(C.splitAdjust(bars, []), bars);
 });
-
-test("reconcile: shares as of the date against the broker's, with what is missing on each side", () => {
-  const recs = [
-    { date: "2025-10-01", side: "buy", symbol: "VOO", shares: 2, price: 600 },
-    { date: "2025-10-01", side: "buy", symbol: "NFLX", shares: 1, price: 1170.9 },
-    { date: "2025-11-17", side: "split", symbol: "NFLX", from: 1, to: 10 },
-    { date: "2026-10-25", side: "buy", symbol: "VOO", shares: 1, price: 700 }, // after the date: not counted
-  ];
-  const rows = C.reconcile(recs, "2026-10-21", { VOO: 2, NFLX: 9, QQQM: 3 });
-  const by = Object.fromEntries(rows.map((r) => [r.symbol, r]));
-  assert.equal(rows.map((r) => r.symbol).join(), "NFLX,QQQM,VOO");
-  assert.ok(by.VOO.ok);
-  near(by.NFLX.ledger, 10);
-  near(by.NFLX.diff, -1); // the records have one share more than the broker
-  near(by.QQQM.ledger, 0);
-  near(by.QQQM.diff, 3); // the broker shows a stock the records never bought
-  const blank = C.reconcile(recs, "2026-10-21", { VOO: "" });
-  assert.equal(blank.find((r) => r.symbol === "VOO").ok, null); // not filled in: neither right nor wrong
-});

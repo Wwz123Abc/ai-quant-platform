@@ -77,10 +77,10 @@ button.navlink { font: inherit; font-size: 13px; font-weight: 500; cursor: point
 button.navlink:disabled { opacity: .6; cursor: default; }
 .navlink.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 /* Entry dialog */
-#entry, #importDlg, #reconDlg { width: min(860px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); box-shadow: 0 16px 48px rgba(0, 0, 0, .25); }
-#entry[open], #importDlg[open], #reconDlg[open] { display: grid; gap: 14px; align-content: start; }
-#entry > *, #importDlg > *, #reconDlg > * { min-width: 0; }
-#entry::backdrop, #importDlg::backdrop, #reconDlg::backdrop { background: rgba(15, 20, 30, .45); }
+#entry, #importDlg { width: min(860px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); box-shadow: 0 16px 48px rgba(0, 0, 0, .25); }
+#entry[open], #importDlg[open] { display: grid; gap: 14px; align-content: start; }
+#entry > *, #importDlg > * { min-width: 0; }
+#entry::backdrop, #importDlg::backdrop { background: rgba(15, 20, 30, .45); }
 .dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .dlg-x { font: inherit; font-size: 16px; line-height: 1; width: 36px; height: 36px; flex: none; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--muted); cursor: pointer; }
 .linkbtn { font: inherit; font-size: 13px; background: none; border: 0; padding: 0 0 10px; color: var(--accent); cursor: pointer; text-decoration: underline; display: block; }
@@ -206,11 +206,6 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .check { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 .check.bad { color: var(--warn); }
 .check ul { margin: 4px 0 0; padding-left: 18px; }
-#reconTable input { width: 8em; text-align: right; }
-#reconTable .ok { color: var(--up); }
-#reconTable .bad { color: var(--warn); }
-#reconHist { font-size: 13px; color: var(--muted); }
-#reconHist ul { margin: 4px 0 0; padding-left: 18px; }
 .hints { margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; }
 .hints h3 { margin: 0 0 4px; font-size: 14px; }
 .hints .src { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
@@ -382,20 +377,10 @@ footer p { margin: 0 0 6px; }
   .navrow .nav2 { display: none; }
   .navrow.open .nav2 { display: inline-flex; }
   .navrow.open .nav2[hidden] { display: none; }
-  #reconTable { min-width: 0; }
-  #reconTable thead { display: none; }
-  #reconTable tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lbl lbl" "led inp" "res res"; gap: 6px 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
-  #reconTable tbody td { border: 0; padding: 0; text-align: left; white-space: normal; }
-  #reconTable td:nth-child(1) { grid-area: lbl; font-weight: 500; }
-  #reconTable td:nth-child(2) { grid-area: led; align-self: center; }
-  #reconTable td:nth-child(2)::before { content: "账本 "; color: var(--muted); font-size: 12px; }
-  #reconTable td:nth-child(3) { grid-area: inp; }
-  #reconTable td:nth-child(4) { grid-area: res; font-size: 13px; }
-  #reconTable td.empty { grid-column: 1 / -1; }
   #f-side-row .seg { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #f-side-row .seg label { padding: 7px 4px; text-align: center; }
   .nav-x { display: none; }
-  #entry, #importDlg, #reconDlg { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 14px; }
+  #entry, #importDlg { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 14px; }
   #impText { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -408,7 +393,6 @@ footer p { margin: 0 0 6px; }
     <div class="navrow" id="navRow">
       <button class="navlink primary" type="button" id="entryBtn">＋ 记一笔</button>
       <button class="navlink" type="button" id="refreshBtn">↻ 刷新数据</button>
-      <button class="navlink" type="button" id="reconBtn">对账</button>
       <button class="navlink nav-more" type="button" id="navMore" aria-expanded="false" aria-controls="navRow">更多 ▾</button>
       <a class="navlink nav2" href="/dashboard">打开股票看板<span class="nav-x">（K 线、金价）</span>→</a>
       <a class="navlink nav2" href="/reading">读书清单</a>
@@ -628,23 +612,6 @@ footer p { margin: 0 0 6px; }
     </form>
   </dialog>
 
-  <dialog id="reconDlg" aria-labelledby="recon-h">
-    <div class="dlg-head">
-      <h2 id="recon-h">和券商对账</h2>
-      <button class="dlg-x" type="button" id="reconClose" aria-label="关闭">✕</button>
-    </div>
-    <p class="hint">打开汇丰的持仓页面，把每只股票的股数和现金余额照着填进来，和账本截至同一天的记录比较。只比较数量，不比较价格；没填的项目不算。现金账户只记当前余额，所以总是按现在的余额比较。</p>
-    <div class="field"><label for="r-date">对账日期（券商数据对应的日期）</label><input id="r-date" type="date"></div>
-    <div class="table-wrap">
-      <table id="reconTable">
-        <thead><tr><th>项目</th><th class="num">账本</th><th class="num">券商显示</th><th>结果</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div class="form-foot"><button class="btn" type="button" id="reconSave">保存这次对账</button><p id="reconMsg"></p></div>
-    <div id="reconHist"></div>
-  </dialog>
-
   <dialog id="importDlg" aria-labelledby="imp-h">
     <div class="dlg-head">
       <h2 id="imp-h">导入交易</h2>
@@ -705,7 +672,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="sys-h" id="sysSec" hidden>
     <div class="head-row">
-      <div class="title"><h2 id="sys-h">系统状态</h2><details class="help"><summary aria-label="系统状态说明">?</summary><div class="help-body"><p>只有你能看到。每天 03:30 在服务器上备份数据库（保留 30 份），03:45 把最新一份复制到另一台服务器（保留 60 份），收到时会检查文件完整。</p><p>恢复演练：把异地备份恢复成一个临时账本、启动并核对记录数，证明备份真的能用；建议每季度做一次。</p></div></details></div>
+      <div class="title"><h2 id="sys-h">系统状态</h2><details class="help"><summary aria-label="系统状态说明">?</summary><div class="help-body"><p>只有你能看到。每天 03:30 在服务器上备份数据库（保留 30 份），03:45 把最新一份复制到另一台服务器（保留 60 份），收到时会检查文件完整。</p><p>恢复演练：把异地备份恢复成一个临时账本、启动并核对记录数，证明备份真的能用；建议每季度做一次。</p><p>行情接口：每天 06:15 把腾讯、新浪、东方财富的每个接口各调用一次，检查数据拿得到、格式对、日期是最新的。主用和核对的接口必须正常；东方财富只是备用，不通时只做提示。</p></div></details></div>
     </div>
     <dl class="pnl-stats" id="sysStats"></dl>
   </section>
@@ -973,7 +940,7 @@ TAL|好未来|TAL Education
   const EN = Object.fromEntries(LIST.map((x) => [x.c, x.en]));
   const DEFAULT_PICKS = ["QQQM", "VOO", "AAPL", "NVDA", "TSLA", "0700", "9988", "NIO"];
 
-  const state = { sysBad: 0, recon: [], checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
+  const state = { sysBad: 0, checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
   let db = null;
   const $ = (s) => document.querySelector(s);
 
@@ -1141,12 +1108,6 @@ TAL|好未来|TAL Education
       parts.push('股票总收益 <span class="' + tone(total) + '">' + signed(total) + "</span>");
     }
     parts.push("累计费用 " + money(c.fees));
-    const lastRecon = state.recon[0];
-    if (lastRecon) {
-      const age = dayDiff(lastRecon.date, todayUS());
-      parts.push('上次对账 <span class="' + (lastRecon.matched ? "up" : "down") + '">' + md(lastRecon.date) + (lastRecon.matched ? " 一致" : " 有差异") + "</span>" +
-        (age > 35 ? "（已过 " + age + " 天）" : ""));
-    }
     $("#holdSum").innerHTML = state.ready && (c.syms.length || c.fees) ? parts.join(" · ") : "";
   }
 
@@ -1904,26 +1865,20 @@ TAL|好未来|TAL Education
   }
 
   // ---------- today: the first thing on the page ----------
-  // Total assets and the latest day's change, then everything elsewhere on the page that wants attention, each
+  // The latest day's change, then everything elsewhere on the page that wants attention, each
   // linking to where it is. Only what applies is listed.
   function renderToday(c, list) {
     const box = $("#today");
     if (!state.ready || (!c.held && !state.fixed.length && !state.cash.length)) { box.hidden = true; return; }
-    const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0);
     const rows = pnlSeries(list), last = rows[rows.length - 1], prev = rows[rows.length - 2];
     const base = prev ? prev.value + prev.fixedValue : 0;
-    $("#todayHead").innerHTML = "总资产 <b>" + money(total) + "</b>" +
-      (last ? '今日 <span class="' + tone(last.day) + '">' + signed(last.day) + (base > 0 ? "（" + pct(last.day / base * 100) + "）" : "") + "</span>" +
+    $("#todayHead").innerHTML = (last ? '今日 <span class="' + tone(last.day) + '">' + signed(last.day) + (base > 0 ? "（" + pct(last.day / base * 100) + "）" : "") + "</span>" +
         "<small>" + md(last.date) + (last.live ? " 最新价" : " 收盘") + "</small>" : "");
     const todo = [], item = (text, href, warn) => todo.push('<li class="' + (warn ? "warn-item" : "") + '"><a href="' + href + '">' + text + "</a></li>");
     if (hints.length) item(hints.length + " 条可能漏记的拆股和合股", "#actHints", true);
     const badChecks = c.syms.filter((x) => x.shares > 0 && checkBad(x.symbol)).length;
     if (badChecks) item(badChecks + " 只股票的价格核对需要留意", "#checkLine", true);
     if (c.warnings.length) item(c.warnings.length + " 条卖出超过当时持有的股数", "#warn", true);
-    const r = state.recon[0];
-    if (!r) item("还没有和券商对过账", "#recon", false);
-    else if (!r.matched) item(md(r.date) + " 对账有 " + r.off + " 项不一致", "#recon", true);
-    else if (dayDiff(r.date, todayUS()) > 35) item("上次对账已经是 " + dayDiff(r.date, todayUS()) + " 天前", "#recon", false);
     if (state.sysBad) item("系统状态有 " + state.sysBad + " 项需要留意", "#sysSec", true);
     for (const f of state.fixed) {
       const left = dayDiff(todayUS(), f.maturity);
@@ -1939,7 +1894,6 @@ TAL|好未来|TAL Education
     if (!a) return;
     e.preventDefault();
     const href = a.getAttribute("href");
-    if (href === "#recon") { $("#reconBtn").click(); return; }
     if (href === "#refreshBtn") { $("#refreshBtn").click(); return; }
     const el = $(href);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1976,73 +1930,6 @@ TAL|好未来|TAL Education
     }
     el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（腾讯和第二个来源对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
   }
-  // ---------- reconciliation with the broker ----------
-  const reconDlg = $("#reconDlg");
-  let reconRows = [];
-  // What the ledger says as of the date: shares per symbol (records on or before it) and each cash account.
-  function renderRecon(keep) {
-    const date = $("#r-date").value || todayUS(), prev = keep ? Object.fromEntries([...document.querySelectorAll("#reconTable input")].map((i) => [i.dataset.k, i.value])) : {};
-    const stock = LedgerCalc.reconcile(state.trades, date, {}).filter((r) => r.ledger > 1e-9);
-    reconRows = stock.map((r) => ({ key: "s:" + r.symbol, label: r.symbol + (nameOf(r.symbol) ? " · " + nameOf(r.symbol) : ""), ledger: r.ledger, unit: "股", symbol: r.symbol }))
-      .concat(state.cash.map((k) => ({ key: "c:" + k.id, label: "现金 · " + k.name, ledger: k.amount, unit: k.currency, cash: k })));
-    $("#reconTable tbody").innerHTML = reconRows.length ? reconRows.map((r) =>
-      "<tr><td>" + esc(r.label) + '</td><td class="num">' + (r.cash ? money(r.ledger, r.unit) : nfQ.format(r.ledger)) +
-      '</td><td class="num"><input type="number" inputmode="decimal" step="any" min="0" data-k="' + esc(r.key) + '" value="' + esc(prev[r.key] || "") +
-      '" aria-label="' + esc(r.label) + ' 券商显示"></td><td class="res" data-k="' + esc(r.key) + '"></td></tr>').join("")
-      : '<tr><td colspan="4" class="empty">这一天之前没有持仓，也没有现金账户。</td></tr>';
-    updateRecon();
-  }
-  // Result per row as the owner types: equal, or how far off and what may explain it.
-  function updateRecon() {
-    let filled = 0, off = 0;
-    for (const r of reconRows) {
-      const inp = document.querySelector('#reconTable input[data-k="' + r.key + '"]'), cell = document.querySelector('#reconTable td.res[data-k="' + r.key + '"]');
-      const v = inp && inp.value.trim() !== "" ? Number(inp.value) : null;
-      r.broker = v;
-      if (v == null || !Number.isFinite(v)) { cell.textContent = "—"; cell.className = "res"; continue; }
-      filled++;
-      const diff = v - r.ledger, ok = Math.abs(diff) < (r.cash ? 0.005 : 1e-6);
-      if (!ok) off++;
-      cell.className = "res " + (ok ? "ok" : "bad");
-      cell.textContent = ok ? "✓ 一致"
-        : r.cash ? "账本" + (diff > 0 ? "少 " : "多 ") + money(Math.abs(diff), r.unit) + "：现金余额要按券商的改"
-        : "账本" + (diff > 0 ? "少 " : "多 ") + nfQ.format(Math.abs(diff)) + " 股：" + (diff > 0 ? "可能漏记了买入、拆股或红股" : "可能漏记了卖出，或者多记了买入");
-    }
-    $("#reconMsg").textContent = filled ? "已填 " + filled + " / " + reconRows.length + " 项，" + (off ? off + " 项不一致。" : "全部一致。") : "";
-    return { filled, off };
-  }
-  function renderReconHist() {
-    $("#reconHist").innerHTML = state.recon.length ? "以前的对账：<ul>" + state.recon.slice(0, 6).map((x) => "<li>" + esc(x.date) + " · " +
-      x.filled + " 项" + (x.matched ? "全部一致" : "，" + x.off + " 项不一致") + "</li>").join("") + "</ul>" : "";
-  }
-  $("#reconBtn").addEventListener("click", () => {
-    if (!$("#r-date").value) $("#r-date").value = todayUS();
-    renderRecon(false);
-    renderReconHist();
-    reconDlg.showModal();
-  });
-  $("#reconClose").addEventListener("click", () => reconDlg.close());
-  $("#r-date").addEventListener("change", () => renderRecon(true));
-  $("#reconTable").addEventListener("input", updateRecon);
-  $("#reconSave").addEventListener("click", async () => {
-    const { filled, off } = updateRecon(), date = $("#r-date").value;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { $("#reconMsg").textContent = "请选择对账日期。"; return; }
-    if (!filled) { $("#reconMsg").textContent = "还没有填券商显示的数字。"; return; }
-    const items = reconRows.filter((r) => r.broker != null && Number.isFinite(r.broker)).map((r) => ({ item: r.symbol || r.label, ledger: r.ledger, broker: r.broker }));
-    try {
-      await db.collection("recon").add({ date, items, filled, off, matched: off === 0, createdAt: new Date().toISOString() });
-      $("#reconMsg").textContent = "已保存：" + md(date) + "，" + filled + " 项" + (off ? "，" + off + " 项不一致，改好账本后可以再对一次。" : "全部一致。");
-    } catch (err) {
-      $("#reconMsg").textContent = errText(err);
-    }
-  });
-  function applyRecon(snap) {
-    state.recon = snap.docs.map((doc) => doc.data() || {}).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.date))
-      .sort((a, b) => (a.date + (a.createdAt || "") < b.date + (b.createdAt || "") ? 1 : -1));
-    if (reconDlg.open) renderReconHist();
-    render();
-  }
-
   // ---------- system status (the platform owner only) ----------
   // Backups older than 26 hours, a failed off-site copy, or a restore drill older than 90 days are flagged.
   async function loadStatus() {
@@ -2052,10 +1939,19 @@ TAL|好未来|TAL Education
     const when = (iso) => { if (!iso) return "—"; const h = hours(iso); return h < 1 ? "刚刚" : h < 48 ? Math.round(h) + " 小时前" : Math.round(h / 24) + " 天前"; };
     const item = (k, ok, v, note) => "<div><dt>" + k + '</dt><dd class="' + (ok ? "up" : "down") + '">' + (ok ? "✓ " : "⚠ ") + v + "<small>" + note + "</small></dd></div>";
     const b = st.backup, o = st.offsite, d = st.drill;
+    // data sources: main and cross-check ones must work; a failing stand-in is only noted
+    const srcOk = (x) => !!(x && x.results && x.results.every((r) => r.ok || r.role === "备用"));
+    const srcLine = (x) => (x && x.results ? when(x.time) + " · " + x.results.filter((r) => r.ok).length + " / " + x.results.length + " 正常" : "还没检查过");
+    const srcNote = (x) => {
+      if (!x || !x.results) return "每天 06:15 自动检查";
+      const bad = x.results.filter((r) => !r.ok);
+      return bad.length ? "不通：" + bad.map((r) => esc(r.name) + (r.role === "备用" ? "（备用）" : "")).join("、") : "全部正常";
+    };
     $("#sysStats").innerHTML =
       item("本地备份", b && hours(b.time) < 26, b ? when(b.time) : "没有备份", b ? "共 " + b.count + " 份 · 最新 " + esc(b.file) : "每天 03:30 自动备份") +
       item("异地备份", o && o.ok && hours(o.time) < 26, o ? when(o.time) + (o.ok ? "" : " 失败") : "还没有", o ? esc(String(o.detail || "")).slice(0, 80) : "每天 03:45 复制到另一台服务器") +
       item("恢复演练", d && d.ok && hours(d.time) < 24 * 90, d ? when(d.time) + (d.ok ? " 通过" : " 没通过") : "还没做过", d ? "恢复后的记录：" + esc(d.restored || "") : "运行 ledger/deploy/restore-drill.sh") +
+      item("行情接口", srcOk(st.sources) && hours(st.sources.time) < 26, srcLine(st.sources), srcNote(st.sources)) +
       item("运行版本", !!st.deployed, st.deployed || "未记录", "服务启动于 " + when(st.started));
     $("#sysSec").hidden = false;
     state.sysBad = $("#sysStats").querySelectorAll("dd.down").length;
@@ -2486,7 +2382,7 @@ TAL|好未来|TAL Education
   });
 
   function readOnly(msg, kind) {
-    $("#entryBtn").hidden = $("#impOpen").hidden = $("#reconBtn").hidden = true;
+    $("#entryBtn").hidden = $("#impOpen").hidden = true;
     setStatus(msg, kind);
     render();
   }
@@ -2726,7 +2622,6 @@ TAL|好未来|TAL Education
     db.collection("history").onSnapshot(applyHistory, () => { state.histReady = true; render(); });
     db.collection("actions").onSnapshot(applyActions, () => {});
     db.collection("checks").onSnapshot(applyChecks, () => {});
-    db.collection("recon").onSnapshot(applyRecon, () => {});
     db.doc("config/actions").onSnapshot(applyDismissed, () => {});
     db.doc("config/main").onSnapshot(applyConfig, () => {});
     db.collection("fixed").onSnapshot(applyFixed, () => {});
