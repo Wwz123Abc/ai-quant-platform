@@ -49,10 +49,8 @@ PKG="/tmp/ledger-$TS.tgz"
 git -C "$(git rev-parse --show-toplevel)" archive --format=tar.gz -o "${TMPDIR:-/tmp}/ledger-$TS.tgz" "HEAD:$REPO_PATH" app.py static
 scp -q "${TMPDIR:-/tmp}/ledger-$TS.tgz" "$HOST:$PKG"
 rm -f "${TMPDIR:-/tmp}/ledger-$TS.tgz"
-RESTART=0
-case " $CHANGED " in *" app.py "*) RESTART=1 ;; esac
 
-ssh -o BatchMode=yes "$HOST" "TS=$TS PKG=$PKG DIR=$DIR COMMIT=$COMMIT RESTART=$RESTART bash -s" <<'REMOTE'
+ssh -o BatchMode=yes "$HOST" "TS=$TS PKG=$PKG DIR=$DIR COMMIT=$COMMIT bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$DIR"
 BK="page-backups/deploy-$TS"
@@ -64,7 +62,9 @@ python3 -m py_compile /tmp/ledger-stage-$TS/app.py
 install -o root -g root -m 644 /tmp/ledger-stage-$TS/app.py app.py
 for f in /tmp/ledger-stage-$TS/static/*; do install -o root -g root -m 644 "$f" "static/$(basename "$f")"; done
 rm -rf /tmp/ledger-stage-$TS "$PKG"
-[ "$RESTART" = 1 ] && systemctl restart stock-ledger
+# Always restart: a page-only deploy costs a second of downtime, and the running process can never lag behind app.py.
+systemctl restart stock-ledger
+STARTED=$(systemctl show -p ActiveEnterTimestamp --value stock-ledger)
 healthy() {
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     sleep 1
@@ -73,7 +73,7 @@ healthy() {
   done
   return 1
 }
-if healthy; then
+if healthy && [ "$(date -d "$STARTED" +%s)" -ge "$(stat -c %Y app.py)" ]; then
   echo "$COMMIT" > .deployed
   echo "$TS $COMMIT ok" >> deploy.log
   echo "已部署并通过检查；上一版保存在 $DIR/$BK"
