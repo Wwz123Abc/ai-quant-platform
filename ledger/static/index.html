@@ -158,13 +158,13 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .donut .ctr .k { font-size: 12px; color: var(--muted); }
 .donut .ctr .v { font-size: 20px; font-weight: 600; }
 .donut .ctr .s { font-size: 11px; color: var(--muted); }
-#mix { font-size: 14px; }
-#mix td, #mix th { padding: 8px 6px; white-space: normal; }
-#mix tbody tr { cursor: default; }
-#mix tbody tr.hot td { background: var(--accent-soft); }
-#mix .sw { margin-right: 8px; }
-#mix .nm { display: block; font-size: 12px; color: var(--muted); }
-#mix tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
+#mix, #stkMix { font-size: 14px; }
+#mix td, #mix th, #stkMix td, #stkMix th { padding: 8px 6px; white-space: normal; }
+#mix tbody tr, #stkMix tbody tr { cursor: default; }
+#mix tbody tr.hot td, #stkMix tbody tr.hot td { background: var(--accent-soft); }
+#mix .sw, #stkMix .sw { margin-right: 8px; }
+#mix .nm, #stkMix .nm { display: block; font-size: 12px; color: var(--muted); }
+#mix tfoot td, #stkMix tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
 @media (max-width: 680px) { .mixbox { grid-template-columns: minmax(0, 1fr); } }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
 .sw.stk { background: var(--c-stk); }
@@ -237,7 +237,7 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .pnl-chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 .pnl-mark { font-size: 9px; font-weight: 600; fill: var(--surface); font-family: var(--f-num); }
 .pnl-note { font-size: 10.5px; font-family: var(--f-num); }
-#assetStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#assetStats, #stkStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pnl-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .pnl-stats div { background: var(--surface); padding: 10px 14px; min-width: 0; }
 .pnl-stats dt { font-size: 12px; color: var(--muted); }
@@ -294,6 +294,7 @@ footer p { margin: 0 0 6px; }
   .pnl-sub { text-align: left; }
   /* Trade log as cards: symbol and amount, then date, shares and price, then note and actions */
   #mix thead th:nth-child(2), #mix tbody td:nth-child(2) { display: none; }
+  #stkMix thead th:nth-child(3), #stkMix tbody td:nth-child(3), #stkMix tfoot td:nth-child(3) { display: none; }
   /* Profit calendar on phones: smaller cells */
   .cal { padding: 10px 8px; }
   .cal-grid { gap: 3px; }
@@ -421,6 +422,25 @@ footer p { margin: 0 0 6px; }
       </div>
       <table id="mix">
         <thead><tr><th>名称</th><th>类别</th><th class="num">金额</th><th class="num">占比</th></tr></thead>
+        <tbody><tr><td colspan="4" class="empty">正在读取…</td></tr></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="stk-h">
+    <div class="head-row">
+      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不画在圆盘里，但它们的已实现盈亏列在表格最后，也算进合计。</p></div></details></div>
+      <p class="hint" id="stkSum"></p>
+    </div>
+    <dl class="pnl-stats" id="stkStats" hidden></dl>
+    <div class="mixbox">
+      <div class="donut" id="stkChart">
+        <div class="ctr"><span class="k">股票现值</span><span class="v" id="stkTotal">—</span></div>
+        <div class="pnl-tip" id="stkTip" hidden></div>
+      </div>
+      <table id="stkMix">
+        <thead><tr><th>股票</th><th class="num">现值</th><th class="num">占比</th><th class="num">盈亏</th></tr></thead>
         <tbody><tr><td colspan="4" class="empty">正在读取…</td></tr></tbody>
         <tfoot></tfoot>
       </table>
@@ -1125,34 +1145,19 @@ TAL|好未来|TAL Education
     for (const it of items) { const n = seen[it.k] = (seen[it.k] || 0) + 1; it.op = SHADES[Math.min(n - 1, SHADES.length - 1)]; }
     return items;
   }
-  let mixLay = null;
-  function renderMix(c) {
-    const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0), box = $("#mixChart");
+  // A ring of items [{k, name, v, op}] in box, labelled in place or with leader lines; returns its layout for focus().
+  function drawDonut(box, items, total, label, short) {
     box.querySelectorAll("svg").forEach((n) => n.remove());
-    $("#mixTip").hidden = true;
-    mixLay = null;
-    const unpriced = c.syms.some((s) => s.shares > 0 && !(Number(state.prices[s.symbol]) > 0));
-    $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；先在持仓表里填现价。" : items.length ? "共 " + items.length + " 项" : "";
-    $("#mixTotal").textContent = total > 0 ? money(total) : "—";
-    // Original assets: the money put in and not yet taken back. Current value minus it is the total profit
-    // (unrealized + realized + Treasury and deposit income), the same figure as the profit trend.
-    const as = $("#assetStats"), profit = c.unreal + c.realized + fixedNow().income, original = total - profit;
-    const stat = (k, v, cls, note) => "<div><dt>" + k + '</dt><dd class="' + (cls || "") + '">' + v + (note ? "<small>" + note + "</small>" : "") + "</dd></div>";
-    as.hidden = !(total > 0);
-    as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金（含现金）") +
-      stat("盈亏", signed(profit), tone(profit), original > 0 ? pct((profit / original) * 100) : "") : "";
     if (!items.length || !(total > 0)) {
       // An empty grey ring keeps the chart's shape, so the centre label stays in place.
       box.insertAdjacentHTML("afterbegin", '<svg viewBox="0 0 300 300" aria-hidden="true"><circle cx="150" cy="150" r="91" fill="none" stroke="var(--line)" stroke-width="42"/></svg>');
-      $("#mix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有持仓。" : "正在读取…") + "</td></tr>";
-      $("#mix tfoot").innerHTML = "";
-      return;
+      return null;
     }
     const S = 300, R = 112, r0 = 70, NS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", "0 0 " + S + " " + S);
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "资产占比：" + items.map((it) => it.name + " " + nf2.format((it.v / total) * 100) + "%").join("，"));
+    svg.setAttribute("aria-label", label + "：" + items.map((it) => it.name + " " + nf2.format((it.v / total) * 100) + "%").join("，"));
     const pt = (r, a) => [S / 2 + r * Math.sin(a), S / 2 - r * Math.cos(a)];
     const arc = (a0, a1, rO) => {
       if (a1 - a0 >= 2 * Math.PI - 1e-6) a1 = a0 + 2 * Math.PI - 1e-4;
@@ -1173,7 +1178,6 @@ TAL|好未来|TAL Education
       return p;
     });
     // Labels: big slices carry name and share inside the ring; small ones get a leader line and an outside label.
-    const short = (it) => (it.k === "stk" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存"));
     const text = (x, y, anchor, lines) => {
       const t = document.createElementNS(NS, "text");
       t.setAttribute("class", "lbl"); t.setAttribute("x", x); t.setAttribute("y", y); t.setAttribute("text-anchor", anchor);
@@ -1186,23 +1190,77 @@ TAL|好未来|TAL Education
       svg.append(t);
     };
     let acc = 0;
+    const outs = [];
     items.forEach((it) => {
-      const share = it.v / total, mid = (acc + share / 2) * 2 * Math.PI, label = nf2.format(share * 100) + "%";
+      const share = it.v / total, mid = (acc + share / 2) * 2 * Math.PI, pc = nf2.format(share * 100) + "%";
       acc += share;
       if (share >= 0.07) {
         const [x, y] = pt((R + r0) / 2, mid);
-        text(x, y, "middle", [short(it), label]);
+        text(x, y, "middle", [short(it), pc]);
       } else {
-        const [x0, y0] = pt(R + 2, mid), [x1, y1] = pt(R + 14, mid), right = Math.sin(mid) >= 0;
-        const line = document.createElementNS(NS, "polyline");
-        line.setAttribute("class", "lead");
-        line.setAttribute("points", x0 + "," + y0 + " " + x1 + "," + y1 + " " + (x1 + (right ? 8 : -8)) + "," + y1);
-        svg.append(line);
-        text(x1 + (right ? 11 : -11), y1, right ? "start" : "end", [short(it) + " " + label]);
+        const [x0, y0] = pt(R + 2, mid), [x1, y1] = pt(R + 14, mid);
+        outs.push({ x0, y0, x1, y: y1, right: Math.sin(mid) >= 0, label: short(it) + " " + pc });
       }
     });
+    // Outside labels on the same side are pushed apart so neighbouring small slices do not overlap.
+    for (const right of [true, false]) {
+      const side = outs.filter((o) => o.right === right).sort((p, q) => p.y - q.y);
+      side.forEach((o, k) => { if (k && o.y < side[k - 1].y + 13) o.y = side[k - 1].y + 13; });
+    }
+    for (const o of outs) {
+      const line = document.createElementNS(NS, "polyline");
+      line.setAttribute("class", "lead");
+      line.setAttribute("points", o.x0 + "," + o.y0 + " " + o.x1 + "," + o.y + " " + (o.x1 + (o.right ? 8 : -8)) + "," + o.y);
+      svg.append(line);
+      text(o.x1 + (o.right ? 11 : -11), o.y, o.right ? "start" : "end", [o.label]);
+    }
     box.insertBefore(svg, box.firstChild);
-    mixLay = { items, total, paths, arc, R };
+    return { items, total, paths, arc, R };
+  }
+  // Hover or tap on a slice or a table row: the slice moves out, the row lights up and a tip shows the details.
+  function donutFocus(D, i, clientX, clientY) {
+    if (!D.lay) return;
+    D.lay.paths.forEach((p, j) => p.setAttribute("d", D.lay.arc(p._arc[0], p._arc[1], j === i ? D.lay.R + 4 : D.lay.R)));
+    document.querySelectorAll(D.table + " tbody tr").forEach((tr) => tr.classList.toggle("hot", tr.dataset.i != null && Number(tr.dataset.i) === i));
+    const tip = $(D.tip);
+    if (i == null || clientX == null) { tip.hidden = true; return; }
+    tip.innerHTML = D.tipHtml(D.lay.items[i], D.lay.total);
+    tip.hidden = false;
+    const box = $(D.chart).getBoundingClientRect(), bw = box.width, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(bw - tw, clientX - box.left + 12)) + "px";
+    tip.style.top = Math.max(0, clientY - box.top - 10) + "px";
+  }
+  function wireDonut(D) {
+    $(D.chart).addEventListener("pointermove", (e) => { const p = e.target.closest("path"); donutFocus(D, p ? Number(p.dataset.i) : null, e.clientX, e.clientY); });
+    $(D.chart).addEventListener("pointerdown", (e) => { const p = e.target.closest("path"); if (p) donutFocus(D, Number(p.dataset.i), e.clientX, e.clientY); });
+    $(D.chart).addEventListener("pointerleave", () => donutFocus(D, null));
+    $(D.table).addEventListener("pointerover", (e) => { const tr = e.target.closest("tbody tr[data-i]"); donutFocus(D, tr ? Number(tr.dataset.i) : null); });
+    $(D.table).addEventListener("pointerleave", () => donutFocus(D, null));
+  }
+  const stat = (k, v, cls, note) => "<div><dt>" + k + '</dt><dd class="' + (cls || "") + '">' + v + (note ? "<small>" + note + "</small>" : "") + "</dd></div>";
+  const tipRow = (k, v) => '<div class="r"><span>' + k + "</span><span>" + v + "</span></div>";
+  const MIX = { chart: "#mixChart", tip: "#mixTip", table: "#mix", lay: null,
+    tipHtml: (it, total) => '<div class="d">' + esc(it.name) + " · " + CLASS_NAME[it.k] + "</div>" + tipRow("金额", money(it.v)) + tipRow("占总资产", nf2.format((it.v / total) * 100) + "%") };
+  wireDonut(MIX);
+
+  function renderMix(c) {
+    const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0);
+    $("#mixTip").hidden = true;
+    const unpriced = c.syms.some((s) => s.shares > 0 && !(Number(state.prices[s.symbol]) > 0));
+    $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；先在持仓表里填现价。" : items.length ? "共 " + items.length + " 项" : "";
+    $("#mixTotal").textContent = total > 0 ? money(total) : "—";
+    // Original assets: the money put in and not yet taken back. Current value minus it is the total profit
+    // (unrealized + realized + Treasury and deposit income), the same figure as the profit trend.
+    const as = $("#assetStats"), profit = c.unreal + c.realized + fixedNow().income, original = total - profit;
+    as.hidden = !(total > 0);
+    as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金（含现金）") +
+      stat("盈亏", signed(profit), tone(profit), original > 0 ? pct((profit / original) * 100) : "") : "";
+    MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存")));
+    if (!MIX.lay) {
+      $("#mix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有持仓。" : "正在读取…") + "</td></tr>";
+      $("#mix tfoot").innerHTML = "";
+      return;
+    }
     $("#mix tbody").innerHTML = items.map((it, i) => '<tr data-i="' + i + '"><td><span class="sw ' + it.k + '" style="opacity:' + it.op + '"></span>' + esc(it.name) +
       (it.sub ? '<span class="nm">' + esc(it.sub) + "</span>" : "") + "</td><td>" + CLASS_NAME[it.k] + '</td><td class="num">' + money(it.v) + usdCap(it.v, "USD") +
       '</td><td class="num">' + nf2.format((it.v / total) * 100) + "%</td></tr>").join("");
@@ -1210,25 +1268,45 @@ TAL|好未来|TAL Education
     $("#mix tfoot").innerHTML = '<tr><td colspan="2">合计 <span class="muted" style="font-weight:400">（' + byClass.map(([k, v]) => CLASS_NAME[k] + " " + nf2.format((v / total) * 100) + "%").join(" · ") +
       '）</span></td><td class="num">' + money(total) + '</td><td class="num">100%</td></tr>';
   }
-  function mixFocus(i, clientX, clientY) {
-    if (!mixLay) return;
-    mixLay.paths.forEach((p, j) => p.setAttribute("d", mixLay.arc(p._arc[0], p._arc[1], j === i ? mixLay.R + 4 : mixLay.R)));
-    document.querySelectorAll("#mix tbody tr").forEach((tr) => tr.classList.toggle("hot", Number(tr.dataset.i) === i));
-    const tip = $("#mixTip");
-    if (i == null || clientX == null) { tip.hidden = true; return; }
-    const it = mixLay.items[i], row = (k, v) => '<div class="r"><span>' + k + "</span><span>" + v + "</span></div>";
-    tip.innerHTML = '<div class="d">' + esc(it.name) + " · " + CLASS_NAME[it.k] + "</div>" + row("金额", money(it.v)) +
-      row("占总资产", nf2.format((it.v / mixLay.total) * 100) + "%");
-    tip.hidden = false;
-    const box = $("#mixChart").getBoundingClientRect(), bw = box.width, tw = tip.offsetWidth;
-    tip.style.left = Math.max(0, Math.min(bw - tw, clientX - box.left + 12)) + "px";
-    tip.style.top = Math.max(0, clientY - box.top - 10) + "px";
+
+  // ---------- stocks alone: each stock's share of the stocks, and the stocks' own profit ----------
+  const STK = { chart: "#stkChart", tip: "#stkTip", table: "#stkMix", lay: null,
+    tipHtml: (it, total) => '<div class="d">' + esc(it.name) + (it.sub ? " · " + esc(it.sub) : "") + "</div>" + tipRow("现值", money(it.v)) +
+      tipRow("占股票", nf2.format((it.v / total) * 100) + "%") + tipRow("浮动盈亏", signed(it.unreal)) +
+      (Math.abs(it.realized) >= 0.005 ? tipRow("已实现盈亏", signed(it.realized)) : "") + tipRow("盈亏合计", signed(it.unreal + it.realized)) };
+  wireDonut(STK);
+  function renderStocks(c) {
+    const items = [], sold = [];
+    for (const s of c.syms) {
+      const realized = toUSD(s.realized, s.ccy);
+      if (s.shares > 0 && Number(state.prices[s.symbol]) > 0) items.push({ k: "stk", name: s.symbol, sub: nameOf(s.symbol), v: toUSD(s.mv, s.ccy), unreal: toUSD(s.unreal, s.ccy), realized });
+      else if (!(s.shares > 0) && Math.abs(realized) >= 0.005) sold.push({ name: s.symbol, sub: nameOf(s.symbol), realized });
+    }
+    items.sort((a, b) => b.v - a.v);
+    // One hue for all stocks, stepping lighter from the biggest, so neighbours never share a shade.
+    items.forEach((it, i) => { it.op = items.length > 1 ? 1 - (0.74 * i) / (items.length - 1) : 1; });
+    const total = items.reduce((t, it) => t + it.v, 0), profit = c.unreal + c.realized, original = total - profit;
+    $("#stkTip").hidden = true;
+    $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；先在持仓表里填现价。" : items.length ? "共 " + items.length + " 只" : "";
+    $("#stkTotal").textContent = total > 0 ? money(total) : "—";
+    const st = $("#stkStats");
+    st.hidden = !(total > 0 || sold.length);
+    st.innerHTML = st.hidden ? "" : stat("股票现值", money(total), "", "持有的股票按现价") + stat("原始投入", money(original), "", "买入花的钱减去卖出拿回的钱") +
+      stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized));
+    STK.lay = drawDonut($("#stkChart"), items, total, "股票占比", (it) => it.name);
+    if (!items.length && !sold.length) {
+      $("#stkMix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有股票。" : "正在读取…") + "</td></tr>";
+      $("#stkMix tfoot").innerHTML = "";
+      return;
+    }
+    const gain = (v) => '<span class="' + tone(v) + '">' + signed(v) + "</span>";
+    const name = (it, note) => esc(it.name) + (it.sub || note ? '<span class="nm">' + esc([it.sub, note].filter(Boolean).join(" · ")) + "</span>" : "");
+    $("#stkMix tbody").innerHTML = items.map((it, i) => '<tr data-i="' + i + '"><td><span class="sw stk" style="opacity:' + it.op + '"></span>' + name(it) +
+      '</td><td class="num">' + money(it.v) + '</td><td class="num">' + nf2.format((it.v / total) * 100) + '%</td><td class="num">' + gain(it.unreal + it.realized) +
+      (Math.abs(it.realized) >= 0.005 ? '<span class="nm">已实现 ' + signed(it.realized) + "</span>" : "") + "</td></tr>").join("") +
+      sold.map((it) => '<tr><td><span class="sw" style="background:var(--line)"></span>' + name(it, "已清仓") + '</td><td class="num">—</td><td class="num">—</td><td class="num">' + gain(it.realized) + "</td></tr>").join("");
+    $("#stkMix tfoot").innerHTML = '<tr><td>合计</td><td class="num">' + money(total) + '</td><td class="num">' + (total > 0 ? "100%" : "—") + '</td><td class="num">' + gain(profit) + "</td></tr>";
   }
-  $("#mixChart").addEventListener("pointermove", (e) => { const p = e.target.closest("path"); mixFocus(p ? Number(p.dataset.i) : null, e.clientX, e.clientY); });
-  $("#mixChart").addEventListener("pointerdown", (e) => { const p = e.target.closest("path"); if (p) mixFocus(Number(p.dataset.i), e.clientX, e.clientY); });
-  $("#mixChart").addEventListener("pointerleave", () => mixFocus(null));
-  $("#mix").addEventListener("pointerover", (e) => { const tr = e.target.closest("tbody tr[data-i]"); mixFocus(tr ? Number(tr.dataset.i) : null); });
-  $("#mix").addEventListener("pointerleave", () => mixFocus(null));
 
   function renderFixed() {
     const tb = $("#fixed tbody"), ro = !db || state.canWrite === false, d = todayUS();
@@ -1851,6 +1929,7 @@ TAL|好未来|TAL Education
     const c = compute(list);
     renderSummary(c);
     renderMix(c);
+    renderStocks(c);
     renderPnl(list);
     renderPlan(list);
     renderHoldings(c);
