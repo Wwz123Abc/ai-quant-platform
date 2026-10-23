@@ -537,6 +537,8 @@ def cmd_holdings_policy(a):
         if key == "target":
             sym, _, w = val.partition(":")
             p["targets"][sym.upper()] = float(w)
+        elif key == "uncapped":  # --set uncapped=VOO,QQQM
+            p["uncapped"] = [s for s in val.replace("，", ",").split(",") if s.strip()]
         elif key in p:
             p[key] = val.lower() in ("1", "true", "yes") if isinstance(p[key], bool) else float(val)
         else:
@@ -756,7 +758,7 @@ def build_parser():
     hosub = ho.add_subparsers(dest="holdings_cmd", required=True)
     hosub.add_parser("status", help="账本密钥和上次同步时间").set_defaults(fn=cmd_holdings_status)
     hosub.add_parser("review", help="同步账本并检查持仓").set_defaults(fn=cmd_holdings_review)
-    hp = hosub.add_parser("policy", help="查看或修改规则，例如 --set max_position=0.3 --set target=QQQM:0.4")
+    hp = hosub.add_parser("policy", help="查看或修改规则，例如 --set max_position=0.3 --set target=QQQM:0.4 --set uncapped=VOO,QQQM")
     hp.add_argument("--set", action="append", metavar="KEY=VALUE")
     hp.set_defaults(fn=cmd_holdings_policy)
     for name, text in (("approve", "确认一条建议订单"), ("reject", "拒绝一条建议订单")):

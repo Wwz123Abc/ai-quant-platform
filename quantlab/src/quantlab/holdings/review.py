@@ -69,7 +69,7 @@ def proposals(val, pol, prices):
             w = value / inv
             if sym not in held or abs(w - t) > pol["band"]:
                 desired, why = t * inv, "目标 %.0f%%，当前 %.1f%%（偏离超过 %.0f 个百分点）" % (t * 100, w * 100, pol["band"] * 100)
-        cap = pol["max_position"] * inv
+        cap = policy.cap_for(pol, sym) * inv
         if desired > cap + 1e-6:
             desired, why = cap, "超过单只上限 %.0f%%（当前 %.1f%%）" % (pol["max_position"] * 100, value / inv * 100)
         if why:
@@ -91,11 +91,17 @@ def proposals(val, pol, prices):
         value = abs(delta) * (scale if delta > 0 else 1.0)
         shares = value / px
         if pol["whole_shares"]:
-            shares = math.floor(shares) if delta > 0 else min(math.ceil(shares - 1e-9), held[sym]["shares"] if sym in held else 0)
+            # buys round down to stay within cash; sells take the whole number of shares that lands nearest the
+            # rule, so a holding a few dollars over its cap is not cut by a whole share far below it
+            shares = math.floor(shares) if delta > 0 else min(math.floor(shares + 0.5), held[sym]["shares"] if sym in held else 0)
         shares = min(shares, held[sym]["shares"]) if delta < 0 and sym in held else shares
-        if shares <= 0 or shares * px < pol["min_trade_usd"]:
+        if shares <= 0:
             if value >= 1:
-                notes.append("%s 需要调整 $%.0f，不到最小下单金额或不足 1 股，暂不建议" % (sym, value))
+                notes.append("%s 需要%s约 $%.0f，不到半股（每股约 $%.0f），按整股暂不建议" % (sym, "卖出" if delta < 0 else "买入", value, px)
+                             if pol["whole_shares"] and value < px else "%s 需要调整约 $%.0f，暂不建议" % (sym, value))
+            continue
+        if shares * px < pol["min_trade_usd"]:
+            notes.append("%s 需要调整约 $%.0f，不到最小下单金额 $%.0f，暂不建议" % (sym, shares * px, pol["min_trade_usd"]))
             continue
         out.append({"symbol": sym, "side": "sell" if delta < 0 else "buy", "shares": round(shares, 6), "price": px,
                     "value": round(shares * px, 2), "reason": why})

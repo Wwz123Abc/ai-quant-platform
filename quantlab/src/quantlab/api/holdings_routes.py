@@ -16,6 +16,7 @@ class Policy(BaseModel):
     targets: dict[str, float] = Field(default_factory=dict, description="股票 -> 目标仓位（占股票加现金的比例）")
     band: float = Field(0.05, description="偏离目标超过这么多（绝对值）才再平衡")
     max_position: float = Field(0.30, description="单只股票上限")
+    uncapped: list[str] = Field(default_factory=list, description="不设单只上限的代码（宽基 ETF）")
     cash_reserve: float = Field(0.10, description="现金储备下限")
     min_trade_usd: float = 50.0
     whole_shares: bool = True

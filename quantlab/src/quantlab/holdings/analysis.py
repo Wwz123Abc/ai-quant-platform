@@ -62,7 +62,8 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True):
         val = review.valuation(snap, prices)
         inv = val["investable"]
         current = next((p["value"] or 0 for p in val["positions"] if p["symbol"] == sym), 0.0)
-        room_cap = max(0.0, pol["max_position"] * inv - current)
+        cap = policy.cap_for(pol, sym)
+        room_cap = max(0.0, cap * inv - current)
         room_cash = max(0.0, val["cash"] - pol["cash_reserve"] * inv)
         max_buy = min(room_cap, room_cash)
         corr = correlations(sym, held_syms, load)
@@ -71,8 +72,9 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True):
         avg_corr = sum(corr[s] * weights.get(s, 0) for s in corr) / weight_sum if weight_sum > 0 else None  # weighted by holding size
         amt = float(amount) if amount else max_buy
         after = (current + amt) / inv if inv > 0 else None
-        checks.append({"rule": "单只上限", "ok": after is not None and after <= pol["max_position"] + 1e-9,
-                       "text": "买入 $%.0f 后占可投资资金 %.1f%%（上限 %.0f%%）" % (amt, (after or 0) * 100, pol["max_position"] * 100)})
+        checks.append({"rule": "单只上限", "ok": after is not None and after <= cap + 1e-9,
+                       "text": "买入 $%.0f 后占可投资资金 %.1f%%（%s）" % (amt, (after or 0) * 100, "宽基 ETF，不设上限" if cap >= 1
+                                                                       else "上限 %.0f%%" % (pol["max_position"] * 100))})
         checks.append({"rule": "现金储备", "ok": amt <= room_cash + 1e-6,
                        "text": "可用现金（扣除 %.0f%% 储备后）$%.0f" % (pol["cash_reserve"] * 100, room_cash)})
         portfolio = {"investable": inv, "cash": val["cash"], "held_value": current, "max_buy": max_buy, "amount": amt,

@@ -63,10 +63,36 @@ def test_cap_trims_and_target_buys_within_the_cash_reserve():
     pol = policy.validate({"targets": {"CCC": 0.2}, "max_position": 0.4, "cash_reserve": 0.1, "min_trade_usd": 10})
     props, notes = review.proposals(v, pol, prices)
     by = {p["symbol"]: p for p in props}
-    assert by["AAA"]["side"] == "sell" and by["AAA"]["shares"] == 7          # 2250 - 1340 = 910 -> ceil(6.07) = 7 shares
+    assert by["AAA"]["side"] == "sell" and by["AAA"]["shares"] == 6          # 2250 - 1340 = 910 -> 6.07, nearest is 6 shares
     assert "单只上限" in by["AAA"]["reason"]
     assert by["CCC"]["side"] == "buy" and by["CCC"]["shares"] == 16           # 20% of 3350 = 670 -> 16 whole shares
     assert [p["side"] for p in props] == ["sell", "buy"]
+
+
+def test_selling_rounds_to_the_nearest_whole_share():
+    pol = policy.validate({"max_position": 0.3, "uncapped": [], "min_trade_usd": 10})
+    snap = {**SNAP, "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 3, "price": 700, "currency": "USD"}],
+            "cash": [{"currency": "USD", "amount": 4870}]}
+    prices = {"AAA": 702.0}
+    v = review.valuation(snap, prices)                       # investable 6976; AAA 2106 = 30.2%, $13 over the cap
+    props, notes = review.proposals(v, pol, prices)
+    assert props == [] and any("不到半股" in n for n in notes)
+    prices = {"AAA": 900.0}
+    v = review.valuation(snap, prices)                       # investable 7570; AAA 2700 = 35.7%, $429 over: 0.48 share
+    assert review.proposals(v, pol, prices)[0] == []
+    prices = {"AAA": 1000.0}
+    v = review.valuation(snap, prices)                       # investable 7870; AAA 3000 = 38.1%, $639 over: 0.64 share
+    props, _ = review.proposals(v, pol, prices)
+    assert [(p["symbol"], p["side"], p["shares"]) for p in props] == [("AAA", "sell", 1)]
+
+
+def test_broad_etfs_are_not_capped():
+    prices = {"AAA": 150.0, "BBB": 25.0}
+    v = review.valuation(SNAP, prices)                       # AAA is 67%
+    pol = policy.validate({"max_position": 0.3, "uncapped": ["aaa"]})
+    assert pol["uncapped"] == ["AAA"] and review.proposals(v, pol, prices)[0] == []
+    assert policy.validate({"targets": {"AAA": 0.6}, "uncapped": ["AAA"], "cash_reserve": 0.1})["targets"] == {"AAA": 0.6}
+    assert "QQQM" in policy.load()["uncapped"] and "VOO" in policy.load()["uncapped"]   # the defaults
 
 
 def test_buys_scaled_to_cash_after_reserve():
@@ -132,6 +158,9 @@ def test_analysis_verdict(monkeypatch):
     assert not too_much["allowed"] and [c["ok"] for c in too_much["checks"]] == [False, False]
     held = analysis.analyze("AAA", load=load, with_fundamentals=False)   # already 67% of the money
     assert not held["allowed"] and held["portfolio"]["max_buy"] == 0
+    policy.save({"max_position": 0.3, "cash_reserve": 0.1, "uncapped": ["AAA"]})
+    etf = analysis.analyze("AAA", load=load, with_fundamentals=False)    # a broad ETF: only the cash rule applies
+    assert etf["allowed"] and etf["portfolio"]["max_buy"] == pytest.approx(665) and "不设上限" in etf["checks"][0]["text"]
 
 
 def test_api(monkeypatch):

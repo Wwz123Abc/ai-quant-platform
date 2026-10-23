@@ -13,6 +13,8 @@ DEFAULT = {
     "targets": {},                    # symbol -> target weight; holdings without a target are only capped
     "band": 0.05,                     # rebalance a target when it drifts more than this (absolute)
     "max_position": 0.30,             # no stock above this share
+    # broad index ETFs already spread over hundreds of companies: no cap for these (the owner's choice, 2026-10-23)
+    "uncapped": ["DIA", "IVV", "ITOT", "QQQ", "QQQM", "SPLG", "SPY", "VOO", "VT", "VTI"],
     "cash_reserve": 0.10,             # buys never take cash below this share
     "min_trade_usd": 50.0,            # smaller orders are not proposed
     "whole_shares": True,             # round orders to whole shares (most brokers without fractional trading)
@@ -45,17 +47,24 @@ def validate(policy):
         raise InvalidInput("单只上限要在 2% 到 100% 之间")
     p["min_trade_usd"] = max(0.0, float(p["min_trade_usd"]))
     p["whole_shares"] = bool(p["whole_shares"])
+    p["uncapped"] = sorted({normalize(s) for s in (p.get("uncapped") or []) if str(s).strip()})
     targets = {}
     for sym, w in (p.get("targets") or {}).items():
-        w = float(w)
-        if not 0 <= w <= p["max_position"] + 1e-9:
-            raise InvalidInput("%s 的目标仓位要在 0 到单只上限（%.0f%%）之间" % (sym, p["max_position"] * 100))
+        w, sym = float(w), normalize(sym)
+        top = cap_for(p, sym)
+        if not 0 <= w <= top + 1e-9:
+            raise InvalidInput("%s 的目标仓位要在 0 到 %.0f%% 之间" % (sym, top * 100))
         if w > 0:
-            targets[normalize(sym)] = w
+            targets[sym] = w
     if sum(targets.values()) > 1 - p["cash_reserve"] + 1e-9:
         raise InvalidInput("目标仓位合计 %.0f%% 超过了 1 减去现金储备（%.0f%%）" % (sum(targets.values()) * 100, (1 - p["cash_reserve"]) * 100))
     p["targets"] = targets
     return {k: p[k] for k in DEFAULT}
+
+
+def cap_for(policy, sym):
+    """The largest share one holding may take: the single-stock cap, or none for an uncapped (broad ETF) symbol."""
+    return 1.0 if normalize(sym) in policy["uncapped"] else policy["max_position"]
 
 
 def save(policy):

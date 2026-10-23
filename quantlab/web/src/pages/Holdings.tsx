@@ -121,7 +121,7 @@ function toForm(p: HoldingsPolicy): Record<string, string> {
   return {
     targets: Object.entries(p.targets ?? {}).map(([s, w]) => `${s}:${pct(w)}`).join(", "),
     band: pct(p.band), max_position: pct(p.max_position), cash_reserve: pct(p.cash_reserve),
-    min_trade_usd: String(p.min_trade_usd ?? 50), whole_shares: p.whole_shares === false ? "0" : "1",
+    uncapped: (p.uncapped ?? []).join(", "), min_trade_usd: String(p.min_trade_usd ?? 50), whole_shares: p.whole_shares === false ? "0" : "1",
     alert_drawdown_from_cost: pct(p.alert_drawdown_from_cost), alert_drawdown_from_high: pct(p.alert_drawdown_from_high),
   };
 }
@@ -150,6 +150,7 @@ function PolicyForm({ initial }: { initial: HoldingsPolicy }) {
     const pct = (k: string) => Number(form[k]) / 100;
     save.mutate({
       targets, band: pct("band"), max_position: pct("max_position"), cash_reserve: pct("cash_reserve"),
+      uncapped: (form.uncapped ?? "").split(/[,，\s]+/).filter(Boolean).map((s) => s.toUpperCase()),
       min_trade_usd: Number(form.min_trade_usd), whole_shares: form.whole_shares === "1",
       alert_drawdown_from_cost: pct("alert_drawdown_from_cost"), alert_drawdown_from_high: pct("alert_drawdown_from_high"),
     });
@@ -165,6 +166,7 @@ function PolicyForm({ initial }: { initial: HoldingsPolicy }) {
         <div className="field wide"><label>目标仓位（代码:百分比，逗号分隔，可不填）<input value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" /></label></div>
         {f("band", "再平衡区间（%）")}
         {f("max_position", "单只上限（%）")}
+        <div className="field wide"><label>不设上限的代码（宽基 ETF，逗号分隔）<input value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" /></label></div>
         {f("cash_reserve", "现金储备（%）")}
         {f("min_trade_usd", "最小下单金额（$）")}
         <div className="field"><label>按整股

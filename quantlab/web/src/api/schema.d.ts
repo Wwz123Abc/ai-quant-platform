@@ -1067,6 +1067,11 @@ export interface components {
              */
             max_position: number;
             /**
+             * Uncapped
+             * @description 不设单只上限的代码（宽基 ETF）
+             */
+            uncapped?: string[];
+            /**
              * Cash Reserve
              * @description 现金储备下限
              * @default 0.1

@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.10.0"
+    "version": "0.10.1"
   },
   "paths": {
     "/api/health": {
@@ -3552,6 +3552,14 @@
             "title": "Max Position",
             "description": "单只股票上限",
             "default": 0.3
+          },
+          "uncapped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Uncapped",
+            "description": "不设单只上限的代码（宽基 ETF）"
           },
           "cash_reserve": {
             "type": "number",
