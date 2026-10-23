@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     }
 
     # Automated trading of the machine-learning portfolio. Every limit is enforced on each order, whatever the mode.
+    trading_daily: bool = False             # the daily job also runs the trading step (paused since 2026-10-23)
     trading_capital: float = 500.0          # the most money the program may ever put to work, in USD
     trading_top_n: int = 10
     trading_max_weight: float = 0.20        # largest share of the capital in one stock

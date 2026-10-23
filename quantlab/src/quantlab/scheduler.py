@@ -116,12 +116,14 @@ class Scheduler:
                     if not self.worker.wait_idle(wait_hours * 3600):
                         notes.append("AI 分析超过 %d 小时还没跑完，先记录其他决定" % wait_hours)
                 recorded = record_all(paper_con, self.load)
-                try:
-                    from .trading import daily as trading_daily
-                    trading = trading_daily.run(self.load)
-                except Exception as e:  # trading problems must not stop the rest of the job; they are reported
-                    log.exception("trading step failed")
-                    trading, notes = {"error": str(e)}, [*notes, "自动交易步骤出错：%s" % e]
+                trading = None  # paused unless QUANTLAB_TRADING_DAILY is set
+                if get_settings().trading_daily:
+                    try:
+                        from .trading import daily as trading_daily
+                        trading = trading_daily.run(self.load)
+                    except Exception as e:  # trading problems must not stop the rest of the job; they are reported
+                        log.exception("trading step failed")
+                        trading, notes = {"error": str(e)}, [*notes, "自动交易步骤出错：%s" % e]
                 holdings = None
                 try:
                     from .holdings import ledger as hledger
