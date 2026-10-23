@@ -675,7 +675,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="sys-h" id="sysSec" hidden>
     <div class="head-row">
-      <div class="title"><h2 id="sys-h">系统状态</h2><details class="help"><summary aria-label="系统状态说明">?</summary><div class="help-body"><p>只有你能看到。每天 03:30 在服务器上备份数据库（保留 30 份），03:45 把最新一份复制到另一台服务器（保留 60 份），收到时会检查文件完整。</p><p>恢复演练：把异地备份恢复成一个临时账本、启动并核对记录数，证明备份真的能用；建议每季度做一次。</p><p>行情接口：每天 06:15 把腾讯、新浪、东方财富的每个接口各调用一次，检查数据拿得到、格式对、日期是最新的。主用和核对的接口必须正常；东方财富只是备用，不通时只做提示。</p></div></details></div>
+      <div class="title"><h2 id="sys-h">系统状态</h2><details class="help"><summary aria-label="系统状态说明">?</summary><div class="help-body"><p>只有你能看到，而且只在有项目需要留意时才出现；全部正常时不显示。每天 03:30 在服务器上备份数据库（保留 30 份），03:45 把最新一份复制到另一台服务器（保留 60 份），收到时会检查文件完整。</p><p>恢复演练：把异地备份恢复成一个临时账本、启动并核对记录数，证明备份真的能用；建议每季度做一次。</p><p>行情接口：每天 06:15 把腾讯、新浪、东方财富的每个接口各调用一次，检查数据拿得到、格式对、日期是最新的。主用和核对的接口必须正常；东方财富只是备用，不通时只做提示。</p></div></details></div>
     </div>
     <dl class="pnl-stats" id="sysStats"></dl>
   </section>
@@ -1910,7 +1910,8 @@ TAL|好未来|TAL Education
     el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（腾讯和第二个来源对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
   }
   // ---------- system status (the platform owner only) ----------
-  // Backups older than 26 hours, a failed off-site copy, or a restore drill older than 90 days are flagged.
+  // Backups older than 26 hours, a failed off-site copy, or a restore drill older than 90 days are flagged; the
+  // section stays hidden while every item is fine.
   async function loadStatus() {
     let st;
     try { st = await window.ledgerApi("GET", "/api/status"); } catch (err) { $("#sysSec").hidden = true; return; }
@@ -1932,7 +1933,8 @@ TAL|好未来|TAL Education
       item("恢复演练", d && d.ok && hours(d.time) < 24 * 90, d ? when(d.time) + (d.ok ? " 通过" : " 没通过") : "还没做过", d ? "恢复后的记录：" + esc(d.restored || "") : "运行 ledger/deploy/restore-drill.sh") +
       item("行情接口", srcOk(st.sources) && hours(st.sources.time) < 26, srcLine(st.sources), srcNote(st.sources)) +
       item("运行版本", !!st.deployed, st.deployed || "未记录", "服务启动于 " + when(st.started));
-    $("#sysSec").hidden = false;
+    // Shown only while something needs attention.
+    $("#sysSec").hidden = !$("#sysStats").querySelector("dd.down");
   }
 
   function applyChecks(snap) {
