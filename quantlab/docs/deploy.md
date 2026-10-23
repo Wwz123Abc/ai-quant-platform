@@ -30,6 +30,20 @@ cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set
 
 `quantlab secrets status` 只显示每个密钥是否已配置。改完 `sudo systemctl restart quantlab`。
 
+## 备案前在新服务器试运行（2026-10-23 起）
+
+新服务器（42.194.244.252）的域名还在备案，网页不对外开放；量化分析先在上面跑每天的任务，网页通过 SSH 隧道看。和正式部署的区别都在 `/etc/systemd/system/quantlab.service.d/trial.conf` 里：用访问令牌登录（这台还没有账本）、从线上账本 `https://stock.wwz.cool` 同步持仓、打开每日任务。切换到正式部署时删掉这个文件，`systemctl daemon-reload` 后重启。
+
+更新代码：本地打 wheel，传到服务器后用 root 安装（虚拟环境属于 root）：`sudo /opt/quantlab/venv/bin/pip install --no-deps --force-reinstall quantlab-*.whl`，再 `sudo systemctl restart quantlab`。
+
+在自己电脑上打开网页：
+
+```bash
+ssh -N -L 8010:127.0.0.1:8010 wwz
+```
+
+保持这个窗口开着，浏览器打开 http://127.0.0.1:8010/lab/ ，令牌在服务器上用 `sudo cat /opt/quantlab/data/api_token` 查看。
+
 ## AI 研报的数据来源
 
 服务器访问不了 Yahoo，所以 `QUANTLAB_PRICE_SOURCE=cn` 时，TradingAgents 改用国内能访问的数据（[ai/cn_vendor.py](../src/quantlab/ai/cn_vendor.py)，不修改 TradingAgents 本身）：
