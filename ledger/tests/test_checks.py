@@ -1,4 +1,4 @@
-"""Cross-checking Tencent's closes with Eastmoney's (app.cross_check). Run: python -m unittest discover -s ledger/tests"""
+"""Cross-checking Tencent's closes with a second source's (app.cross_check). Run: python -m unittest discover -s ledger/tests"""
 import importlib.util
 import unittest
 from pathlib import Path
@@ -30,6 +30,17 @@ class CrossCheck(unittest.TestCase):
         t = bars([1, 2, 3, 5, 6], DAYS[:3] + DAYS[4:])  # Tencent skips 10-16
         r = app.cross_check(t, bars([1, 2, 3, 4, 5, 6]), "2026-10-21")
         self.assertEqual(r["missing"], [["2026-10-16", "腾讯"]])
+
+    def test_the_second_source_not_yet_updated_is_not_missing(self):
+        r = app.cross_check(bars([1, 2, 3, 4, 5, 6]), bars([1, 2, 3, 4, 5], DAYS[:5]), "2026-10-21", "新浪财经")
+        self.assertEqual((r["missing"], r["days"][-1]), ([], "2026-10-19"))  # 10-20 waits for the next refresh
+
+    def test_the_second_source_far_behind_or_with_a_gap_is_missing(self):
+        r = app.cross_check(bars([1, 2, 3, 4, 5, 6]), bars([1, 2, 3, 5, 6], DAYS[:3] + DAYS[4:]), "2026-10-21", "新浪财经")
+        self.assertEqual(r["missing"], [["2026-10-16", "新浪财经"]])
+        old = ["2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07"]
+        r = app.cross_check(bars([1, 2, 3, 4, 5, 6, 7], old[:2] + DAYS[1:]), bars([1, 2, 3, 4, 5], old), "2026-10-21", "新浪财经")
+        self.assertTrue(r["missing"])  # two weeks behind is not a lag
 
     def test_stale_when_the_latest_close_is_old(self):
         self.assertTrue(app.cross_check(bars([1, 2, 3], DAYS[:3]), bars([1, 2, 3], DAYS[:3]), "2026-10-23")["stale"])

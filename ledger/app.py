@@ -498,6 +498,7 @@ def us_splits(sym):
 # Eastmoney's market id for a Tencent exchange suffix; unknown suffixes try all three
 EM_MARKET = {"OQ": "105", "N": "106", "AM": "107", "PS": "107"}
 CHECK_DAYS, CHECK_TOLERANCE, STALE_DAYS = 5, 0.002, 6
+LAG_DAYS = 4  # how far the second source may trail on its newest days (a long weekend) before they count as missing
 
 
 def em_markets(code):
@@ -571,22 +572,27 @@ def second_source(sym, code, days):
     return "", [], problems
 
 
-def cross_check(bars, other, today):
-    """Tencent's last CHECK_DAYS closes against Eastmoney's: {days, mismatches: [[date, tencent, eastmoney]],
-    missing: [[date, "腾讯" or "东方财富"]], latest, stale}. A close differing by more than CHECK_TOLERANCE is a
-    mismatch; a date one source has and the other lacks is missing; the latest close older than STALE_DAYS
-    calendar days is stale."""
+def cross_check(bars, other, today, other_name="第二来源"):
+    """Tencent's last CHECK_DAYS closes against a second source's: {days, mismatches: [[date, tencent, other]],
+    missing: [[date, "腾讯" or other_name]], latest, stale}. A close differing by more than CHECK_TOLERANCE is a
+    mismatch; a date one source has and the other lacks is missing, except the newest days the second source has
+    not published yet (it can lag Tencent by hours) while it is at most LAG_DAYS behind: those wait for the next
+    refresh. The latest close older than STALE_DAYS calendar days is stale."""
     a = {b[0]: b[4] for b in bars[-CHECK_DAYS:]}
     b = {r[0]: r[4] for r in other[-CHECK_DAYS:]}
     lo = max(min(a) if a else "", min(b) if b else "")
-    days, mismatches, missing = sorted(d for d in set(a) | set(b) if d >= lo), [], []
-    for d in days:
+    behind = bool(a and b) and (dt.date.fromisoformat(max(a)) - dt.date.fromisoformat(max(b))).days <= LAG_DAYS
+    days, mismatches, missing = [], [], []
+    for d in sorted(d for d in set(a) | set(b) if d >= lo):
         if d not in a:
             missing.append([d, "腾讯"])
         elif d not in b:
-            missing.append([d, "东方财富"])
+            if behind and d > max(b):
+                continue
+            missing.append([d, other_name])
         elif abs(a[d] / b[d] - 1) > CHECK_TOLERANCE:
             mismatches.append([d, a[d], b[d]])
+        days.append(d)
     latest = max(a) if a else ""
     stale = not latest or (dt.date.fromisoformat(today) - dt.date.fromisoformat(latest)).days > STALE_DAYS
     return {"days": days, "mismatches": mismatches, "missing": missing, "latest": latest, "stale": stale}
@@ -766,7 +772,7 @@ def refresh_market(uid):
                 today = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
                 base = {"symbol": s, "source": bar_source, "checkedAt": now_iso()}
                 if bars and other and bar_source == "腾讯财经":
-                    put_doc(0, "checks", s, {**base, "against": other_name, **cross_check(bars, other, today)})
+                    put_doc(0, "checks", s, {**base, "against": other_name, **cross_check(bars, other, today, other_name)})
                 elif bars:  # say why there was no check, never "consistent"
                     put_doc(0, "checks", s, {**base, "against": "", "unchecked": True, "reason": "fallback" if bar_source != "腾讯财经" else "no_second",
                                              "detail": "；".join(problems)[:200], **cross_check(bars, bars, today)})
