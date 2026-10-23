@@ -288,7 +288,7 @@ def system_status():
         except (OSError, ValueError):
             return None
     d = os.path.join(DATA, "backups")
-    files = sorted(f for f in os.listdir(d) if f.startswith("ledger-")) if os.path.isdir(d) else []
+    files = sorted(f for f in os.listdir(d) if f.startswith("ledger-") and f.endswith(".db")) if os.path.isdir(d) else []
     try:
         with open(os.path.join(ROOT, ".deployed"), encoding="utf-8") as f:
             deployed = f.read().strip()[:7]
@@ -1176,7 +1176,7 @@ def backup():
         src.backup(out)
     src.close()
     out.close()
-    for old in sorted(f for f in os.listdir(d) if f.startswith("ledger-"))[:-30]:
+    for old in sorted(f for f in os.listdir(d) if f.startswith("ledger-") and f.endswith(".db"))[:-30]:
         os.remove(os.path.join(d, old))
     print(dst)
 

@@ -22,7 +22,7 @@ PY
 }
 
 if [ -z "$latest" ]; then record failed "没有找到本地备份"; exit 1; fi
-local_check=$(python3 -c "import sqlite3,sys; print(sqlite3.connect('file:%s?mode=ro' % sys.argv[1], uri=True).execute('PRAGMA integrity_check').fetchone()[0])" "$latest" 2>&1)
+local_check=$(python3 -c "import sqlite3,sys; print(sqlite3.connect('file:%s?mode=ro&immutable=1' % sys.argv[1], uri=True).execute('PRAGMA integrity_check').fetchone()[0])" "$latest" 2>&1)
 if [ "$local_check" != ok ]; then record failed "本地备份检查不通过：$local_check"; exit 1; fi
 err=$(mktemp)
 answer=$(ssh -T -i /root/.ssh/ledger_backup -o BatchMode=yes -o ConnectTimeout=20 "$TARGET" < "$latest" 2>"$err")

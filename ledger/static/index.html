@@ -62,16 +62,6 @@ h2 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 20px
 .navrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .navrow .navlink { margin-top: 0; }
 .nav-more { display: none; }
-.today { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.today-head { margin: 0; font-size: 15px; }
-.today-head b { font-size: 20px; margin-right: 6px; }
-.today-head small { color: var(--muted); font-size: 12px; margin-left: 6px; }
-.today-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
-.today-list li { padding: 6px 0; border-top: 1px solid var(--line); }
-.today-list a { color: var(--ink); text-decoration: none; display: flex; justify-content: space-between; gap: 8px; }
-.today-list a::after { content: "→"; color: var(--muted); }
-.today-list .ok { color: var(--muted); }
-.today-list .warn-item a { color: var(--warn); }
 button.navlink { font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
 .navlink[hidden] { display: none; }
 button.navlink:disabled { opacity: .6; cursor: default; }
@@ -137,8 +127,6 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .cal-grid button.c:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cal-grid .c.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
 .cal-grid .c.on { box-shadow: inset 0 0 0 2px var(--ink); }
-#yrStats .bar { display: block; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 6px 0 2px; }
-#yrStats .bar span { display: block; height: 100%; background: var(--accent); }
 .logbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .logbar .seg label { padding: 5px 14px; font-size: 13px; }
 .logsym { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
@@ -403,10 +391,6 @@ footer p { margin: 0 0 6px; }
       <button class="navlink nav2" type="button" id="logoutBtn">退出登录</button>
     </div>
     <p class="status" id="status">正在读取记录…</p>
-    <div class="today" id="today" hidden>
-      <p class="today-head" id="todayHead"></p>
-      <ul class="today-list" id="todayList"></ul>
-    </div>
   </header>
 
   <section aria-labelledby="mix-h">
@@ -465,10 +449,9 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="yr-h">
     <div class="head-row">
-      <div class="title"><h2 id="yr-h">一年投资计划</h2><details class="help"><summary aria-label="一年投资计划怎么算">?</summary><div class="help-body"><p>从第一笔买入或存款那天起算一年。到期前显示至今的结果，满一年后固定显示第一年的结果。</p><p>至今收益率按资金加权计算：中途追加的钱只按它投入以后的时间计算收益，所以和“盈亏 ÷ 本金”略有不同。年化收益率是把至今的表现折算成一年（XIRR），不满一年时会被放大，只能参考；满一年时它就是这一年的实际收益率。</p><p>日收益是最近一个交易日（或今天）相比前一天的盈亏变化；日均是至今盈亏 ÷ 已过天数。现金不计入这些收益。</p></div></details></div>
+      <div class="title"><h2 id="yr-h">一年投资计划</h2><details class="help"><summary aria-label="一年投资计划怎么算">?</summary><div class="help-body"><p>从第一笔买入或存款那天起算一年。日历是每天的盈亏，现金不计入。</p></div></details></div>
       <p class="hint" id="yrSum"></p>
     </div>
-    <dl class="pnl-stats" id="yrStats"><div><dt>进度</dt><dd>—</dd></div></dl>
     <div class="cal" id="yrCal" hidden>
       <div class="cal-head">
         <button type="button" class="mini" id="calPrev" aria-label="上个月">‹</button>
@@ -960,7 +943,7 @@ TAL|好未来|TAL Education
   const EN = Object.fromEntries(LIST.map((x) => [x.c, x.en]));
   const DEFAULT_PICKS = ["QQQM", "VOO", "AAPL", "NVDA", "TSLA", "0700", "9988", "NIO"];
 
-  const state = { sysBad: 0, checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
+  const state = { checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], pendingCash: null, pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
   let db = null;
   const $ = (s) => document.querySelector(s);
 
@@ -1486,58 +1469,11 @@ TAL|好未来|TAL Education
       return { date: d, live: isLive, value, cost, realized, dividends, total, day, pct: base > 0 ? total / base : null, bySym, trades, fixedValue, fixedCost, fixedIncome, byFixed };
     });
   }
-  // ---------- money-weighted return ----------
-  // Every money movement as [date, USD]: buys and purchases out (negative), sells, coupons and maturities in, and
-  // what everything is worth on the last day. Their plain sum is the total profit; XIRR finds the annual rate.
-  function cashFlows(list, end, endValue) {
-    const cf = [];
-    for (const t of list) {
-      if (t.date > end) continue;
-      const v = LedgerCalc.cashFlow(t);
-      if (v) cf.push([t.date, toUSD(v, tradeCcy(t))]);
-    }
-    for (const f of state.fixed) {
-      const c = f.currency || "USD", start = fixedStart(f);
-      if (start > end) continue;
-      if (f.kind === "bond") {
-        cf.push([start, -toUSD((f.face * f.price) / 100 + (f.accruedPaid || 0), c)]);
-        const cpn = (f.face * f.coupon) / 100 / (f.freq || 2);
-        for (const d of coupons(f).slice(1)) if (d <= end) cf.push([d, toUSD(cpn + (d === f.maturity ? f.face : 0), c)]);
-      } else {
-        cf.push([start, -toUSD(f.principal, c)]);
-        if (f.maturity <= end) cf.push([f.maturity, toUSD(f.principal + f.interest, c)]);
-      }
-    }
-    cf.push([end, endValue]);
-    return cf;
-  }
-  function xirr(cf) {
-    const t0 = cf.reduce((m, c) => (c[0] < m ? c[0] : m), cf[0][0]);
-    const ys = cf.map(([d, v]) => [dayDiff(t0, d) / 365, v]);
-    const npv = (r) => ys.reduce((s, [y, v]) => s + v / Math.pow(1 + r, y), 0);
-    let lo = -0.99, hi = 10;
-    if (npv(lo) * npv(hi) > 0) return null;
-    for (let i = 0; i < 200; i++) { const m = (lo + hi) / 2; if (npv(lo) * npv(m) <= 0) hi = m; else lo = m; }
-    return (lo + hi) / 2;
-  }
-  // One year from the first investment. Before it ends, figures run to the latest day; after, to the plan's end.
-  function renderYear(list, rows) {
+  // One year from the first investment; the calendar covers it.
+  function renderYear(rows) {
     const start = rows[0].date, end = addMonths(start, 12), total = dayDiff(start, end);
     const done = todayUS() >= end, upto = rows.filter((r) => r.date <= end), last = upto[upto.length - 1];
     const days = Math.max(1, dayDiff(start, done ? end : last.date));
-    const rate = days >= 30 ? xirr(cashFlows(list, last.date, last.value + last.fixedValue)) : null;
-    const held = rate == null ? null : Math.pow(1 + rate, days / 365) - 1;
-    const prev = upto.length > 1 ? upto[upto.length - 2] : null, prevVal = prev ? prev.value + prev.fixedValue : 0;
-    const daily = last.day, dailyPct = prevVal > 0 ? daily / prevVal : null;
-    const stat = (k, v, cls, note) => "<div><dt>" + k + '</dt><dd class="' + (cls || "") + '">' + v + (note ? "<small>" + note + "</small>" : "") + "</dd></div>";
-    const span = start.replace(/-0?/g, "/") + " – " + end.replace(/-0?/g, "/");
-    $("#yrStats").innerHTML =
-      stat("进度", done ? "已满一年" : "第 " + Math.min(days, total) + " / " + total + " 天",
-        "", '<span class="bar"><span style="width:' + Math.min(100, (days / total) * 100) + '%"></span></span>' + span) +
-      stat(done ? "一年盈亏" : "至今盈亏", signed(last.total), tone(last.total), held == null ? (last.pct == null ? "" : "按投入成本 " + pct(last.pct * 100)) : "资金加权 " + pct(held * 100)) +
-      stat(done ? "一年收益率" : "年化收益率", rate == null ? "—" : pct(rate * 100), rate == null ? "" : tone(rate),
-        rate == null ? "满 30 天后显示" : done ? "第一年的实际收益率" : "不满一年，仅供参考") +
-      stat("日收益", signed(daily), tone(daily), (dailyPct == null ? "" : pct(dailyPct * 100) + " · ") + md(last.date) + (last.live ? " 最新" : " 收盘") + " · 日均 " + signed(last.total / days));
     $("#yrSum").textContent = done ? "第一年已结束" : "还剩 " + Math.max(0, total - days) + " 天";
     cal = { rows, start, month: cal.month };
     renderCalendar();
@@ -1603,12 +1539,11 @@ TAL|好未来|TAL Education
   function renderPlan(list) {
     const rows = pnlSeries(list);
     if (!rows.length) {
-      $("#yrStats").innerHTML = '<div><dt>进度</dt><dd>—<small>录入第一笔买入或存款后开始计算</small></dd></div>';
       $("#yrCal").hidden = true;
-      $("#yrSum").textContent = "";
+      $("#yrSum").textContent = "录入第一笔买入或存款后开始计算";
       return;
     }
-    renderYear(list, rows);
+    renderYear(rows);
   }
 
   function niceTicks(lo, hi, n) {
@@ -1940,43 +1875,8 @@ TAL|好未来|TAL Education
     renderSymList(c);
     renderHints();
     renderChecks(c);
-    renderToday(c, list);
   }
 
-  // ---------- today: the first thing on the page ----------
-  // The latest day's change, then everything elsewhere on the page that wants attention, each
-  // linking to where it is. Only what applies is listed.
-  function renderToday(c, list) {
-    const box = $("#today");
-    if (!state.ready || (!c.held && !state.fixed.length && !state.cash.length)) { box.hidden = true; return; }
-    const rows = pnlSeries(list), last = rows[rows.length - 1], prev = rows[rows.length - 2];
-    const base = prev ? prev.value + prev.fixedValue : 0;
-    $("#todayHead").innerHTML = (last ? '今日 <span class="' + tone(last.day) + '">' + signed(last.day) + (base > 0 ? "（" + pct(last.day / base * 100) + "）" : "") + "</span>" +
-        "<small>" + md(last.date) + (last.live ? " 最新价" : " 收盘") + "</small>" : "");
-    const todo = [], item = (text, href, warn) => todo.push('<li class="' + (warn ? "warn-item" : "") + '"><a href="' + href + '">' + text + "</a></li>");
-    if (hints.length) item(hints.length + " 条可能漏记的拆股和合股", "#actHints", true);
-    const badChecks = c.syms.filter((x) => x.shares > 0 && checkBad(x.symbol)).length;
-    if (badChecks) item(badChecks + " 只股票的价格核对需要留意", "#checkLine", true);
-    if (c.warnings.length) item(c.warnings.length + " 条卖出超过当时持有的股数", "#warn", true);
-    if (state.sysBad) item("系统状态有 " + state.sysBad + " 项需要留意", "#sysSec", true);
-    for (const f of state.fixed) {
-      const left = dayDiff(todayUS(), f.maturity);
-      if (left >= 0 && left <= 30) item(esc(f.name) + " " + (left ? left + " 天后" : "今天") + "到期（" + md(f.maturity) + "）", "#fix-h", false);
-    }
-    const age = state.updatedAt ? (Date.now() - Date.parse(state.updatedAt)) / 36e5 : Infinity;
-    if (c.held && age > 24) item(state.updatedAt ? "价格是 " + Math.round(age / 24) + " 天前取的，点“刷新数据”更新" : "还没有取过价格，点“刷新数据”", "#refreshBtn", false);
-    $("#todayList").innerHTML = todo.length ? todo.join("") : '<li class="ok">✓ 今天没有需要处理的事</li>';
-    box.hidden = false;
-  }
-  $("#todayList").addEventListener("click", (e) => {
-    const a = e.target.closest("a");
-    if (!a) return;
-    e.preventDefault();
-    const href = a.getAttribute("href");
-    if (href === "#refreshBtn") { $("#refreshBtn").click(); return; }
-    const el = $(href);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
   $("#navMore").addEventListener("click", () => {
     const open = $("#navRow").classList.toggle("open");
     $("#navMore").setAttribute("aria-expanded", String(open));
@@ -2033,8 +1933,6 @@ TAL|好未来|TAL Education
       item("行情接口", srcOk(st.sources) && hours(st.sources.time) < 26, srcLine(st.sources), srcNote(st.sources)) +
       item("运行版本", !!st.deployed, st.deployed || "未记录", "服务启动于 " + when(st.started));
     $("#sysSec").hidden = false;
-    state.sysBad = $("#sysStats").querySelectorAll("dd.down").length;
-    render();
   }
 
   function applyChecks(snap) {
