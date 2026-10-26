@@ -52,7 +52,7 @@ export default function Holdings() {
             </div>
           </div>
           <div className="card">
-            <h2>建议订单（检查 #{r.id}）</h2>
+            <h2>建议订单（检查 #{r.id}{r.price_date ? `，按 ${r.price_date} 收盘价` : ""}）</h2>
             {r.proposals.length ? (
               <div className="table-wrap">
                 <table>

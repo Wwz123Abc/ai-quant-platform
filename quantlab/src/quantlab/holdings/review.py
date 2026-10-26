@@ -155,14 +155,20 @@ def run(refresh=True, load=None, with_fundamentals=True):
     """Syncs (when a key is configured), reviews, and records the review and its proposals.
 
     Pending proposals from earlier reviews are superseded: each review stands on the latest holdings."""
+    load = load or data.load
     snap = ledger.load(refresh=refresh and ledger.configured())
     pol = policy.load()
     syms = {p["symbol"] for p in ledger.positions(snap)} | set(pol["targets"])
     prices = prices_for(syms, load)
+    dates = []
+    for s in syms:
+        with contextlib.suppress(QuantLabError):
+            dates.append(load(s).index[-1].date().isoformat())
     val = valuation(snap, prices)
     props, notes = proposals(val, pol, prices)
     rem = reminders(val, pol, load, with_fundamentals)
     review = {"at": now_iso(), "synced": snap.get("synced"), "account": snap.get("account"), "policy": pol,
+              "price_date": min(dates) if dates else None,  # the oldest close the review used
               "valuation": val, "notes": notes, "reminders": rem}
     con = connect()
     try:

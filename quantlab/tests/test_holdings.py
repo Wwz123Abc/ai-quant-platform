@@ -133,6 +133,7 @@ def test_review_and_decisions(monkeypatch):
     policy.save({"targets": {"CCC": 0.2}, "max_position": 0.4})
     first = review.run(refresh=False, load=load, with_fundamentals=False)
     assert {p["symbol"] for p in first["proposals"]} == {"AAA", "CCC"} and all(p["status"] == "pending" for p in first["proposals"])
+    assert first["price_date"] == "2026-10-16"                         # the close the review priced at
     pid = first["proposals"][0]["id"]
     assert review.decide(pid, True, "下周下单")["status"] == "approved"
     with pytest.raises(NotFound):

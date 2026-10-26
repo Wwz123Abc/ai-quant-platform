@@ -194,6 +194,62 @@ def test_is_due(local, last, due):
     assert is_due(now, last, "07:30") is due
 
 
+def test_scheduler_waits_for_the_latest_close(monkeypatch):
+    """Tencent's bar for Friday's close arrives some hours after it; the job waits for it, then gives up at noon."""
+    market = {"QQQ": bars(end="2026-10-22")}            # Thursday's close only
+    calls = []
+
+    def load(sym, refresh=False):
+        calls.append((sym, refresh))
+        return market[data.normalize(sym)]
+
+    beijing = lambda hm: dt.datetime.fromisoformat("2026-10-24 %s" % hm).replace(tzinfo=dt.timezone(dt.timedelta(hours=8)))
+    sched = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-23")
+    sched.run_daily = lambda now=None: calls.append(("ran", now))
+    get_settings.cache_clear()
+    ledger.set_meta(ledger.connect(), "daily_last", "2026-10-23")
+
+    sched.clock = lambda: beijing("09:00")
+    sched.tick()
+    assert ("QQQ", True) in calls and not [c for c in calls if c[0] == "ran"]   # downloaded afresh, still Thursday
+    calls.clear()
+    sched.clock = lambda: beijing("09:20")
+    sched.tick()
+    assert calls == []                                    # checks at most every half hour
+    market["QQQ"] = bars(end="2026-10-23")                # Friday's bar has arrived
+    sched.clock = lambda: beijing("09:31")
+    sched.tick()
+    assert calls[-1][0] == "ran"
+
+    market["QQQ"] = bars(end="2026-10-22")
+    late = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-23")
+    late.run_daily = lambda now=None: calls.append(("ran", now))
+    late.clock = lambda: beijing("12:00")
+    calls.clear()
+    late.tick()
+    assert calls[-1][0] == "ran"                          # noon: runs anyway
+
+
+def test_daily_job_downloads_each_symbol_afresh_and_notes_old_bars(monkeypatch):
+    monkeypatch.setattr(engine, "available", lambda: False)
+    market = {"QQQ": bars(end="2026-10-22"), "VOO": bars(end="2026-10-22", seed=2)}
+    calls = []
+
+    def load(sym, refresh=False):
+        calls.append((data.normalize(sym), refresh))
+        return market[data.normalize(sym)]
+
+    pc = paper.connect()
+    paper.create(pc, "MA", ["VOO"], {"fast": 20, "slow": 60}, load=load)
+    pc.close()
+    calls.clear()
+    sched = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-23")
+    sched._probe = ("2026-10-22", "2026-10-23")           # what a noon check found
+    result = sched.run_daily(NOW)
+    assert [c for c in calls if c[0] == "VOO"][0] == ("VOO", True)          # the first use of a symbol refreshes it
+    assert any("2026-10-23" in n and "2026-10-22" in n for n in result["notes"])
+
+
 def test_scheduler_queues_due_analyses_then_records(monkeypatch):
     monkeypatch.setattr(engine, "available", lambda: True)
     monkeypatch.setattr(engine, "configured", lambda: True)

@@ -76,7 +76,8 @@ class Settings(BaseSettings):
 
     # Daily job: AI analyses for AI accounts, then a decision for every paper account. Runs inside `serve`.
     schedule_enabled: bool = True
-    schedule_time: str = "07:30"             # Beijing time, Tuesday to Saturday, after the US close
+    schedule_time: str = "09:00"             # Beijing time, Tuesday to Saturday; Tencent's daily bars arrive about 07:30-08:30
+    schedule_give_up: str = "12:00"          # still no bar for the latest close by then: run anyway, and say so
 
 
 @lru_cache

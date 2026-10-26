@@ -1208,6 +1208,11 @@ export interface components {
             at: string;
             /** Synced */
             synced: string | null;
+            /**
+             * Price Date
+             * @description 检查用到的收盘价里最早的日期
+             */
+            price_date?: string | null;
             /** Account */
             account: string | null;
             policy: components["schemas"]["Policy"];

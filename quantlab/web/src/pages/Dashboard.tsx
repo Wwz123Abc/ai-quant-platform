@@ -96,7 +96,7 @@ function TodayCard({ review, pending }: { review: HoldingsReview | undefined; pe
     <div className="card">
       <h2>持仓检查</h2>
       <p className="hint">
-        检查 #{review.id} · {when(review.at)}（北京时间）· <Link to="/holdings">查看持仓和规则 →</Link>
+        检查 #{review.id} · {when(review.at)}（北京时间）{review.price_date ? ` · 按 ${review.price_date} 收盘价` : ""} · <Link to="/holdings">查看持仓和规则 →</Link>
       </p>
       {orders.length ? (
         <>

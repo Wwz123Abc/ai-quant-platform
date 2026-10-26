@@ -111,7 +111,7 @@ QQQ  均线 50/200  2005-01-03 → 2026-10-16（21.8 年）
 想每个交易日自动记录，可以用 Windows 任务计划程序在北京时间早上运行（路径换成你的）：
 
 ```
-schtasks /create /tn "QuantLab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 07:30 /tr "cmd /c cd /d C:\path\to\quant-lab && python -m quantlab paper run >> paper.log 2>&1"
+schtasks /create /tn "QuantLab 模拟盘" /sc weekly /d TUE,WED,THU,FRI,SAT /st 09:00 /tr "cmd /c cd /d C:\path\to\quant-lab && python -m quantlab paper run >> paper.log 2>&1"
 ```
 
 ## 我的持仓和个股分析
@@ -209,7 +209,7 @@ python -m quantlab paper new AI --symbols QQQM,VOO --strategy ai --every 7
 - **费用台账和预算：** 每次分析按模型分别记录调用次数、输入（含缓存命中）和输出 token，按官方价格表计算费用；统一按高峰价计，宁可多算。提交前和开始运行前各检查一次预算，超出就不运行。失败的分析也会记入已经用掉的 token。
 - **一次只跑一个分析**，服务重启时把中断的任务标记为失败，不会重复扣费。
 - **AI 模拟账户：** 买入、增持 → 持有；卖出、减持 → 空仓；持有 → 维持原状；还没有评级时空仓。某一天的分析还在排队或运行时，那天的决定会等它完成再记录。
-- **每日任务：** `serve` 运行时，每周二至周六北京时间 7:30 以后自动执行：先分析到期的股票，再给所有模拟账户记录决定。不开服务时，也可以用 `python -m quantlab schedule run` 配合 Windows 任务计划程序运行。
+- **每日任务：** `serve` 运行时，每周二至周六北京时间 9:00 以后自动执行：先确认腾讯日线已经有最近一个交易日的收盘价（一般北京时间 7:30–8:30 才更新；没有就每半小时再查一次，到 12:00 还没有就照常运行并注明用的是哪天的收盘价），再分析到期的股票，给所有模拟账户记录决定，检查持仓。不开服务时，也可以用 `python -m quantlab schedule run` 配合 Windows 任务计划程序运行。
 
 ## 接口
 

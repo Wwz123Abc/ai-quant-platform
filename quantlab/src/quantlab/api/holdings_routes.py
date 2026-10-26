@@ -69,6 +69,7 @@ class Review(BaseModel):
     id: int
     at: str
     synced: str | None
+    price_date: str | None = Field(None, description="检查用到的收盘价里最早的日期")
     account: str | None
     policy: Policy
     valuation: Valuation
