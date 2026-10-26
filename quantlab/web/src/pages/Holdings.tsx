@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { api, type HoldingsPolicy, type HoldingsReview, type HoldingsStatus, post, type Proposal } from "../api/client";
 import { ErrorBox, PageHead, Signed, Stat } from "../components/ui";
-import { money, pctPlain } from "../lib/format";
+import { money, pctPlain, when } from "../lib/format";
 
 const STATUS: Record<string, string> = { pending: "待确认", approved: "已确认（请去券商下单）", rejected: "已拒绝", superseded: "已过期" };
 
@@ -37,7 +37,7 @@ export default function Holdings() {
             {run.isPending ? "同步和检查中…" : "同步账本并检查"}
           </button>
           <span className="hint">
-            {status.data?.synced ? `上次同步 ${status.data.synced.replace("T", " ").slice(0, 16)}（${status.data.account}）` : "还没有同步过"} · 每日任务也会自动检查
+            {status.data?.synced ? `上次同步 ${when(status.data.synced)}（北京时间，${status.data.account}）` : "还没有同步过"} · 每日任务也会自动检查
           </span>
         </div>
         <ErrorBox error={run.error ?? decide.error} />

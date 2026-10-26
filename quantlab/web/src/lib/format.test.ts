@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { errorMessage } from "../api/client";
-import { drawdown, money, parseInts, pct, pctPlain, tone } from "./format";
+import { drawdown, money, parseInts, pct, pctPlain, tone, when } from "./format";
 
 describe("format", () => {
   it("signs percentages and hides non-numbers", () => {
@@ -17,6 +17,14 @@ describe("format", () => {
     expect(money(113940.4)).toBe("$113,940");
     expect(money(-1500)).toBe("−$1,500");
     expect(money(undefined)).toBe("—");
+  });
+
+  it("shows server times in Beijing time", () => {
+    expect(when("2026-10-23T08:24:10+00:00")).toBe("2026-10-23 16:24");
+    expect(when("2026-10-23T08:24:10")).toBe("2026-10-23 16:24"); // no zone: the server writes UTC
+    expect(when("2026-10-22T20:05:00Z")).toBe("2026-10-23 04:05");
+    expect(when(null)).toBe("—");
+    expect(when("not a date")).toBe("—");
   });
 
   it("picks a tone", () => {

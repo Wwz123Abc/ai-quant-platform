@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, type Limits, post, type TradingAccount } from "../api/client";
 import TimeChart, { type Line } from "../components/TimeChart";
 import { ErrorBox, Field, PageHead, Signed, Stat } from "../components/ui";
-import { money, pctPlain } from "../lib/format";
+import { money, pctPlain, when } from "../lib/format";
 
 const MODE: Record<string, string> = { plan: "只出计划", paper: "模拟券商", live: "实盘" };
 const STATUS: Record<string, string> = { pending: "待成交", filled: "已成交", rejected: "已拒绝", planned: "计划" };
@@ -177,7 +177,7 @@ export function TradingAccountPage() {
             <table>
               <tbody>
                 {a.events?.map((e, i) => (
-                  <tr key={i}><td className="hint">{e.at.replace("T", " ").slice(0, 16)}</td><td style={{ whiteSpace: "normal" }}>{e.message}</td></tr>
+                  <tr key={i}><td className="hint">{when(e.at)}</td><td style={{ whiteSpace: "normal" }}>{e.message}</td></tr>
                 ))}
               </tbody>
             </table>

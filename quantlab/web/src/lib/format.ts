@@ -51,3 +51,13 @@ export function big(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   return Math.abs(v) >= 1e8 ? `${v < 0 ? MINUS : ""}$${Math.round(Math.abs(v) / 1e8).toLocaleString("en-US")} 亿` : money(v);
 }
+
+const BEIJING = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** A server timestamp (UTC, ISO 8601) as Beijing time, "2026-10-23 16:24"; "—" when missing or unreadable. */
+export function when(iso: string | null | undefined): string {
+  const t = iso ? Date.parse(/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(iso) ? iso : iso + "Z") : Number.NaN;
+  if (!Number.isFinite(t)) return "—";
+  const p = Object.fromEntries(BEIJING.formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour === "24" ? "00" : p.hour}:${p.minute}`;
+}
