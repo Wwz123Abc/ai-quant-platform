@@ -152,7 +152,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 #mix tbody tr.hot td, #stkMix tbody tr.hot td { background: var(--accent-soft); }
 #mix .sw, #stkMix .sw { margin-right: 8px; }
 #mix .nm, #stkMix .nm { display: block; font-size: 12px; color: var(--muted); }
-#mix tfoot td, #stkMix tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
+#mix tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
 @media (max-width: 680px) { .mixbox { grid-template-columns: minmax(0, 1fr); } }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
 .sw.stk { background: var(--c-stk); }
@@ -282,7 +282,6 @@ footer p { margin: 0 0 6px; }
   .pnl-sub { text-align: left; }
   /* Trade log as cards: symbol and amount, then date, shares and price, then note and actions */
   #mix thead th:nth-child(2), #mix tbody td:nth-child(2) { display: none; }
-  #stkMix thead th:nth-child(3), #stkMix tbody td:nth-child(3), #stkMix tfoot td:nth-child(3) { display: none; }
   /* Profit calendar on phones: smaller cells */
   .cal { padding: 10px 8px; }
   .cal-grid { gap: 3px; }
@@ -414,7 +413,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="stk-h">
     <div class="head-row">
-      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不画在圆盘里，但它们的已实现盈亏列在表格最后，也算进合计。</p></div></details></div>
+      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不画在圆盘里，但它们的已实现盈亏算进上面的盈亏。每只股票的市值和盈亏见下面的持仓表，鼠标移到圆盘上也能看到。</p></div></details></div>
       <p class="hint" id="stkSum"></p>
     </div>
     <dl class="pnl-stats" id="stkStats" hidden></dl>
@@ -424,9 +423,8 @@ footer p { margin: 0 0 6px; }
         <div class="pnl-tip" id="stkTip" hidden></div>
       </div>
       <table id="stkMix">
-        <thead><tr><th>股票</th><th class="num">现值</th><th class="num">占比</th><th class="num">盈亏</th></tr></thead>
-        <tbody><tr><td colspan="4" class="empty">正在读取…</td></tr></tbody>
-        <tfoot></tfoot>
+        <thead><tr><th>股票</th><th class="num">占比</th></tr></thead>
+        <tbody><tr><td colspan="2" class="empty">正在读取…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -1277,18 +1275,11 @@ TAL|好未来|TAL Education
     st.innerHTML = st.hidden ? "" : stat("股票现值", money(total), "", "持有的股票按现价") + stat("原始投入", money(original), "", "买入花的钱减去卖出拿回的钱") +
       stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized));
     STK.lay = drawDonut($("#stkChart"), items, total, "股票占比", (it) => it.name);
-    if (!items.length && !sold.length) {
-      $("#stkMix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有股票。" : "正在读取…") + "</td></tr>";
-      $("#stkMix tfoot").innerHTML = "";
-      return;
-    }
-    const gain = (v) => '<span class="' + tone(v) + '">' + signed(v) + "</span>";
-    const name = (it, note) => esc(it.name) + (it.sub || note ? '<span class="nm">' + esc([it.sub, note].filter(Boolean).join(" · ")) + "</span>" : "");
-    $("#stkMix tbody").innerHTML = items.map((it, i) => '<tr data-i="' + i + '"><td><span class="sw stk" style="opacity:' + it.op + '"></span>' + name(it) +
-      '</td><td class="num">' + money(it.v) + '</td><td class="num">' + nf2.format((it.v / total) * 100) + '%</td><td class="num">' + gain(it.unreal + it.realized) +
-      (Math.abs(it.realized) >= 0.005 ? '<span class="nm">已实现 ' + signed(it.realized) + "</span>" : "") + "</td></tr>").join("") +
-      sold.map((it) => '<tr><td><span class="sw" style="background:var(--line)"></span>' + name(it, "已清仓") + '</td><td class="num">—</td><td class="num">—</td><td class="num">' + gain(it.realized) + "</td></tr>").join("");
-    $("#stkMix tfoot").innerHTML = '<tr><td>合计</td><td class="num">' + money(total) + '</td><td class="num">' + (total > 0 ? "100%" : "—") + '</td><td class="num">' + gain(profit) + "</td></tr>";
+    // Only each stock's share here; its value and profit are in the holdings table below.
+    $("#stkMix tbody").innerHTML = items.length
+      ? items.map((it, i) => '<tr data-i="' + i + '"><td><span class="sw stk" style="opacity:' + it.op + '"></span>' + esc(it.name) +
+          (it.sub ? '<span class="nm">' + esc(it.sub) + "</span>" : "") + '</td><td class="num">' + nf2.format((it.v / total) * 100) + "%</td></tr>").join("")
+      : '<tr><td colspan="2" class="empty">' + (!state.ready ? "正在读取…" : sold.length ? "股票都已清仓。" : "还没有股票。") + "</td></tr>";
   }
 
   function renderFixed() {
