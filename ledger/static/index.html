@@ -110,7 +110,9 @@ button.navlink:disabled { opacity: .6; cursor: default; }
 /* Tables */
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-#holdings { min-width: 860px; }
+#holdings { min-width: 540px; }
+.hold-scroll { overflow-x: auto; }
+#stkBox { grid-template-columns: minmax(0, 260px) minmax(0, 1fr); }
 #log { min-width: 760px; }
 .cal { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px; display: grid; gap: 8px; }
 .cal-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
@@ -146,14 +148,16 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .donut .ctr .k { font-size: 12px; color: var(--muted); }
 .donut .ctr .v { font-size: 20px; font-weight: 600; }
 .donut .ctr .s { font-size: 11px; color: var(--muted); }
-#mix, #stkMix { font-size: 14px; }
-#mix td, #mix th, #stkMix td, #stkMix th { padding: 8px 6px; white-space: normal; }
-#mix tbody tr, #stkMix tbody tr { cursor: default; }
-#mix tbody tr.hot td, #stkMix tbody tr.hot td { background: var(--accent-soft); }
-#mix .sw, #stkMix .sw { margin-right: 8px; }
-#mix .nm, #stkMix .nm { display: block; font-size: 12px; color: var(--muted); }
+#mix, #holdings { font-size: 14px; }
+#mix td, #mix th, #holdings td, #holdings th { padding: 8px 6px; white-space: normal; }
+#mix tbody tr, #holdings tbody tr { cursor: default; }
+#mix tbody tr.hot td, #holdings tbody tr.hot td { background: var(--accent-soft); }
+#mix .sw, #holdings .sw { margin-right: 8px; }
+#mix .nm { display: block; font-size: 12px; color: var(--muted); }
 #mix tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
 @media (max-width: 680px) { .mixbox { grid-template-columns: minmax(0, 1fr); } }
+/* The six-column table needs the page's full width beside the donut; narrower, it goes under the donut */
+@media (max-width: 919px) { #stkBox { grid-template-columns: minmax(0, 1fr); } }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 0; }
 .sw.stk { background: var(--c-stk); }
 .sw.bond { background: var(--c-bond); }
@@ -304,29 +308,22 @@ footer p { margin: 0 0 6px; }
   #log td.c-act { grid-area: acts; align-self: end; }
   #log tr.mon { display: block; }
   #log tr.mon td { display: block; }
-  /* Holdings as cards: symbol and unrealized P&L, then shares and average cost, then price and market value */
+  /* Holdings as cards: symbol and unrealized P&L, then shares and average cost, then price and the day's change */
   #holdings { min-width: 0; }
   #holdings thead { display: none; }
-  #holdings tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "sym pnl" "qty avg" "px mv" "day real"; gap: 10px 12px; padding: 12px; border-bottom: 1px solid var(--line); }
+  #holdings tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "sym pnl" "qty avg" "px day"; gap: 10px 12px; padding: 12px; border-bottom: 1px solid var(--line); }
   #holdings tbody tr:last-child { border-bottom: 0; }
   #holdings tbody td { border: 0; padding: 0; white-space: normal; text-align: left; }
   #holdings td.sym { grid-area: sym; }
-  #holdings tr:not(.closed) td:nth-child(2) { grid-area: qty; }
-  #holdings tr:not(.closed) td:nth-child(3) { grid-area: avg; }
-  #holdings tr:not(.closed) td:nth-child(4) { grid-area: px; }
-  #holdings tr:not(.closed) td:nth-child(5) { grid-area: day; }
-  #holdings tr:not(.closed) td:nth-child(6) { grid-area: mv; }
-  #holdings tr:not(.closed) td:nth-child(7) { grid-area: pnl; text-align: right; font-weight: 500; }
-  #holdings tr:not(.closed) td:nth-child(8) { grid-area: real; }
-  #holdings tr:not(.closed) td:nth-child(2)::before { content: "持有股数"; }
-  #holdings tr:not(.closed) td:nth-child(3)::before { content: "平均成本"; }
-  #holdings tr:not(.closed) td:nth-child(4)::before { content: "现价"; }
-  #holdings tr:not(.closed) td:nth-child(5)::before { content: "当日涨跌"; }
-  #holdings tr:not(.closed) td:nth-child(6)::before { content: "市值"; }
-  #holdings tr:not(.closed) td:nth-child(8)::before { content: "总收益"; }
-  #holdings tr.closed { grid-template-areas: "sym pnl"; }
-  #holdings tr.closed td:nth-child(2) { display: none; }
-  #holdings tr.closed td:nth-child(3) { grid-area: pnl; text-align: right; }
+  #holdings td:nth-child(2) { grid-area: qty; }
+  #holdings td:nth-child(3) { grid-area: avg; }
+  #holdings td:nth-child(4) { grid-area: px; }
+  #holdings td:nth-child(5) { grid-area: day; }
+  #holdings td:nth-child(6) { grid-area: pnl; text-align: right; font-weight: 500; }
+  #holdings td:nth-child(2)::before { content: "持有股数"; }
+  #holdings td:nth-child(3)::before { content: "平均成本"; }
+  #holdings td:nth-child(4)::before { content: "现价"; }
+  #holdings td:nth-child(5)::before { content: "当日涨跌"; }
   /* Treasuries and deposits as cards */
   #fixed { min-width: 0; }
   #fixed thead { display: none; }
@@ -394,7 +391,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="mix-h">
     <div class="head-row">
-      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按持仓表的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存已经回到储蓄账户，不再计入。账户里的活期现金没有记录，也不计入。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款，青绿色是现金。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱，加上国债买入花的钱、定存本金和现金余额；已到期的国债和定存本息回到储蓄账户后不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
+      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存已经回到储蓄账户，不再计入。账户里的活期现金没有记录，也不计入。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款，青绿色是现金。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱，加上国债买入花的钱、定存本金和现金余额；已到期的国债和定存本息回到储蓄账户后不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
       <p class="hint" id="mixSum"></p>
     </div>
     <dl class="pnl-stats" id="assetStats" hidden></dl>
@@ -413,25 +410,30 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="stk-h">
     <div class="head-row">
-      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不画在圆盘里，但它们的已实现盈亏算进上面的盈亏。每只股票的市值和盈亏见下面的持仓表，鼠标移到圆盘上也能看到。</p></div></details></div>
+      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不在圆盘和表格里，但它们的已实现盈亏算进上面的盈亏。鼠标移到圆盘上可以看到每只股票的现值和盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。你手动填的价格如果日期更新，不会被覆盖。新加的股票可以先在表里手动填现价。</p></div></details></div>
       <p class="hint" id="stkSum"></p>
     </div>
     <dl class="pnl-stats" id="stkStats" hidden></dl>
-    <div class="mixbox">
+    <div class="mixbox" id="stkBox">
       <div class="donut" id="stkChart">
         <div class="ctr"><span class="k">股票现值</span><span class="v" id="stkTotal">—</span></div>
         <div class="pnl-tip" id="stkTip" hidden></div>
       </div>
-      <table id="stkMix">
-        <thead><tr><th>股票</th><th class="num">占比</th></tr></thead>
-        <tbody><tr><td colspan="2" class="empty">正在读取…</td></tr></tbody>
-      </table>
+      <div class="hold-scroll">
+        <table id="holdings">
+          <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">浮动盈亏</th></tr></thead>
+          <tbody><tr><td colspan="6" class="empty">正在读取持仓…</td></tr></tbody>
+        </table>
+      </div>
     </div>
+    <p class="warn" id="warn" hidden></p>
+    <p class="check" id="checkLine" hidden></p>
+    <div class="hints" id="actHints" hidden></div>
   </section>
 
   <section aria-labelledby="pnl-h">
     <div class="head-row">
-      <div class="title"><h2 id="pnl-h">收益走势</h2><details class="help"><summary aria-label="收益走势说明">?</summary><div class="help-body"><p>累计收益 = 股票浮动盈亏 + 已实现盈亏 + 分红（扣税后）+ 国债和定存已计收益，从第一笔买入或存款起按每天收盘价计算，单位美元（港股按当前汇率折算）。最后的“最新”点用今天的日期和持仓表里的现价，和总览对得上。</p><p>收益构成：股价涨跌（浮动盈亏加已实现盈亏，已扣费用）+ 分红（扣税后）+ 国债和定存利息，三者相加等于累计收益。</p><p>收益率 = 累计收益 ÷ 当天的投入成本（股票成本 + 国债买入成本 + 定存本金），加仓那天成本变大，收益率会跳低。</p><p>下方柱子是每天的盈亏变动，B / S 是买入和卖出。鼠标移动或点按查看当天明细，选中图表后可用方向键逐日查看。</p></div></details></div>
+      <div class="title"><h2 id="pnl-h">收益走势</h2><details class="help"><summary aria-label="收益走势说明">?</summary><div class="help-body"><p>累计收益 = 股票浮动盈亏 + 已实现盈亏 + 分红（扣税后）+ 国债和定存已计收益，从第一笔买入或存款起按每天收盘价计算，单位美元（港股按当前汇率折算）。最后的“最新”点用今天的日期和股票表格里的现价，和总览对得上。</p><p>收益构成：股价涨跌（浮动盈亏加已实现盈亏，已扣费用）+ 分红（扣税后）+ 国债和定存利息，三者相加等于累计收益。</p><p>收益率 = 累计收益 ÷ 当天的投入成本（股票成本 + 国债买入成本 + 定存本金），加仓那天成本变大，收益率会跳低。</p><p>下方柱子是每天的盈亏变动，B / S 是买入和卖出。鼠标移动或点按查看当天明细，选中图表后可用方向键逐日查看。</p></div></details></div>
       <p class="hint">累计收益 <span class="pnl-total" id="pnlTotal">—</span><span class="pnl-sub" id="pnlSub"></span></p>
       <p class="hint" id="pnlParts"></p>
     </div>
@@ -460,22 +462,6 @@ footer p { margin: 0 0 6px; }
       <div class="cal-grid" id="calGrid" role="grid" aria-label="收益日历"></div>
       <p class="hint" id="calTip">点格子查看当天明细。</p>
     </div>
-  </section>
-
-  <section aria-labelledby="hold-h">
-    <div class="head-row">
-      <div class="title"><h2 id="hold-h">持仓</h2><details class="help"><summary aria-label="现价说明">?</summary><div class="help-body"><p>点页面顶部的“刷新数据”更新现价和汇率。</p><p>交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。你手动填的价格如果日期更新，不会被覆盖。</p><p>新加的股票可以先在表里手动填现价。</p></div></details></div>
-      <p class="hint" id="holdSum"></p>
-    </div>
-    <div class="table-wrap">
-      <table id="holdings">
-        <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">市值</th><th class="num">浮动盈亏</th><th class="num">总收益</th></tr></thead>
-        <tbody><tr><td colspan="8" class="empty">正在读取持仓…</td></tr></tbody>
-      </table>
-    </div>
-    <p class="warn" id="warn" hidden></p>
-    <p class="check" id="checkLine" hidden></p>
-    <div class="hints" id="actHints" hidden></div>
   </section>
 
   <section aria-labelledby="fix-h">
@@ -1093,23 +1079,9 @@ TAL|好未来|TAL Education
   }
 
   // ---------- rendering ----------
-  function symCell(sym) {
+  function symCell(sym, pre) {
     const nm = nameOf(sym);
-    return '<td class="sym">' + esc(sym) + (isHK(sym) ? '<span class="mk">港股</span>' : "") + (nm ? '<span class="nm">' + esc(nm) + "</span>" : "") + "</td>";
-  }
-
-  function renderSummary(c) {
-    const n = c.syms.filter((s) => s.shares > 0).length, parts = [];
-    if (n) parts.push(n + " 只");
-    if (c.held && c.priced) parts.push("市值 " + money(c.mv), '浮动盈亏 <span class="' + tone(c.unreal) + '">' + signed(c.unreal) + (c.cost > 0 ? "（" + pct(c.unreal / c.cost * 100) + "）" : "") + "</span>");
-    parts.push('已实现盈亏 <span class="' + tone(c.realized) + '">' + signed(c.realized) + "</span>");
-    if (Math.abs(c.dividends) >= 0.005) parts.push('分红 <span class="' + tone(c.dividends) + '">' + signed(c.dividends) + "</span>" + (c.tax >= 0.005 ? "（已扣税 " + money(c.tax) + "）" : ""));
-    if (c.held && c.priced) {
-      const total = c.unreal + c.realized + c.dividends;
-      parts.push('股票总收益 <span class="' + tone(total) + '">' + signed(total) + "</span>");
-    }
-    parts.push("累计费用 " + money(c.fees));
-    $("#holdSum").innerHTML = state.ready && (c.syms.length || c.fees) ? parts.join(" · ") : "";
+    return '<td class="sym">' + (pre || "") + esc(sym) + (isHK(sym) ? '<span class="mk">港股</span>' : "") + (nm ? '<span class="nm">' + esc(nm) + "</span>" : "") + "</td>";
   }
 
   // ---------- asset mix (share of total assets) ----------
@@ -1228,7 +1200,7 @@ TAL|好未来|TAL Education
     const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0);
     $("#mixTip").hidden = true;
     const unpriced = c.syms.some((s) => s.shares > 0 && !(Number(state.prices[s.symbol]) > 0));
-    $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；先在持仓表里填现价。" : items.length ? "共 " + items.length + " 项" : "";
+    $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；先在股票表格里填现价。" : items.length ? "共 " + items.length + " 项" : "";
     $("#mixTotal").textContent = total > 0 ? money(total) : "—";
     // Original assets: the money put in and not yet taken back. Current value minus it is the total profit
     // (unrealized + realized + Treasury and deposit income), the same figure as the profit trend.
@@ -1251,7 +1223,7 @@ TAL|好未来|TAL Education
   }
 
   // ---------- stocks alone: each stock's share of the stocks, and the stocks' own profit ----------
-  const STK = { chart: "#stkChart", tip: "#stkTip", table: "#stkMix", lay: null,
+  const STK = { chart: "#stkChart", tip: "#stkTip", table: "#holdings", lay: null, items: [],
     tipHtml: (it, total) => '<div class="d">' + esc(it.name) + (it.sub ? " · " + esc(it.sub) : "") + "</div>" + tipRow("现值", money(it.v)) +
       tipRow("占股票", nf2.format((it.v / total) * 100) + "%") + tipRow("浮动盈亏", signed(it.unreal)) +
       (Math.abs(it.realized) >= 0.005 ? tipRow("已实现盈亏", signed(it.realized)) : "") + tipRow("盈亏合计", signed(it.unreal + it.realized)) };
@@ -1268,18 +1240,14 @@ TAL|好未来|TAL Education
     items.forEach((it, i) => { it.op = items.length > 1 ? 1 - (0.74 * i) / (items.length - 1) : 1; });
     const total = items.reduce((t, it) => t + it.v, 0), profit = c.unreal + c.realized, original = total - profit;
     $("#stkTip").hidden = true;
-    $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；先在持仓表里填现价。" : items.length ? "共 " + items.length + " 只" : "";
+    $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；先在股票表格里填现价。" : [items.length ? "共 " + items.length + " 只" : "", c.fees ? "累计费用 " + money(c.fees) : ""].filter(Boolean).join(" · ");
     $("#stkTotal").textContent = total > 0 ? money(total) : "—";
     const st = $("#stkStats");
     st.hidden = !(total > 0 || sold.length);
     st.innerHTML = st.hidden ? "" : stat("股票现值", money(total), "", "持有的股票按现价") + stat("原始投入", money(original), "", "买入花的钱减去卖出拿回的钱") +
       stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized));
     STK.lay = drawDonut($("#stkChart"), items, total, "股票占比", (it) => it.name);
-    // Only each stock's share here; its value and profit are in the holdings table below.
-    $("#stkMix tbody").innerHTML = items.length
-      ? items.map((it, i) => '<tr data-i="' + i + '"><td><span class="sw stk" style="opacity:' + it.op + '"></span>' + esc(it.name) +
-          (it.sub ? '<span class="nm">' + esc(it.sub) + "</span>" : "") + '</td><td class="num">' + nf2.format((it.v / total) * 100) + "%</td></tr>").join("")
-      : '<tr><td colspan="2" class="empty">' + (!state.ready ? "正在读取…" : sold.length ? "股票都已清仓。" : "还没有股票。") + "</td></tr>";
+    STK.items = items;   // the holdings table beside the donut links its rows to these
   }
 
   function renderFixed() {
@@ -1359,40 +1327,30 @@ TAL|好未来|TAL Education
     const keep = ae && ae.classList && ae.classList.contains("px") ? { id: ae.id, v: ae.value } : null;
     const ro = !db || state.canWrite === false;
     const usdMV = (s) => (s.shares > 0 ? toUSD((Number(state.prices[s.symbol]) || 0) * s.shares || s.cost, s.ccy) : -1);
-    const rows = c.syms.slice().sort((a, b) => usdMV(b) - usdMV(a) || a.symbol.localeCompare(b.symbol));
+    // Sold-out stocks are left out: their realized profit is in the stats above.
+    const rows = c.syms.filter((s) => s.shares > 0).sort((a, b) => usdMV(b) - usdMV(a) || a.symbol.localeCompare(b.symbol));
     if (!rows.length) {
-      tb.innerHTML = '<tr><td colspan="8" class="empty">' + (state.ready
-        ? "还没有持仓。点页面顶部的“＋ 记一笔”录入第一笔买入，这里会显示股数、平均成本和盈亏。"
-        : "正在读取持仓…") + "</td></tr>";
+      tb.innerHTML = '<tr><td colspan="6" class="empty">' + (!state.ready ? "正在读取持仓…" : c.syms.length ? "股票都已清仓。"
+        : "还没有持仓。点页面顶部的“＋ 记一笔”录入第一笔买入，这里会显示股数、平均成本和盈亏。") + "</td></tr>";
     } else {
       tb.innerHTML = rows.map((s) => {
-        if (s.shares <= 0) {
-          return '<tr class="closed">' + symCell(s.symbol) + '<td class="num">0</td><td colspan="6" class="num">已清仓 · 已实现 <span class="' + tone(s.realized) + '">' + signed(s.realized, s.ccy) + "</span>" +
-            (Math.abs(s.dividends) >= 0.005 ? " · 分红 " + signed(s.dividends, s.ccy) + ' · 总收益 <span class="' + tone(s.realized + s.dividends) + '">' + signed(s.realized + s.dividends, s.ccy) + "</span>" : "") + "</td></tr>";
-        }
         const avg = s.cost / s.shares;
         const px = Number(state.prices[s.symbol]) || 0;
-        const mvCell = px > 0 ? money(s.mv, s.ccy) + usdCap(s.mv, s.ccy) : '<span class="muted">等待收盘价</span>';
         const uCell = px > 0
           ? '<span class="' + tone(s.unreal) + '">' + signed(s.unreal, s.ccy) + "<br><small>" + (s.cost > 0 ? pct(s.unreal / s.cost * 100) : "") + "</small></span>" + usdCap(s.unreal, s.ccy, true)
           : '<span class="muted">—</span>';
         const qt = state.quotes[s.symbol];
-        const cap = qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘") +
+        const cap = !(px > 0) ? "等待收盘价" : qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘") +
           (qt.source && qt.source !== "腾讯财经" ? " · " + esc(qt.source) : "") + (checkBad(s.symbol) ? " · 核对不一致" : "")) : "";
         const sym = esc(s.symbol), prev = prevClose(s.symbol, qt && qt.date ? qt.date : todayUS());
         const dayCell = px > 0 && prev > 0
           ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "<br><small>" + signed((px - prev) * s.shares, s.ccy) + "</small></span>"
           : '<span class="muted">—</span>';
-        // total = unrealized + realized + dividends; the small line shows its parts: price change and dividends
-        const gain = s.unreal + s.realized, total = gain + s.dividends, hasReal = Math.abs(s.realized) >= 0.005, hasDiv = Math.abs(s.dividends) >= 0.005;
-        const partsLine = hasReal || hasDiv ? "<br><small>股价 " + signed(gain, s.ccy) + (hasReal ? "（含已实现 " + signed(s.realized, s.ccy) + "）" : "") +
-          (hasDiv ? " · 分红 " + signed(s.dividends, s.ccy) : "") + "</small>" : "";
-        const realCell = px > 0 ? '<span class="' + tone(total) + '">' + signed(total, s.ccy) + partsLine + "</span>" + usdCap(total, s.ccy, true) : '<span class="muted">—</span>';
-        return "<tr>" + symCell(s.symbol) + '<td class="num">' + nfQ.format(s.shares) + '</td><td class="num">' + price(avg, s.ccy) +
+        const i = STK.items.findIndex((it) => it.name === s.symbol), it = STK.items[i];
+        return "<tr" + (it ? ' data-i="' + i + '"' : "") + ">" + symCell(s.symbol, it ? '<span class="sw stk" style="opacity:' + it.op + '"></span>' : "") + '<td class="num">' + nfQ.format(s.shares) + '</td><td class="num">' + price(avg, s.ccy) +
           '</td><td class="num"><input class="px" type="number" inputmode="decimal" step="any" min="0" id="price-' + sym + '" data-sym="' + sym +
           '" value="' + (px > 0 ? px : "") + '" placeholder="' + (s.ccy === "HKD" ? "港元" : "美元") + '" aria-label="' + sym + " 现价（" + (s.ccy === "HKD" ? "港元" : "美元") + '）"' + (ro ? " disabled" : "") +
-          ">" + (cap ? '<span class="cap">' + cap + "</span>" : "") + '</td><td class="num">' + dayCell + '</td><td class="num">' + mvCell + '</td><td class="num">' + uCell +
-          '</td><td class="num">' + realCell + "</td></tr>";
+          ">" + (cap ? '<span class="cap">' + cap + "</span>" : "") + '</td><td class="num">' + dayCell + '</td><td class="num">' + uCell + "</td></tr>";
       }).join("");
     }
     if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); } }
@@ -1853,7 +1811,6 @@ TAL|好未来|TAL Education
   function render() {
     const list = sortedTrades();
     const c = compute(list);
-    renderSummary(c);
     renderMix(c);
     renderStocks(c);
     renderPnl(list);
@@ -2200,7 +2157,7 @@ TAL|好未来|TAL Education
       const paid = acc ? await moveCash(acc, delta) : "";
       const fresh = LedgerCalc.isTrade(rec) && !(Number(state.prices[symbol]) > 0);
       formMsg("已保存：" + md(date) + " " + recordText(rec) + "。" + paid +
-        (fresh ? "点“刷新数据”后这只股票会有价格，也可以先在持仓表里手动填。" : ""), "ok");
+        (fresh ? "点“刷新数据”后这只股票会有价格，也可以先在股票表格里手动填。" : ""), "ok");
       $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = "0"; $("#f-note").value = ""; $("#f-to").value = "";
     } catch (err) {
       formMsg(errText(err), "err");
