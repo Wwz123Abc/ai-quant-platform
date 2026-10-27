@@ -410,7 +410,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="stk-h">
     <div class="head-row">
-      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不在圆盘和表格里，但它们的已实现盈亏算进上面的盈亏。鼠标移到圆盘上可以看到每只股票的现值和盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。你手动填的价格如果日期更新，不会被覆盖。新加的股票可以先在表里手动填现价。</p></div></details></div>
+      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债、定期存款和现金。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不在圆盘和表格里，但它们的已实现盈亏算进上面的盈亏。鼠标移到圆盘上可以看到每只股票的现值和盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。</p></div></details></div>
       <p class="hint" id="stkSum"></p>
     </div>
     <dl class="pnl-stats" id="stkStats" hidden></dl>
@@ -1200,7 +1200,7 @@ TAL|好未来|TAL Education
     const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0);
     $("#mixTip").hidden = true;
     const unpriced = c.syms.some((s) => s.shares > 0 && !(Number(state.prices[s.symbol]) > 0));
-    $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；先在股票表格里填现价。" : items.length ? "共 " + items.length + " 项" : "";
+    $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；点“刷新数据”取价格。" : items.length ? "共 " + items.length + " 项" : "";
     $("#mixTotal").textContent = total > 0 ? money(total) : "—";
     // Original assets: the money put in and not yet taken back. Current value minus it is the total profit
     // (unrealized + realized + Treasury and deposit income), the same figure as the profit trend.
@@ -1240,7 +1240,7 @@ TAL|好未来|TAL Education
     items.forEach((it, i) => { it.op = items.length > 1 ? 1 - (0.74 * i) / (items.length - 1) : 1; });
     const total = items.reduce((t, it) => t + it.v, 0), profit = c.unreal + c.realized, original = total - profit;
     $("#stkTip").hidden = true;
-    $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；先在股票表格里填现价。" : [items.length ? "共 " + items.length + " 只" : "", c.fees ? "累计费用 " + money(c.fees) : ""].filter(Boolean).join(" · ");
+    $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；点“刷新数据”取价格。" : [items.length ? "共 " + items.length + " 只" : "", c.fees ? "累计费用 " + money(c.fees) : ""].filter(Boolean).join(" · ");
     $("#stkTotal").textContent = total > 0 ? money(total) : "—";
     const st = $("#stkStats");
     st.hidden = !(total > 0 || sold.length);
@@ -1323,9 +1323,6 @@ TAL|好未来|TAL Education
 
   function renderHoldings(c) {
     const tb = $("#holdings tbody");
-    const ae = document.activeElement;
-    const keep = ae && ae.classList && ae.classList.contains("px") ? { id: ae.id, v: ae.value } : null;
-    const ro = !db || state.canWrite === false;
     const usdMV = (s) => (s.shares > 0 ? toUSD((Number(state.prices[s.symbol]) || 0) * s.shares || s.cost, s.ccy) : -1);
     // Sold-out stocks are left out: their realized profit is in the stats above.
     const rows = c.syms.filter((s) => s.shares > 0).sort((a, b) => usdMV(b) - usdMV(a) || a.symbol.localeCompare(b.symbol));
@@ -1342,18 +1339,15 @@ TAL|好未来|TAL Education
         const qt = state.quotes[s.symbol];
         const cap = !(px > 0) ? "等待收盘价" : qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘") +
           (qt.source && qt.source !== "腾讯财经" ? " · " + esc(qt.source) : "") + (checkBad(s.symbol) ? " · 核对不一致" : "")) : "";
-        const sym = esc(s.symbol), prev = prevClose(s.symbol, qt && qt.date ? qt.date : todayUS());
+        const prev = prevClose(s.symbol, qt && qt.date ? qt.date : todayUS());
         const dayCell = px > 0 && prev > 0
           ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "<br><small>" + signed((px - prev) * s.shares, s.ccy) + "</small></span>"
           : '<span class="muted">—</span>';
         const i = STK.items.findIndex((it) => it.name === s.symbol), it = STK.items[i];
         return "<tr" + (it ? ' data-i="' + i + '"' : "") + ">" + symCell(s.symbol, it ? '<span class="sw stk" style="opacity:' + it.op + '"></span>' : "") + '<td class="num">' + nfQ.format(s.shares) + '</td><td class="num">' + price(avg, s.ccy) +
-          '</td><td class="num"><input class="px" type="number" inputmode="decimal" step="any" min="0" id="price-' + sym + '" data-sym="' + sym +
-          '" value="' + (px > 0 ? px : "") + '" placeholder="' + (s.ccy === "HKD" ? "港元" : "美元") + '" aria-label="' + sym + " 现价（" + (s.ccy === "HKD" ? "港元" : "美元") + '）"' + (ro ? " disabled" : "") +
-          ">" + (cap ? '<span class="cap">' + cap + "</span>" : "") + '</td><td class="num">' + dayCell + '</td><td class="num">' + uCell + "</td></tr>";
+          '</td><td class="num">' + (px > 0 ? price(px, s.ccy) : '<span class="muted">—</span>') + (cap ? '<span class="cap">' + cap + "</span>" : "") + '</td><td class="num">' + dayCell + '</td><td class="num">' + uCell + "</td></tr>";
       }).join("");
     }
-    if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); } }
     const w = $("#warn");
     w.textContent = c.warnings.join("；");
     w.hidden = !c.warnings.length;
@@ -2094,29 +2088,6 @@ TAL|好未来|TAL Education
   $("#d-ccy").addEventListener("change", updatePay);
 
   // ---------- writes ----------
-  let cfgChain = Promise.resolve();
-  function saveConfig() {
-    if (!db || state.canWrite === false) return;
-    const body = {
-      fx: state.fx, prices: Object.assign({}, state.prices),
-      quotes: JSON.parse(JSON.stringify(state.quotes)), updatedAt: state.updatedAt, source: state.source,
-    };
-    cfgChain = cfgChain.then(() => db.doc("config/main").set(body)).catch((err) => setStatus(errText(err), "err"));
-  }
-
-  $("#holdings").addEventListener("change", (e) => {
-    const el = e.target;
-    if (!el.classList || !el.classList.contains("px")) return;
-    const v = parseFloat(el.value);
-    if (!(v >= 0)) return;
-    const sym = el.dataset.sym;
-    state.prices[sym] = v;
-    state.quotes[sym] = Object.assign({}, state.quotes[sym] || {}, { date: todayUS(), source: "手动" });
-    saveConfig();
-    render();
-  });
-
-
   $("#tradeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!db) { formMsg("还连不上数据库，暂时不能保存。", "err"); return; }
@@ -2157,7 +2128,7 @@ TAL|好未来|TAL Education
       const paid = acc ? await moveCash(acc, delta) : "";
       const fresh = LedgerCalc.isTrade(rec) && !(Number(state.prices[symbol]) > 0);
       formMsg("已保存：" + md(date) + " " + recordText(rec) + "。" + paid +
-        (fresh ? "点“刷新数据”后这只股票会有价格，也可以先在股票表格里手动填。" : ""), "ok");
+        (fresh ? "点“刷新数据”后这只股票会有价格。" : ""), "ok");
       $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = "0"; $("#f-note").value = ""; $("#f-to").value = "";
     } catch (err) {
       formMsg(errText(err), "err");
