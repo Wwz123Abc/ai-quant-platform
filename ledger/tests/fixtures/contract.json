@@ -1,0 +1,1155 @@
+{
+ "about": "Rules the stock ledger and the quant platform must apply alike. Each case gives inputs and the ledger's own answer: holdings from static/calc.js (LedgerCalc.holdings), programs from app.trades_for_programs (what GET /api/holdings returns), fixed from LedgerCalc.fixedOn, cross_check from app.cross_check. The ledger's tests check its code still gives these answers; quantlab/tests/test_contract.py checks the quant platform gives the same.",
+ "holdings": [
+  {
+   "name": "moving average cost: fees go into the cost, a sale keeps the average",
+   "records": [
+    {
+     "id": "r1",
+     "date": "2026-01-02",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 10,
+     "price": 100,
+     "fees": 1
+    },
+    {
+     "id": "r2",
+     "date": "2026-02-02",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "shares": 10,
+     "price": 120,
+     "fees": 1
+    },
+    {
+     "id": "r3",
+     "date": "2026-03-02",
+     "side": "sell",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:03Z",
+     "shares": 5,
+     "price": 130,
+     "fees": 1
+    }
+   ],
+   "holdings": {
+    "X": {
+     "shares": 15,
+     "cost": 1651.5
+    }
+   },
+   "programs": [
+    {
+     "id": "r1",
+     "date": "2026-01-02",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 10,
+     "price": 100,
+     "fees": 1
+    },
+    {
+     "id": "r2",
+     "date": "2026-02-02",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "shares": 10,
+     "price": 120,
+     "fees": 1
+    },
+    {
+     "id": "r3",
+     "date": "2026-03-02",
+     "side": "sell",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:03Z",
+     "shares": 5,
+     "price": 130,
+     "fees": 1
+    }
+   ]
+  },
+  {
+   "name": "a split multiplies the shares and keeps the cost; a buy on the split date is already split",
+   "records": [
+    {
+     "id": "r1",
+     "date": "2026-01-05",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 10,
+     "price": 300,
+     "fees": 0
+    },
+    {
+     "id": "r2",
+     "date": "2026-06-10",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "shares": 5,
+     "price": 100,
+     "fees": 2
+    },
+    {
+     "id": "r3",
+     "date": "2026-06-10",
+     "side": "split",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:03Z",
+     "from": 1,
+     "to": 3
+    },
+    {
+     "id": "r4",
+     "date": "2026-07-01",
+     "side": "sell",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:04Z",
+     "shares": 12,
+     "price": 110,
+     "fees": 1
+    }
+   ],
+   "holdings": {
+    "X": {
+     "shares": 23,
+     "cost": 2301.3142857142857
+    }
+   },
+   "programs": [
+    {
+     "id": "r1",
+     "date": "2026-01-05",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 30.0,
+     "price": 100.0,
+     "fees": 0,
+     "split_factor": 3.0
+    },
+    {
+     "id": "r2",
+     "date": "2026-06-10",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "shares": 5,
+     "price": 100,
+     "fees": 2
+    },
+    {
+     "id": "r4",
+     "date": "2026-07-01",
+     "side": "sell",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:04Z",
+     "shares": 12,
+     "price": 110,
+     "fees": 1
+    }
+   ]
+  },
+  {
+   "name": "a reverse split, two symbols, and a sale of more than is held",
+   "records": [
+    {
+     "id": "r1",
+     "date": "2026-02-03",
+     "side": "buy",
+     "symbol": "A",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 1000,
+     "price": 0.5,
+     "fees": 5
+    },
+    {
+     "id": "r2",
+     "date": "2026-04-01",
+     "side": "split",
+     "symbol": "A",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "from": 10,
+     "to": 1
+    },
+    {
+     "id": "r3",
+     "date": "2026-04-02",
+     "side": "buy",
+     "symbol": "A",
+     "createdAt": "2026-01-01T00:00:03Z",
+     "shares": 10,
+     "price": 6,
+     "fees": 0
+    },
+    {
+     "id": "r4",
+     "date": "2026-03-01",
+     "side": "buy",
+     "symbol": "B",
+     "createdAt": "2026-01-01T00:00:04Z",
+     "shares": 2,
+     "price": 50,
+     "fees": 0
+    },
+    {
+     "id": "r5",
+     "date": "2026-03-05",
+     "side": "sell",
+     "symbol": "B",
+     "createdAt": "2026-01-01T00:00:05Z",
+     "shares": 3,
+     "price": 55,
+     "fees": 0
+    }
+   ],
+   "holdings": {
+    "A": {
+     "shares": 110,
+     "cost": 565
+    },
+    "B": {
+     "shares": 0,
+     "cost": 0
+    }
+   },
+   "programs": [
+    {
+     "id": "r1",
+     "date": "2026-02-03",
+     "side": "buy",
+     "symbol": "A",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 100.0,
+     "price": 5.0,
+     "fees": 5,
+     "split_factor": 0.1
+    },
+    {
+     "id": "r3",
+     "date": "2026-04-02",
+     "side": "buy",
+     "symbol": "A",
+     "createdAt": "2026-01-01T00:00:03Z",
+     "shares": 10,
+     "price": 6,
+     "fees": 0
+    },
+    {
+     "id": "r4",
+     "date": "2026-03-01",
+     "side": "buy",
+     "symbol": "B",
+     "createdAt": "2026-01-01T00:00:04Z",
+     "shares": 2,
+     "price": 50,
+     "fees": 0
+    },
+    {
+     "id": "r5",
+     "date": "2026-03-05",
+     "side": "sell",
+     "symbol": "B",
+     "createdAt": "2026-01-01T00:00:05Z",
+     "shares": 3,
+     "price": 55,
+     "fees": 0
+    }
+   ]
+  },
+  {
+   "name": "everything sold: nothing left",
+   "records": [
+    {
+     "id": "r1",
+     "date": "2026-01-02",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 3,
+     "price": 10,
+     "fees": 0
+    },
+    {
+     "id": "r2",
+     "date": "2026-01-03",
+     "side": "sell",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "shares": 3,
+     "price": 11,
+     "fees": 0
+    }
+   ],
+   "holdings": {
+    "X": {
+     "shares": 0,
+     "cost": 0
+    }
+   },
+   "programs": [
+    {
+     "id": "r1",
+     "date": "2026-01-02",
+     "side": "buy",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:01Z",
+     "shares": 3,
+     "price": 10,
+     "fees": 0
+    },
+    {
+     "id": "r2",
+     "date": "2026-01-03",
+     "side": "sell",
+     "symbol": "X",
+     "createdAt": "2026-01-01T00:00:02Z",
+     "shares": 3,
+     "price": 11,
+     "fees": 0
+    }
+   ]
+  }
+ ],
+ "fixed": [
+  {
+   "name": "a Treasury held to maturity (month-end coupons): before settlement, between coupons, on a coupon date, at maturity",
+   "item": {
+    "kind": "bond",
+    "currency": "USD",
+    "face": 1000,
+    "price": 98.5,
+    "coupon": 4.25,
+    "freq": 2,
+    "settle": "2026-03-10",
+    "maturity": "2029-06-30",
+    "accruedPaid": 8.5
+   },
+   "dates": [
+    "2026-03-09",
+    "2026-03-10",
+    "2026-05-15",
+    "2026-06-30",
+    "2026-12-31",
+    "2029-06-29",
+    "2029-06-30",
+    "2029-07-15"
+   ],
+   "expected": [
+    null,
+    {
+     "value": 993.1008287292817,
+     "matured": false
+    },
+    {
+     "value": 1001.6689839376533,
+     "matured": false
+    },
+    {
+     "value": 986.3907284768212,
+     "matured": false
+    },
+    {
+     "value": 988.6754966887418,
+     "matured": false
+    },
+    {
+     "value": 1021.1201794665398,
+     "matured": false
+    },
+    {
+     "value": 0,
+     "matured": true
+    },
+    {
+     "value": 0,
+     "matured": true
+    }
+   ]
+  },
+  {
+   "name": "a Treasury with a reference sale price from its date on",
+   "item": {
+    "kind": "bond",
+    "currency": "USD",
+    "face": 1000,
+    "price": 98.5,
+    "coupon": 4.25,
+    "freq": 2,
+    "settle": "2026-03-10",
+    "maturity": "2029-06-30",
+    "accruedPaid": 8.5,
+    "markPrice": 99.2,
+    "markDate": "2026-09-01"
+   },
+   "dates": [
+    "2026-08-31",
+    "2026-09-01",
+    "2027-01-15"
+   ],
+   "expected": [
+    {
+     "value": 994.3209221134466,
+     "matured": false
+    },
+    {
+     "value": 999.2758152173913,
+     "matured": false
+    },
+    {
+     "value": 993.7610497237569,
+     "matured": false
+    }
+   ]
+  },
+  {
+   "name": "a deposit: interest spread over the days of the term, nothing after maturity",
+   "item": {
+    "kind": "deposit",
+    "currency": "USD",
+    "principal": 5000,
+    "rate": 4.5,
+    "start": "2026-06-01",
+    "maturity": "2026-12-01",
+    "interest": 113.75
+   },
+   "dates": [
+    "2026-05-31",
+    "2026-06-01",
+    "2026-09-10",
+    "2026-11-30",
+    "2026-12-01"
+   ],
+   "expected": [
+    null,
+    {
+     "value": 5000,
+     "matured": false
+    },
+    {
+     "value": 5062.780054644809,
+     "matured": false
+    },
+    {
+     "value": 5113.128415300546,
+     "matured": false
+    },
+    {
+     "value": 0,
+     "matured": true
+    }
+   ]
+  },
+  {
+   "name": "a deposit in Hong Kong dollars (valued in HKD; converting is the caller's job)",
+   "item": {
+    "kind": "deposit",
+    "currency": "HKD",
+    "principal": 20000,
+    "rate": 3.8,
+    "start": "2026-09-10",
+    "maturity": "2027-09-10",
+    "interest": 760
+   },
+   "dates": [
+    "2026-10-28"
+   ],
+   "expected": [
+    {
+     "value": 20099.945205479453,
+     "matured": false
+    }
+   ]
+  }
+ ],
+ "cross_check": [
+  {
+   "name": "the same closes agree; only the last five days count",
+   "tencent": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "other": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "today": "2026-10-21",
+   "expected": {
+    "days": [
+     "2026-10-14",
+     "2026-10-15",
+     "2026-10-16",
+     "2026-10-19",
+     "2026-10-20"
+    ],
+    "mismatches": [],
+    "missing": [],
+    "latest": "2026-10-20",
+    "stale": false
+   }
+  },
+  {
+   "name": "a close off by more than 0.2% is a mismatch; 0.1% is not",
+   "tencent": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5.006,
+     5.006,
+     5.006,
+     5.006,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6.1,
+     6.1,
+     6.1,
+     6.1,
+     1000
+    ]
+   ],
+   "other": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "today": "2026-10-21",
+   "expected": {
+    "days": [
+     "2026-10-14",
+     "2026-10-15",
+     "2026-10-16",
+     "2026-10-19",
+     "2026-10-20"
+    ],
+    "mismatches": [
+     [
+      "2026-10-20",
+      6.1,
+      6
+     ]
+    ],
+    "missing": [],
+    "latest": "2026-10-20",
+    "stale": false
+   }
+  },
+  {
+   "name": "a day Tencent lacks is missing",
+   "tencent": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "other": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "today": "2026-10-21",
+   "expected": {
+    "days": [
+     "2026-10-14",
+     "2026-10-15",
+     "2026-10-16",
+     "2026-10-19",
+     "2026-10-20"
+    ],
+    "mismatches": [],
+    "missing": [
+     [
+      "2026-10-16",
+      "腾讯"
+     ]
+    ],
+    "latest": "2026-10-20",
+    "stale": false
+   }
+  },
+  {
+   "name": "the second source may trail by a day or two",
+   "tencent": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "other": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ]
+   ],
+   "today": "2026-10-21",
+   "expected": {
+    "days": [
+     "2026-10-14",
+     "2026-10-15",
+     "2026-10-16",
+     "2026-10-19"
+    ],
+    "mismatches": [],
+    "missing": [],
+    "latest": "2026-10-20",
+    "stale": false
+   }
+  },
+  {
+   "name": "a second source far behind: its missing days count",
+   "tencent": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "other": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ]
+   ],
+   "today": "2026-10-21",
+   "expected": {
+    "days": [
+     "2026-10-14",
+     "2026-10-15",
+     "2026-10-16",
+     "2026-10-19",
+     "2026-10-20"
+    ],
+    "mismatches": [],
+    "missing": [
+     [
+      "2026-10-15",
+      "新浪财经"
+     ],
+     [
+      "2026-10-16",
+      "新浪财经"
+     ],
+     [
+      "2026-10-19",
+      "新浪财经"
+     ],
+     [
+      "2026-10-20",
+      "新浪财经"
+     ]
+    ],
+    "latest": "2026-10-20",
+    "stale": false
+   }
+  },
+  {
+   "name": "a latest close over six days old is stale",
+   "tencent": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "other": [
+    [
+     "2026-10-13",
+     1,
+     1,
+     1,
+     1,
+     1000
+    ],
+    [
+     "2026-10-14",
+     2,
+     2,
+     2,
+     2,
+     1000
+    ],
+    [
+     "2026-10-15",
+     3,
+     3,
+     3,
+     3,
+     1000
+    ],
+    [
+     "2026-10-16",
+     4,
+     4,
+     4,
+     4,
+     1000
+    ],
+    [
+     "2026-10-19",
+     5,
+     5,
+     5,
+     5,
+     1000
+    ],
+    [
+     "2026-10-20",
+     6,
+     6,
+     6,
+     6,
+     1000
+    ]
+   ],
+   "today": "2026-10-28",
+   "expected": {
+    "days": [
+     "2026-10-14",
+     "2026-10-15",
+     "2026-10-16",
+     "2026-10-19",
+     "2026-10-20"
+    ],
+    "mismatches": [],
+    "missing": [],
+    "latest": "2026-10-20",
+    "stale": true
+   }
+  }
+ ]
+}

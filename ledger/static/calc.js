@@ -136,5 +136,52 @@
     });
   }
 
-  root.LedgerCalc = { SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust };
+  // ---------- dates: YYYY-MM-DD strings, compared as text ----------
+  const parseD = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const fmtD = (dt) => dt.toISOString().slice(0, 10);
+  const dayDiff = (a, b) => Math.round((parseD(b) - parseD(a)) / 864e5);
+  // Month arithmetic that keeps month-end dates at month end (6/30 - 6 months = 12/31), as Treasury coupon dates do.
+  function addMonths(s, n) {
+    const [y, m, d] = s.split("-").map(Number);
+    const eom = d === new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const last = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();
+    return fmtD(new Date(Date.UTC(y, m - 1 + n, eom ? last : Math.min(d, last))));
+  }
+
+  // ---------- Treasuries and time deposits (also implemented by the quant platform; see tests/fixtures/contract.json) ----------
+  // Coupon dates counted back from maturity: the first one is on or before settlement, the last is maturity.
+  function coupons(b) {
+    const step = 12 / (b.freq || 2), out = [];
+    for (let i = 0; i < 400; i++) { const c = addMonths(b.maturity, -i * step); out.unshift(c); if (c <= b.settle) break; }
+    return out;
+  }
+  // Hold-to-maturity value: clean price pulls straight-line to par, plus accrued coupon; a reference price replaces the clean part.
+  function bondAt(b, d, mark) {
+    if (d < b.settle) return null;
+    const face = b.face, cpn = (face * b.coupon) / 100 / (b.freq || 2), cs = coupons(b);
+    const cleanCost = (face * b.price) / 100, cost = cleanCost + (b.accruedPaid || 0);
+    if (d >= b.maturity) return { value: 0, cost: 0, income: cpn * (cs.length - 1) + face - cost, matured: true };
+    let k = 0;
+    while (k + 1 < cs.length && cs[k + 1] <= d) k++;
+    const accr = (cpn * dayDiff(cs[k], d)) / dayDiff(cs[k], cs[k + 1]);
+    const clean = mark != null ? (face * mark) / 100 : cleanCost + ((face - cleanCost) * dayDiff(b.settle, d)) / dayDiff(b.settle, b.maturity);
+    return { value: clean + accr, cost, income: clean + accr - cost + cpn * k, accr, matured: false };
+  }
+  // Time deposit: the maturity interest spread evenly over the days of the term.
+  function depositAt(t, d) {
+    if (d < t.start) return null;
+    if (d >= t.maturity) return { value: 0, cost: 0, income: t.interest, matured: true };
+    const income = (t.interest * dayDiff(t.start, d)) / dayDiff(t.start, t.maturity);
+    return { value: t.principal + income, cost: t.principal, income, matured: false };
+  }
+  const markOn = (f, d) => (f.kind === "bond" && Number(f.markPrice) > 0 && f.markDate && d >= f.markDate ? Number(f.markPrice) : null);
+  const fixedStart = (f) => (f.kind === "bond" ? f.settle : f.start);
+  // One Treasury or deposit on date d, in its own currency: null before it starts; value 0 once matured, when the
+  // money is back in savings.
+  const fixedOn = (f, d) => (f.kind === "bond" ? bondAt(f, d, markOn(f, d)) : depositAt(f, d));
+
+  root.LedgerCalc = {
+    SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust,
+    parseD, fmtD, dayDiff, addMonths, coupons, bondAt, depositAt, markOn, fixedStart, fixedOn,
+  };
 })(typeof window !== "undefined" ? window : globalThis);

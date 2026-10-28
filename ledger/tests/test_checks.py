@@ -1,5 +1,6 @@
 """Cross-checking Tencent's closes with a second source's (app.cross_check). Run: python -m unittest discover -s ledger/tests"""
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -130,6 +131,23 @@ class SourceCheck(unittest.TestCase):
         roles = {n: r["role"] for n, r in self.by_name().items()}
         self.assertEqual(roles["东方财富日 K 线"], "备用")
         self.assertEqual(roles["新浪日 K 线"], "核对")
+
+
+class Contract(unittest.TestCase):
+    """The rules the quant platform must apply alike (quantlab/tests/test_contract.py reads the same file)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.c = json.loads((Path(__file__).resolve().parent / "fixtures" / "contract.json").read_text(encoding="utf-8"))
+
+    def test_trades_for_programs(self):
+        for case in self.c["holdings"]:
+            docs = [{"id": r["id"], "data": {k: v for k, v in r.items() if k != "id"}} for r in case["records"]]
+            self.assertEqual(app.trades_for_programs(docs), case["programs"], case["name"])
+
+    def test_cross_check(self):
+        for case in self.c["cross_check"]:
+            self.assertEqual(app.cross_check(case["tencent"], case["other"], case["today"], "新浪财经"), case["expected"], case["name"])
 
 
 if __name__ == "__main__":

@@ -945,16 +945,7 @@ TAL|好未来|TAL Education
   const nameOf = (sym) => ZH[sym] || (state.quotes[sym] && state.quotes[sym].name) || "";
 
   // ---------- dates (all YYYY-MM-DD, Hong Kong calendar) ----------
-  const dayDiff = (a, b) => Math.round((parseD(b) - parseD(a)) / 864e5);
-  // Month arithmetic that keeps month-end dates at month end (6/30 - 6 months = 12/31), as Treasury coupon dates do.
-  function addMonths(s, n) {
-    const [y, m, d] = s.split("-").map(Number);
-    const eom = d === new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const last = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();
-    return fmtD(new Date(Date.UTC(y, m - 1 + n, eom ? last : Math.min(d, last))));
-  }
-  const parseD = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
-  const fmtD = (dt) => dt.toISOString().slice(0, 10);
+  const { dayDiff, addMonths, parseD, fmtD } = LedgerCalc;
   const addDays = (s, n) => { const dt = parseD(s); dt.setUTCDate(dt.getUTCDate() + n); return fmtD(dt); };
   const weekOf = (s) => { const dt = parseD(s); dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7)); return fmtD(dt); };
   const md = (s) => { const [, m, d] = s.split("-"); return Number(m) + "/" + Number(d); };
@@ -1028,25 +1019,8 @@ TAL|好未来|TAL Education
     return { syms: [...syms.values()], fees: feesUSD, realized: realizedUSD, dividends: divUSD, tax: taxUSD, mv, cost, unreal, priced, held, warnings };
   }
 
-  // ---------- Treasuries and time deposits ----------
-  // Coupon dates counted back from maturity: the first one is on or before settlement, the last is maturity.
-  function coupons(b) {
-    const step = 12 / (b.freq || 2), out = [];
-    for (let i = 0; i < 400; i++) { const c = addMonths(b.maturity, -i * step); out.unshift(c); if (c <= b.settle) break; }
-    return out;
-  }
-  // Hold-to-maturity value: clean price pulls straight-line to par, plus accrued coupon; a reference price replaces the clean part.
-  function bondAt(b, d, mark) {
-    if (d < b.settle) return null;
-    const face = b.face, cpn = (face * b.coupon) / 100 / (b.freq || 2), cs = coupons(b);
-    const cleanCost = (face * b.price) / 100, cost = cleanCost + (b.accruedPaid || 0);
-    if (d >= b.maturity) return { value: 0, cost: 0, income: cpn * (cs.length - 1) + face - cost, matured: true };
-    let k = 0;
-    while (k + 1 < cs.length && cs[k + 1] <= d) k++;
-    const accr = (cpn * dayDiff(cs[k], d)) / dayDiff(cs[k], cs[k + 1]);
-    const clean = mark != null ? (face * mark) / 100 : cleanCost + ((face - cleanCost) * dayDiff(b.settle, d)) / dayDiff(b.settle, b.maturity);
-    return { value: clean + accr, cost, income: clean + accr - cost + cpn * k, accr, matured: false };
-  }
+  // ---------- Treasuries and time deposits (the valuation rules are in calc.js) ----------
+  const { coupons, bondAt, fixedStart } = LedgerCalc;
   function bondYield(b) {
     const face = b.face, f = b.freq || 2, cpn = (face * b.coupon) / 100 / f, cs = coupons(b), dirty = (face * b.price) / 100 + (b.accruedPaid || 0);
     const frac = dayDiff(b.settle, cs[1]) / dayDiff(cs[0], cs[1]);
@@ -1055,21 +1029,12 @@ TAL|好未来|TAL Education
     for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (pv(m) > dirty) lo = m; else hi = m; }
     return (lo + hi) / 2;
   }
-  // Time deposit: the maturity interest spread evenly over the days of the term.
-  function depositAt(t, d) {
-    if (d < t.start) return null;
-    if (d >= t.maturity) return { value: 0, cost: 0, income: t.interest, matured: true };
-    const income = (t.interest * dayDiff(t.start, d)) / dayDiff(t.start, t.maturity);
-    return { value: t.principal + income, cost: t.principal, income, matured: false };
-  }
-  const markOn = (f, d) => (f.kind === "bond" && Number(f.markPrice) > 0 && f.markDate && d >= f.markDate ? Number(f.markPrice) : null);
   function fixedAt(f, d) {
-    const r = f.kind === "bond" ? bondAt(f, d, markOn(f, d)) : depositAt(f, d);
+    const r = LedgerCalc.fixedOn(f, d);
     if (!r) return null;
     const c = f.currency || "USD";
     return { value: toUSD(r.value, c), cost: toUSD(r.cost, c), income: toUSD(r.income, c), raw: r };
   }
-  const fixedStart = (f) => (f.kind === "bond" ? f.settle : f.start);
   const fixedTotal = (f) => (f.kind === "bond" ? bondAt(f, f.maturity, null).income : f.interest);
   function fixedNow() {
     const d = todayUS();

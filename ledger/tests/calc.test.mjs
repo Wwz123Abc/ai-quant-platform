@@ -151,3 +151,44 @@ test("factor after a date and split-adjusted bars", () => {
   assert.equal(adj[1], bars[1]); // after the split: untouched
   assert.equal(C.splitAdjust(bars, []), bars);
 });
+
+test("month arithmetic keeps month ends, as Treasury coupon dates do", () => {
+  assert.equal(C.addMonths("2029-06-30", -6), "2028-12-31");
+  assert.equal(C.addMonths("2028-02-29", -6), "2027-08-31");
+  assert.equal(C.addMonths("2026-05-15", 6), "2026-11-15");
+  assert.equal(C.dayDiff("2026-06-30", "2026-12-31"), 184);
+});
+
+test("Treasury held to maturity: accrued coupon plus a clean price pulled to par; nothing after maturity", () => {
+  const b = { kind: "bond", face: 1000, price: 98, coupon: 4, freq: 2, settle: "2026-01-01", maturity: "2027-01-01", accruedPaid: 0 };
+  assert.equal(C.fixedOn(b, "2025-12-31"), null);
+  const mid = C.fixedOn(b, "2026-07-01"); // a coupon date: nothing accrued yet, the clean price halfway to par
+  near(mid.accr, 0);
+  near(mid.value, 980 + (20 * 181) / 365);
+  assert.deepEqual(C.fixedOn(b, "2027-01-01").matured, true);
+  near(C.fixedOn({ ...b, markPrice: 99, markDate: "2026-07-01" }, "2026-07-01").value, 990); // the reference price replaces the clean part
+});
+
+// The rules the quant platform must apply alike (quantlab/tests/test_contract.py reads the same file).
+const contract = JSON.parse(readFileSync(new URL("./fixtures/contract.json", import.meta.url), "utf8"));
+
+test("contract: holdings", () => {
+  for (const c of contract.holdings) {
+    const h = C.holdings(c.records);
+    for (const [sym, want] of Object.entries(c.holdings)) {
+      near(h[sym].shares, want.shares);
+      near(h[sym].cost, want.cost);
+    }
+  }
+});
+
+test("contract: Treasuries and deposits", () => {
+  for (const c of contract.fixed) {
+    c.dates.forEach((d, i) => {
+      const got = C.fixedOn(c.item, d), want = c.expected[i];
+      if (want === null) return assert.equal(got, null, c.name + " " + d);
+      near(got.value, want.value);
+      assert.equal(got.matured, want.matured, c.name + " " + d);
+    });
+  }
+});
