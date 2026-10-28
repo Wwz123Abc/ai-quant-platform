@@ -129,12 +129,14 @@ def adjust(raw, factors):
 SPLIT_RATIOS = (1.5, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30)
 
 
-def missed_splits(bars, factors, tolerance=0.03):
+def missed_splits(bars, factors, tolerance=0.03, window=20):
     """Splits the factor list does not record: a day whose close and opening gap both moved by the same
-    common split ratio (a 2-for-1 halves both), on a day with no recorded event. Returns [(date, ratio)], where
-    ratio > 1 is a split and < 1 a reverse split."""
+    common split ratio (a 2-for-1 halves both), on a day with no recorded event, and whose volume moved the way
+    the share count did. News can move a price by a split-like ratio too, but then trading swells: NBIS opened
+    52% higher on 2025-09-09 on nine times its usual volume, which is no 1-for-1.5 reverse split. Returns
+    [(date, ratio)], where ratio > 1 is a split and < 1 a reverse split."""
     recorded = {e[0] for e in factors}
-    close, open_ = bars["close"].to_numpy(), bars["open"].to_numpy()
+    close, open_, volume = bars["close"].to_numpy(), bars["open"].to_numpy(), bars["volume"].to_numpy()
     found = []
     for i in range(1, len(bars)):
         day = bars.index[i]
@@ -143,9 +145,19 @@ def missed_splits(bars, factors, tolerance=0.03):
         move, gap = close[i - 1] / close[i], close[i - 1] / open_[i]
         for r in SPLIT_RATIOS:
             for ratio in (r, 1 / r):
-                if abs(move / ratio - 1) < tolerance and abs(gap / ratio - 1) < tolerance:
+                if abs(move / ratio - 1) < tolerance and abs(gap / ratio - 1) < tolerance and _volume_agrees(volume, i, ratio, window):
                     found.append((day, ratio))
     return found
+
+
+def _volume_agrees(volume, i, ratio, window):
+    """Whether the median volume from day i on moved from the one before it toward ratio, the change in the
+    number of shares, rather than staying where it was. Without volume it cannot tell, and the prices decide."""
+    before, after = np.median(volume[max(0, i - window):i]), np.median(volume[i:i + window])
+    if not (before > 0 and after > 0):
+        return True
+    change = np.log(after / before)
+    return abs(change - np.log(ratio)) < abs(change)
 
 
 def fetch(sym):

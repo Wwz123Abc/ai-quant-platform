@@ -29,14 +29,32 @@ def test_no_factors_leaves_prices_alone():
     pd.testing.assert_frame_equal(cn_data.adjust(raw, []), raw)
 
 
+def with_volume(bars, volumes):
+    return bars.assign(volume=[float(v) for v in volumes])
+
+
 def test_missed_split_found_only_when_close_and_gap_agree():
-    bars = raw_bars([1000, 1010, 505, 510], opens=[1000, 1005, 503, 508])
+    bars = with_volume(raw_bars([1000, 1010, 505, 510], opens=[1000, 1005, 503, 508]), [100, 100, 210, 190])
     assert cn_data.missed_splits(bars, []) == [(bars.index[2], 2)]
     crash = raw_bars([1000, 1010, 505, 510], opens=[1000, 1005, 990, 508])  # fell 50% during the day: not a split
     assert cn_data.missed_splits(crash, []) == []
     assert cn_data.missed_splits(bars, [(bars.index[2], 1.0, 0.0)]) == []   # recorded: not "missed"
-    reverse = raw_bars([10, 10, 100, 101], opens=[10, 10, 100, 100])
+    reverse = with_volume(raw_bars([10, 10, 100, 101], opens=[10, 10, 100, 100]), [100, 100, 12, 9])
     assert cn_data.missed_splits(reverse, []) == [(reverse.index[2], pytest.approx(0.1))]
+
+
+def test_news_jump_with_swelling_volume_is_no_split():
+    # NBIS on 2025-09-09: from 64.06 it opened at 97.20 and closed at 95.72, a 1.5 ratio, on nine times the volume
+    jump = with_volume(raw_bars([64, 64.06, 95.72, 96], opens=[64, 64, 97.2, 95]), [100, 100, 950, 300])
+    assert cn_data.missed_splits(jump, []) == []
+    # a 2-for-1 split on which trading barely changed is not confirmed either
+    flat = with_volume(raw_bars([1000, 1010, 505, 510], opens=[1000, 1005, 503, 508]), [100, 100, 110, 100])
+    assert cn_data.missed_splits(flat, []) == []
+
+
+def test_missed_split_without_volume_decided_by_prices():
+    bars = with_volume(raw_bars([1000, 1010, 505, 510], opens=[1000, 1005, 503, 508]), [0, 0, 0, 0])
+    assert cn_data.missed_splits(bars, []) == [(bars.index[2], 2)]
 
 
 def test_source_switch(monkeypatch):
