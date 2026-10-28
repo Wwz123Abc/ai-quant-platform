@@ -17,7 +17,7 @@ export default function Scan() {
     e.preventDefault();
     run.mutate({
       symbol: form.symbol.trim(), fasts: parseInts(form.fasts), slows: parseInts(form.slows), by: form.by,
-      start: form.start || null, split: form.split || null, end: null, cash: 10000, fee: 0, slippage: 5, rf: 0, refresh: false,
+      start: form.start || null, split: form.split || null, end: null, cash: 10000, fee: "trade25", slippage: 5, rf: 0, refresh: false,
     });
   }
 

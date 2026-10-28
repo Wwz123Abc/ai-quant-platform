@@ -8,7 +8,7 @@ import pandas as pd
 
 from . import __version__, logs
 from .config import get_settings
-from .core import data, paper, research, scan
+from .core import data, fees, paper, research, scan
 from .errors import QuantLabError
 
 
@@ -49,7 +49,7 @@ def cmd_backtest(a):
     run = research.backtest_ma(sym, data.load(sym, a.refresh), a.fast, a.slow, a.start, a.end, a.cash, a.fee, a.slippage, a.rf)
     s, b = run.summary, run.benchmark_summary
     print("\n%s  均线 %d/%d  %s → %s（%.1f 年）" % (sym, a.fast, a.slow, s["start"], s["end"], s["years"]))
-    print("初始资金 %s · 每笔手续费 $%g · 滑点 %g bp · 信号按收盘价计算，下一个交易日开盘成交\n" % (money(a.cash), a.fee, a.slippage))
+    print("初始资金 %s · %s · 滑点 %g bp · 信号按收盘价计算，下一个交易日开盘成交\n" % (money(a.cash), fees.describe(a.fee), a.slippage))
     dd = lambda m: "%s（%s → %s）" % (pct(m["mdd"]), m["mdd_peak"], m["mdd_trough"])
     table([("", "均线策略", "买入持有"),
            ("期末资产", money(s["final"]), money(b["final"])),
@@ -61,7 +61,9 @@ def cmd_backtest(a):
            ("持仓时间占比", "%.0f%%" % (s["exposure"] * 100), "%.0f%%" % (b["exposure"] * 100)),
            ("交易次数", "%d" % s["trades"], "%d" % b["trades"]),
            ("胜率", "—" if pd.isna(s["win_rate"]) else "%.0f%%" % (s["win_rate"] * 100), "—"),
-           ("平均每笔收益", pct(s["avg_trade"]), "—")])
+           ("平均每笔收益", pct(s["avg_trade"]), "—"),
+           ("交易费用", money(s["fees"]), money(b["fees"])),
+           ("扣费前年化", pct(s["gross_cagr"]), pct(b["gross_cagr"]))])
     out, stem = reports_dir(), "%s_ma%d_%d" % (sym, a.fast, a.slow)
     run.strategy.trades.to_csv(out / (stem + "_trades.csv"), index=False, float_format="%.4f")
     print("\n交易明细：%s" % (out / (stem + "_trades.csv")))
@@ -193,6 +195,7 @@ def report_paper(s, new):
                      "持有" if q["held"] else "空仓", "%d" % q["shares"], money(q["value"]), pct(q["return"]), pct(q["benchmark_return"])))
     rows.append(("合计", "", "", "", money(s["value"]), pct(s["return"]), pct(s["benchmark_return"])))
     table(rows)
+    print("收费：%s，至今付出 %s" % (fees.describe(s["fee"]), money(s["fees"])))
     if not s["days"]:
         print("\n还没有成交日：下一个交易日开盘后开始模拟。")
     if s["pending"]:
@@ -629,6 +632,21 @@ def cmd_open(a):
     webbrowser.open(base + "/?token=" + api_token())
 
 
+FEE_HELP = "收费：trade25（汇丰 Trade25，默认）、standard（汇丰标准收费），或每笔固定美元数，如 18"
+
+
+def fee_arg(v):
+    if v in fees.PLANS:
+        return v
+    try:
+        x = float(v)
+    except ValueError:
+        raise argparse.ArgumentTypeError("只能是 trade25、standard 或不小于 0 的数字") from None
+    if x < 0:
+        raise argparse.ArgumentTypeError("手续费不能是负数")
+    return x
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="quantlab", description="AI量化交易分析平台 · 量化分析：回测、参数扫描、每日信号、模拟盘")
     p.add_argument("--version", action="version", version="%(prog)s " + __version__)
@@ -642,7 +660,7 @@ def build_parser():
         sp.add_argument("--start", help="开始日期，如 2015-01-01")
         sp.add_argument("--end", help="结束日期（默认：最近一个交易日）")
         sp.add_argument("--cash", type=float, default=10_000, help="初始资金，美元（默认 10000）")
-        sp.add_argument("--fee", type=float, default=0, help="每笔手续费，美元（默认 0）")
+        sp.add_argument("--fee", type=fee_arg, default="trade25", help=FEE_HELP)
         sp.add_argument("--slippage", type=float, default=5, help="滑点，基点（默认 5，即 0.05%%）")
         sp.add_argument("--rf", type=float, default=0, help="无风险年利率，用于夏普比率，如 0.04（默认 0）")
         sp.add_argument("--refresh", action="store_true", help="忽略缓存，重新下载数据")
@@ -680,7 +698,7 @@ def build_parser():
     pn.add_argument("--every", type=int, default=7, help="AI 账户每隔多少天重新分析一次（默认 7）")
     ma(pn)
     pn.add_argument("--cash", type=float, default=10_000, help="初始资金，美元，平均分给每只股票（默认 10000）")
-    pn.add_argument("--fee", type=float, default=0, help="每笔手续费，美元（默认 0）")
+    pn.add_argument("--fee", type=fee_arg, default="trade25", help=FEE_HELP)
     pn.add_argument("--slippage", type=float, default=5, help="滑点，基点（默认 5）")
     pn.set_defaults(fn=cmd_paper_new)
     pr = psub.add_parser("run", help="记录最新的决定并显示账户（每个交易日收盘后运行）")

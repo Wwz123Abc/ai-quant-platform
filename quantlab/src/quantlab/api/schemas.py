@@ -1,6 +1,6 @@
 """Request and response models. They define the public contract shown in the OpenAPI document."""
 import datetime as dt
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -9,7 +9,8 @@ Symbol = Field(min_length=1, max_length=10, examples=["QQQM"])
 
 class Costs(BaseModel):
     cash: float = Field(10_000, gt=0, le=1e9, description="初始资金（美元）")
-    fee: float = Field(0, ge=0, le=1_000, description="每笔手续费（美元）")
+    fee: Literal["trade25", "standard"] | Annotated[float, Field(ge=0, le=1_000)] = Field(
+        "trade25", description="汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数")
     slippage: float = Field(5, ge=0, le=500, description="滑点（基点）")
 
 
@@ -48,6 +49,8 @@ class Summary(BaseModel):
     trades: int
     win_rate: float | None
     avg_trade: float | None
+    fees: float = Field(description="付出的佣金和 SEC 费合计（美元）")
+    gross_cagr: float | None = Field(None, description="不计佣金和 SEC 费时的年化收益（滑点照算）")
 
 
 class Trade(BaseModel):
@@ -204,8 +207,9 @@ class Account(BaseModel):
     symbols: list[str]
     start: dt.date
     cash: float
-    fee: float
+    fee: str | float
     slippage: float
+    fees: float = Field(description="付出的佣金和 SEC 费合计（美元）")
     value: float
     ret: float = Field(alias="return")
     benchmark_return: float

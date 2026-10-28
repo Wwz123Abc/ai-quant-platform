@@ -2,7 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { type BacktestRequest, type BacktestResponse, post, type Summary } from "../api/client";
 import TimeChart, { type Line, type TradeMark } from "../components/TimeChart";
+import FeeFields from "../components/FeeFields";
 import { ErrorBox, Field, PageHead, Signed, Stat } from "../components/ui";
+import { FEE_NOTE, type FeePlan, feeValue } from "../lib/fees";
 import { drawdown, money, num, pct, pctPlain } from "../lib/format";
 
 const fmtPrice = (v: number) => v.toFixed(2);
@@ -10,7 +12,7 @@ const fmtMoney = (v: number) => money(v);
 const fmtPct = (v: number) => pct(v);
 
 export default function Backtest() {
-  const [form, setForm] = useState({ symbol: "QQQ", fast: "50", slow: "200", start: "2005-01-01", end: "", cash: "10000", fee: "0", slippage: "5" });
+  const [form, setForm] = useState({ symbol: "QQQ", fast: "50", slow: "200", start: "2005-01-01", end: "", cash: "10000", plan: "trade25" as FeePlan, fee: "0", slippage: "5" });
   const run = useMutation({ mutationFn: (req: BacktestRequest) => post<BacktestResponse>("/api/backtests", req) });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 
@@ -19,14 +21,14 @@ export default function Backtest() {
     run.mutate({
       symbol: form.symbol.trim(), fast: Number(form.fast), slow: Number(form.slow),
       start: form.start || null, end: form.end || null,
-      cash: Number(form.cash), fee: Number(form.fee), slippage: Number(form.slippage), rf: 0, refresh: false,
+      cash: Number(form.cash), fee: feeValue(form.plan, form.fee), slippage: Number(form.slippage), rf: 0, refresh: false,
     });
   }
 
   return (
     <>
       <PageHead title="均线回测">
-        短均线在长均线上方时持有，否则空仓。信号按收盘价计算，下一个交易日开盘成交，计入手续费和滑点，并和同期买入持有比较。
+        短均线在长均线上方时持有，否则空仓。信号按收盘价计算，下一个交易日开盘成交，按汇丰的收费和滑点计算，并和同期买入持有比较。
       </PageHead>
       <div className="card">
         <form className="params" onSubmit={submit}>
@@ -36,10 +38,11 @@ export default function Backtest() {
           <Field label="开始日期"><input type="date" value={form.start} onChange={set("start")} /></Field>
           <Field label="结束日期"><input type="date" value={form.end} onChange={set("end")} /></Field>
           <Field label="初始资金（$）"><input type="number" min={1} value={form.cash} onChange={set("cash")} /></Field>
-          <Field label="每笔手续费（$）"><input type="number" min={0} step="any" value={form.fee} onChange={set("fee")} /></Field>
+          <FeeFields plan={form.plan} flat={form.fee} onPlan={set("plan")} onFlat={set("fee")} />
           <Field label="滑点（bp）"><input type="number" min={0} step="any" value={form.slippage} onChange={set("slippage")} /></Field>
           <button className="primary" type="submit" disabled={run.isPending}>{run.isPending ? "回测中…" : "开始回测"}</button>
         </form>
+        <p className="hint">{FEE_NOTE}</p>
         <ErrorBox error={run.error} />
       </div>
       {run.data ? <Result r={run.data} /> : null}
@@ -139,6 +142,8 @@ function Compare({ a, b }: { a: Summary; b: Summary }) {
     ["交易次数", (m) => m.trades],
     ["胜率", (m) => pctPlain(m.win_rate, 0)],
     ["平均每笔收益", (m) => <Signed v={m.avg_trade} />],
+    ["交易费用（佣金和 SEC 费）", (m) => money(m.fees, 2)],
+    ["扣费前年化收益", (m) => <Signed v={m.gross_cagr} />],
   ];
   return (
     <table>

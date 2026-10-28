@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { type Account, type AccountCreate, api, post } from "../api/client";
+import FeeFields from "../components/FeeFields";
 import { ErrorBox, Field, PageHead, Signed } from "../components/ui";
+import { FEE_NOTE, type FeePlan, feeValue } from "../lib/fees";
 import { money } from "../lib/format";
 
 /** "均线 50/200" or "AI 评级 · 每 7 天", for an account's strategy. */
@@ -57,7 +59,7 @@ function CreateAccount() {
   const nav = useNavigate();
   const [form, setForm] = useState({
     name: "", symbols: "QQQM,VOO", strategy: "ma_cross" as "ma_cross" | "ai_rating", fast: "50", slow: "200", every: "7",
-    cash: "10000", fee: "0", slippage: "5",
+    cash: "10000", plan: "trade25" as FeePlan, fee: "0", slippage: "5",
   });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
   const create = useMutation({
@@ -73,7 +75,7 @@ function CreateAccount() {
     create.mutate({
       name: form.name.trim(), symbols: form.symbols.split(/[,，\s]+/).filter(Boolean), strategy: form.strategy,
       fast: Number(form.fast), slow: Number(form.slow), every_days: Number(form.every),
-      cash: Number(form.cash), fee: Number(form.fee), slippage: Number(form.slippage),
+      cash: Number(form.cash), fee: feeValue(form.plan, form.fee), slippage: Number(form.slippage),
     });
   }
 
@@ -102,10 +104,11 @@ function CreateAccount() {
           <Field label="每隔几天分析一次"><input type="number" min={1} max={60} value={form.every} onChange={set("every")} /></Field>
         )}
         <Field label="初始资金（$）"><input type="number" min={1} value={form.cash} onChange={set("cash")} /></Field>
-        <Field label="每笔手续费（$）"><input type="number" min={0} step="any" value={form.fee} onChange={set("fee")} /></Field>
+        <FeeFields plan={form.plan} flat={form.fee} onPlan={set("plan")} onFlat={set("fee")} />
         <Field label="滑点（bp）"><input type="number" min={0} step="any" value={form.slippage} onChange={set("slippage")} /></Field>
         <button className="primary" type="submit" disabled={create.isPending}>{create.isPending ? "创建中…" : "创建"}</button>
       </form>
+      <p className="hint">{FEE_NOTE}</p>
       <ErrorBox error={create.error} />
     </div>
   );

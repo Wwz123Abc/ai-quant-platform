@@ -12,13 +12,15 @@ import pandas as pd
 from .. import storage
 from ..config import get_settings
 from ..errors import Conflict, InvalidInput, NotFound
-from . import backtest, data, strategy
+from . import backtest, data, fees, strategy
 
 MIGRATIONS = [
     """CREATE TABLE IF NOT EXISTS accounts (name TEXT PRIMARY KEY, strategy TEXT, params TEXT, symbols TEXT,
                                             cash REAL, fee REAL, slippage REAL, start TEXT, created TEXT);
        CREATE TABLE IF NOT EXISTS signals (account TEXT, symbol TEXT, date TEXT, target INTEGER, detail TEXT,
                                            recorded TEXT, PRIMARY KEY (account, symbol, date))""",
+    # accounts that paid nothing per order now pay HSBC Trade25 rates; past fills are recomputed from the decisions
+    "UPDATE accounts SET fee = 'trade25' WHERE fee = 0",
 ]
 NAME_RE = re.compile(r"^[\w\-]{1,40}$")  # letters (any script), digits, _ and -
 
@@ -94,7 +96,7 @@ def get_account(con, name):
     raise NotFound("没有叫 %s 的模拟账户" % name)
 
 
-def create(con, name, symbols, params, cash=10_000.0, fee=0.0, slippage=5.0, kind="ma_cross", load=None, now=None):
+def create(con, name, symbols, params, cash=10_000.0, fee="trade25", slippage=5.0, kind="ma_cross", load=None, now=None):
     """A new account. Its first decisions are taken at the latest close already available, and trading starts at
     the next open, so nothing before the account existed is ever traded."""
     load = load or data.load
@@ -106,7 +108,7 @@ def create(con, name, symbols, params, cash=10_000.0, fee=0.0, slippage=5.0, kin
         raise InvalidInput("短均线天数要小于长均线天数")
     if kind == "ai_rating" and not 1 <= params.get("every_days", 0) <= 60:
         raise InvalidInput("AI 分析间隔要在 1 到 60 天之间")
-    if not cash > 0 or fee < 0 or slippage < 0:
+    if not cash > 0 or (fee not in fees.PLANS if isinstance(fee, str) else fee < 0) or slippage < 0:
         raise InvalidInput("初始资金要大于 0，手续费和滑点不能是负数")
     if con.execute("SELECT 1 FROM accounts WHERE name = ?", (name,)).fetchone():
         raise Conflict("已经有一个叫 %s 的模拟账户" % name)
@@ -233,6 +235,7 @@ def summarize(acct, rep):
     return {
         "name": acct["name"], "strategy": acct["strategy"], "params": acct["params"], "symbols": acct["symbols"],
         "start": acct["start"], "cash": acct["cash"], "fee": acct["fee"], "slippage": acct["slippage"],
+        "fees": sum(r["result"].fees for r in rep.values() if r["result"]),
         "value": total, "return": total / acct["cash"] - 1, "benchmark_return": bench_total / acct["cash"] - 1,
         "days": len(equity), "positions": positions, "pending": pending,
         "fills": sorted(fills, key=lambda f: f["date"], reverse=True), "equity": equity,

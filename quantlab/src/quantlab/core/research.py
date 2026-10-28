@@ -19,10 +19,11 @@ class BacktestRun:
     benchmark_summary: dict
 
 
-def backtest_ma(symbol, bars, fast=50, slow=200, start=None, end=None, cash=10_000.0, fee=0.0, slippage_bps=5.0, rf=0.0):
+def backtest_ma(symbol, bars, fast=50, slow=200, start=None, end=None, cash=10_000.0, fee="trade25", slippage_bps=5.0, rf=0.0):
     """Moving-average crossover against buy and hold over the same days.
 
-    The window starts on the first day the slow average exists, or on start if that is later."""
+    The window starts on the first day the slow average exists, or on start if that is later. Each summary also
+    gives gross_cagr, the annual return with the same slippage but no commission or SEC fee."""
     sig = strategy.ma_cross(bars["close"], fast, slow)
     first = sig["slow"].first_valid_index()
     if first is None:
@@ -33,7 +34,11 @@ def backtest_ma(symbol, bars, fast=50, slow=200, start=None, end=None, cash=10_0
         raise InvalidInput("这个时间段内没有足够的数据")
     kw = dict(cash=cash, fee=fee, slippage_bps=slippage_bps)
     strat, bench = backtest.run(window, sig["target"], **kw), backtest.buy_and_hold(window, **kw)
-    return BacktestRun(symbol, fast, slow, sig, strat, bench, metrics.summary(strat, rf), metrics.summary(bench, rf))
+    a, b = metrics.summary(strat, rf), metrics.summary(bench, rf)
+    gross = dict(kw, fee=0.0)
+    a["gross_cagr"] = metrics.summary(backtest.run(window, sig["target"], **gross), rf)["cagr"]
+    b["gross_cagr"] = metrics.summary(backtest.buy_and_hold(window, **gross), rf)["cagr"]
+    return BacktestRun(symbol, fast, slow, sig, strat, bench, a, b)
 
 
 @dataclass
@@ -54,7 +59,7 @@ class ScanRun:
 
 
 def scan_ma(symbol, bars, fasts=scan.FAST, slows=scan.SLOW, split=None, start=None, end=None, by="sharpe",
-            cash=10_000.0, fee=0.0, slippage_bps=5.0, rf=0.0):
+            cash=10_000.0, fee="trade25", slippage_bps=5.0, rf=0.0):
     """Every (fast, slow) pair ranked on the in-sample period, with its out-of-sample result."""
     if by not in ("sharpe", "cagr"):
         raise InvalidInput("排名指标只能是 sharpe 或 cagr")

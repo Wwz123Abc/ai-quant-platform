@@ -11,7 +11,7 @@ def max_drawdown(equity):
 
 
 def summary(res, rf=0.0):
-    """Total and annualized return, volatility, Sharpe ratio, drawdown, time in market and trade stats.
+    """Total and annualized return, volatility, Sharpe ratio, drawdown, time in market, trade stats and fees paid.
 
     rf is the annual risk-free rate used for the Sharpe ratio."""
     eq = res.equity
@@ -32,4 +32,5 @@ def summary(res, rf=0.0):
         "trades": len(res.trades),
         "win_rate": (closed["pnl"] > 0).mean() if len(closed) else float("nan"),
         "avg_trade": closed["return"].mean() if len(closed) else float("nan"),
+        "fees": res.fees,
     }

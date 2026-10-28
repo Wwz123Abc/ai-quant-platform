@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from . import fees
+
 
 @dataclass
 class Result:
@@ -11,6 +13,7 @@ class Result:
     in_market: pd.Series   # 1 on days a position was held at the close
     trades: pd.DataFrame   # one row per round trip; the last may still be open
     cash: float            # starting cash
+    fees: float = 0.0      # commissions and SEC fees paid
 
 
 def run(bars, target, cash=10_000.0, fee=0.0, slippage_bps=5.0):
@@ -18,23 +21,31 @@ def run(bars, target, cash=10_000.0, fee=0.0, slippage_bps=5.0):
 
     target[t] is decided on day t's close and traded at day t+1's open, so no day trades on prices it could not
     have seen. target may start before bars (indicator warm-up), so the first day acts on the day before it.
-    Buys pay the open plus slippage, sells get the open minus slippage, and each order costs fee dollars."""
+    Buys pay the open plus slippage, sells get the open minus slippage. fee is dollars per order or an HSBC plan
+    (see fees.py); an open position is valued at the close without the cost of selling it."""
     want = target.shift(1).reindex(bars.index).fillna(0).to_numpy()
     opens, closes, dates = bars["open"].to_numpy(), bars["close"].to_numpy(), bars.index
     slip = slippage_bps / 10_000
-    start, shares, entry = cash, 0, None
+    costs = fees.Schedule(fee)
+    start, shares, entry, paid = cash, 0, None, 0.0
     equity, held, trades = [], [], []
     for i in range(len(dates)):  # plain arrays: a parameter scan runs this loop many times
         if want[i] == 1 and shares == 0:
             px = opens[i] * (1 + slip)
-            n = math.floor((cash - fee) / px)
+            n = math.floor(cash / px)
+            while n > 0 and n * px + costs.quote(dates[i], n, n * px, False) > cash:
+                n -= 1
             if n > 0:
-                cash -= n * px + fee
-                shares, entry = n, (dates[i], px, n * px + fee)
+                cost = costs.charge(dates[i], n, n * px, False)
+                cash -= n * px + cost
+                paid += cost
+                shares, entry = n, (dates[i], px, n * px + cost)
         elif want[i] == 0 and shares > 0:
             px = opens[i] * (1 - slip)
-            cash += shares * px - fee
-            trades.append(_trade(entry, dates[i], px, shares * px - fee, shares, False))
+            cost = costs.charge(dates[i], shares, shares * px, True)
+            cash += shares * px - cost
+            paid += cost
+            trades.append(_trade(entry, dates[i], px, shares * px - cost, shares, False))
             shares, entry = 0, None
         equity.append(cash + shares * closes[i])
         held.append(1 if shares else 0)
@@ -42,7 +53,7 @@ def run(bars, target, cash=10_000.0, fee=0.0, slippage_bps=5.0):
         trades.append(_trade(entry, dates[-1], closes[-1], shares * closes[-1], shares, True))
     cols = ["entry_date", "entry_price", "exit_date", "exit_price", "shares", "pnl", "return", "open"]
     trades = pd.DataFrame(trades, columns=cols).astype({"open": bool})  # bool even with no trades, for filtering
-    return Result(pd.Series(equity, bars.index), pd.Series(held, bars.index), trades, start)
+    return Result(pd.Series(equity, bars.index), pd.Series(held, bars.index), trades, start, paid)
 
 
 def _trade(entry, exit_date, exit_px, proceeds, shares, still_open):

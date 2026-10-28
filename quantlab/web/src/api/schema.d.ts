@@ -511,9 +511,14 @@ export interface components {
             /** Cash */
             cash: number;
             /** Fee */
-            fee: number;
+            fee: string | number;
             /** Slippage */
             slippage: number;
+            /**
+             * Fees
+             * @description 付出的佣金和 SEC 费合计（美元）
+             */
+            fees: number;
             /** Value */
             value: number;
             /** Return */
@@ -540,10 +545,10 @@ export interface components {
             cash: number;
             /**
              * Fee
-             * @description 每笔手续费（美元）
-             * @default 0
+             * @description 汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数
+             * @default trade25
              */
-            fee: number;
+            fee: ("trade25" | "standard") | number;
             /**
              * Slippage
              * @description 滑点（基点）
@@ -748,10 +753,10 @@ export interface components {
             cash: number;
             /**
              * Fee
-             * @description 每笔手续费（美元）
-             * @default 0
+             * @description 汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数
+             * @default trade25
              */
-            fee: number;
+            fee: ("trade25" | "standard") | number;
             /**
              * Slippage
              * @description 滑点（基点）
@@ -1258,10 +1263,10 @@ export interface components {
             cash: number;
             /**
              * Fee
-             * @description 每笔手续费（美元）
-             * @default 0
+             * @description 汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数
+             * @default trade25
              */
-            fee: number;
+            fee: ("trade25" | "standard") | number;
             /**
              * Slippage
              * @description 滑点（基点）
@@ -1564,6 +1569,16 @@ export interface components {
             win_rate: number | null;
             /** Avg Trade */
             avg_trade: number | null;
+            /**
+             * Fees
+             * @description 付出的佣金和 SEC 费合计（美元）
+             */
+            fees: number;
+            /**
+             * Gross Cagr
+             * @description 不计佣金和 SEC 费时的年化收益（滑点照算）
+             */
+            gross_cagr?: number | null;
         };
         /** Technical */
         Technical: {

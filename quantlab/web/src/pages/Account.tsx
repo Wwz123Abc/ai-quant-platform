@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { type Account as AccountT, api, post, type RecordResult } from "../api/client";
 import TimeChart, { type Line } from "../components/TimeChart";
 import { ErrorBox, PageHead, Signed, Stat } from "../components/ui";
+import { feeLabel } from "../lib/fees";
 import { money } from "../lib/format";
 import { describe } from "./Paper";
 
@@ -54,6 +55,7 @@ export default function Account() {
           <Stat k="当前资产" v={money(a.value)} s={`已运行 ${a.days} 个交易日`} />
           <Stat k="收益" v={<Signed v={a.return} />} />
           <Stat k="同期买入持有" v={<Signed v={a.benchmark_return} />} />
+          <Stat k="交易费用" v={money(a.fees, 2)} s={feeLabel(a.fee)} />
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
           <button className="primary" onClick={() => record.mutate()} disabled={record.isPending}>

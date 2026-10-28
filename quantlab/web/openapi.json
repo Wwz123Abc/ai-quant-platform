@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.10.3"
+    "version": "0.10.5"
   },
   "paths": {
     "/api/health": {
@@ -2055,12 +2055,24 @@
             "title": "Cash"
           },
           "fee": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
             "title": "Fee"
           },
           "slippage": {
             "type": "number",
             "title": "Slippage"
+          },
+          "fees": {
+            "type": "number",
+            "title": "Fees",
+            "description": "付出的佣金和 SEC 费合计（美元）"
           },
           "value": {
             "type": "number",
@@ -2120,6 +2132,7 @@
           "cash",
           "fee",
           "slippage",
+          "fees",
           "value",
           "return",
           "benchmark_return",
@@ -2141,12 +2154,23 @@
             "default": 10000
           },
           "fee": {
-            "type": "number",
-            "maximum": 1000.0,
-            "minimum": 0.0,
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "trade25",
+                  "standard"
+                ]
+              },
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              }
+            ],
             "title": "Fee",
-            "description": "每笔手续费（美元）",
-            "default": 0
+            "description": "汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数",
+            "default": "trade25"
           },
           "slippage": {
             "type": "number",
@@ -2682,12 +2706,23 @@
             "default": 10000
           },
           "fee": {
-            "type": "number",
-            "maximum": 1000.0,
-            "minimum": 0.0,
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "trade25",
+                  "standard"
+                ]
+              },
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              }
+            ],
             "title": "Fee",
-            "description": "每笔手续费（美元）",
-            "default": 0
+            "description": "汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数",
+            "default": "trade25"
           },
           "slippage": {
             "type": "number",
@@ -4039,12 +4074,23 @@
             "default": 10000
           },
           "fee": {
-            "type": "number",
-            "maximum": 1000.0,
-            "minimum": 0.0,
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "trade25",
+                  "standard"
+                ]
+              },
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "minimum": 0.0
+              }
+            ],
             "title": "Fee",
-            "description": "每笔手续费（美元）",
-            "default": 0
+            "description": "汇丰收费方式：trade25（月成交不超过 25 万港元免佣金）、standard（每笔 18 美元起），或每笔固定美元数",
+            "default": "trade25"
           },
           "slippage": {
             "type": "number",
@@ -4863,6 +4909,23 @@
               }
             ],
             "title": "Avg Trade"
+          },
+          "fees": {
+            "type": "number",
+            "title": "Fees",
+            "description": "付出的佣金和 SEC 费合计（美元）"
+          },
+          "gross_cagr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Cagr",
+            "description": "不计佣金和 SEC 费时的年化收益（滑点照算）"
           }
         },
         "type": "object",
@@ -4881,7 +4944,8 @@
           "exposure",
           "trades",
           "win_rate",
-          "avg_trade"
+          "avg_trade",
+          "fees"
         ],
         "title": "Summary"
       },
