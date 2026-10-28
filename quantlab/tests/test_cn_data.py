@@ -68,3 +68,22 @@ def test_source_switch(monkeypatch):
     assert data.fetch("MCD") == "cn:MCD"
     with pytest.raises(NotFound):
         data.fetch("700")
+
+
+def test_bars_before_a_halt_of_over_a_year_are_left_out():
+    # QQQM at Tencent: 15 bars of 2012 from an earlier security, then QQQM itself from 2020-10-13
+    old = pd.bdate_range("2012-07-25", periods=15)
+    new = pd.bdate_range("2020-10-13", periods=5)
+    raw = pd.DataFrame({"close": range(20)}, index=old.append(new), dtype=float)
+    assert list(cn_data.after_long_halt(raw).index) == list(new)
+    assert len(cn_data.after_long_halt(raw.iloc[15:])) == 5        # no long pause: nothing left out
+    month = raw.iloc[15:].copy()
+    month.index = pd.DatetimeIndex(["2020-10-13", "2020-10-14", "2020-12-01", "2020-12-02", "2020-12-03"])
+    assert len(cn_data.after_long_halt(month)) == 5                 # a seven-week halt is not long enough
+
+
+def test_is_etf_reads_the_quote_type(monkeypatch):
+    fields = ["200"] * 73
+    fields[56] = "GP-ETF"
+    monkeypatch.setattr(cn_data, "tencent_quote", lambda s: fields if s == "QQQM" else fields[:56] + ["GP"] + fields[57:])
+    assert cn_data.is_etf("QQQM") and not cn_data.is_etf("AAPL")

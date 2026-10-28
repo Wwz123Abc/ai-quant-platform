@@ -97,7 +97,7 @@ def run_backtest(req: s.BacktestRequest):
         "summary": summary(run.summary), "benchmark": summary(run.benchmark_summary),
         "series": {"dates": [d.date() for d in idx], "close": nums(sig["close"]), "fast": nums(sig["fast"]),
                    "slow": nums(sig["slow"]), "equity": nums(run.strategy.equity), "benchmark": nums(run.benchmark.equity)},
-        "trades": trades(run.strategy.trades),
+        "trades": trades(run.strategy.trades), "note": run.note,
     }
 
 

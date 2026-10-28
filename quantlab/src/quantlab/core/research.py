@@ -17,6 +17,7 @@ class BacktestRun:
     benchmark: backtest.Result
     summary: dict
     benchmark_summary: dict
+    note: str | None = None        # why the test starts later than asked
 
 
 def backtest_ma(symbol, bars, fast=50, slow=200, start=None, end=None, cash=10_000.0, fee="trade25", slippage_bps=5.0, rf=0.0):
@@ -29,6 +30,10 @@ def backtest_ma(symbol, bars, fast=50, slow=200, start=None, end=None, cash=10_0
     if first is None:
         raise InvalidInput("%s 只有 %d 个交易日的数据，不够算 %d 日均线" % (symbol, len(bars), slow))
     lo = max(first, pd.Timestamp(start)) if start else first
+    note = None
+    if not start or pd.Timestamp(start) < first:
+        why = "%s 的数据从 %s 开始，%d 日线要先攒够 %d 个交易日，所以回测从 %s 开始" % (symbol, bars.index[0].date(), slow, slow, first.date())
+        note = ("开始日期 %s 早于能回测的日子：%s。" % (pd.Timestamp(start).date(), why)) if start else why + "。"
     window = bars.loc[lo:end] if end else bars.loc[lo:]
     if len(window) < 2:
         raise InvalidInput("这个时间段内没有足够的数据")
@@ -38,7 +43,7 @@ def backtest_ma(symbol, bars, fast=50, slow=200, start=None, end=None, cash=10_0
     gross = dict(kw, fee=0.0)
     a["gross_cagr"] = metrics.summary(backtest.run(window, sig["target"], **gross), rf)["cagr"]
     b["gross_cagr"] = metrics.summary(backtest.buy_and_hold(window, **gross), rf)["cagr"]
-    return BacktestRun(symbol, fast, slow, sig, strat, bench, a, b)
+    return BacktestRun(symbol, fast, slow, sig, strat, bench, a, b, note)
 
 
 @dataclass

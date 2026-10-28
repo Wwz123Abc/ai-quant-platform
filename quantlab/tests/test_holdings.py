@@ -28,7 +28,7 @@ def bars(level, n=300, seed=0, end="2026-10-16"):
     return pd.DataFrame({"open": c, "high": c, "low": c, "close": c, "volume": 1.0}, index=idx)
 
 
-MARKET = {"AAA": bars(150, seed=1), "BBB": bars(25, seed=2), "CCC": bars(40, seed=3), "QQQ": bars(400, seed=4)}
+MARKET = {"AAA": bars(150, seed=1), "BBB": bars(25, seed=2), "CCC": bars(40, seed=3), "QQQ": bars(400, seed=4), "DDD": bars(700, seed=5)}
 load = lambda s, refresh=False: MARKET[s]
 
 
@@ -152,16 +152,36 @@ def test_analysis_verdict(monkeypatch):
     policy.save({"max_position": 0.3, "cash_reserve": 0.1})
     a = analysis.analyze("ccc", load=load, with_fundamentals=False)
     p = a["portfolio"]
-    # investable 3350: cap room 1005, cash room 1000 - 335 = 665
-    assert a["allowed"] and p["max_buy"] == pytest.approx(665) and "665" in a["verdict"]
+    # investable 3350: cap room 1005, cash room 1000 - 335 = 665, which buys 16 whole shares at 40
+    assert a["allowed"] and p["max_buy"] == pytest.approx(665) and "665" in a["verdict"] and "16 股" in a["verdict"]
+    assert p["max_shares"] == 16 and p["shares"] == 16 and p["amount"] == pytest.approx(640)
     assert set(p["correlations"]) == {"AAA", "BBB"}
     too_much = analysis.analyze("CCC", amount=2000, load=load, with_fundamentals=False)
     assert not too_much["allowed"] and [c["ok"] for c in too_much["checks"]] == [False, False]
     held = analysis.analyze("AAA", load=load, with_fundamentals=False)   # already 67% of the money
-    assert not held["allowed"] and held["portfolio"]["max_buy"] == 0
+    # the rule that blocks the purchase is the one marked as failed (the verdict never contradicts the checks)
+    assert not held["allowed"] and held["portfolio"]["max_buy"] == 0 and [c["ok"] for c in held["checks"]] == [False, True]
+    pricey = analysis.analyze("DDD", load=load, with_fundamentals=False)  # $665 of room, but one share costs 700
+    assert not pricey["allowed"] and pricey["checks"][-1]["rule"] == "整股" and pricey["portfolio"]["max_shares"] == 0
     policy.save({"max_position": 0.3, "cash_reserve": 0.1, "uncapped": ["AAA"]})
     etf = analysis.analyze("AAA", load=load, with_fundamentals=False)    # a broad ETF: only the cash rule applies
     assert etf["allowed"] and etf["portfolio"]["max_buy"] == pytest.approx(665) and "不设上限" in etf["checks"][0]["text"]
+
+
+def test_fundamentals_note(monkeypatch):
+    from quantlab.core import cn_data
+    from quantlab.errors import DataSourceError
+    from quantlab.ml import sec
+
+    monkeypatch.setattr(cn_data, "is_etf", lambda s: s == "QQQM")
+    monkeypatch.setattr(sec, "cik_map", lambda refresh=False: {"AAPL": 320193})
+    assert "ETF 没有公司财报" in signals.fundamentals_note("QQQM")
+    assert "名单里没有 NBIS" in signals.fundamentals_note("NBIS")
+
+    def down(refresh=False):
+        raise DataSourceError("SEC 返回错误 403")
+    monkeypatch.setattr(sec, "cik_map", down)
+    assert "暂时取不到 SEC 数据" in signals.fundamentals_note("AAPL")
 
 
 def test_api(monkeypatch):
@@ -174,6 +194,7 @@ def test_api(monkeypatch):
     monkeypatch.setattr(ledger, "load", lambda refresh=False: {**SNAP, "synced": "2026-10-19T00:00:00+00:00"})
     monkeypatch.setattr(signals, "ai_rating", lambda s: None)
     monkeypatch.setattr(signals, "fundamentals", lambda s, close=None: None)
+    monkeypatch.setattr(signals, "fundamentals_note", lambda s: "ETF 没有公司财报")
     c = TestClient(create_app())
     auth = {"Authorization": "Bearer test-token"}
     assert c.get("/api/holdings/review", headers=auth).status_code == 404
@@ -185,4 +206,6 @@ def test_api(monkeypatch):
     assert c.post("/api/holdings/proposals/%d/reject" % pid, json={"note": "不想卖"}, headers=auth).json()["status"] == "rejected"
     a = c.get("/api/analyze/CCC?amount=100", headers=auth)
     assert a.status_code == 200, a.text
-    assert a.json()["portfolio"]["amount"] == 100 and a.json()["technical"]["symbol"] == "CCC"
+    j = a.json()
+    assert j["portfolio"]["shares"] == 2 and j["portfolio"]["amount"] == 80 and j["technical"]["symbol"] == "CCC"   # $100 buys 2 whole shares
+    assert j["fundamentals"] is None and j["fundamentals_note"] == "ETF 没有公司财报"

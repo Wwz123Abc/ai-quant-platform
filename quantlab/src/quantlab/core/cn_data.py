@@ -57,6 +57,12 @@ def tencent_code(sym):
     return _codes[sym]
 
 
+def is_etf(sym):
+    """Whether Tencent lists sym as an exchange-traded fund (field 56 is "GP-ETF"; a company's share is "GP")."""
+    fields = tencent_quote(sym)
+    return len(fields) > 56 and "ETF" in fields[56].upper()
+
+
 def tencent_bars(sym, pause=0.1):
     """Unadjusted daily bars (open, high, low, close, volume) from 2007 to today."""
     code = tencent_code(sym)
@@ -160,11 +166,26 @@ def _volume_agrees(volume, i, ratio, window):
     return abs(change - np.log(ratio)) < abs(change)
 
 
+def after_long_halt(raw, days=365):
+    """The bars from the end of the last pause in trading longer than days, or all of them.
+
+    Before such a pause the ticker may have been another security (Tencent's QQQM starts with 15 bars of 2012,
+    eight years before QQQM was launched) or the company another business (NBIS, halted as Yandex from 2022 to
+    2024, sold its Russian business in between); either way the prices do not continue across it."""
+    gaps = np.flatnonzero(np.diff(raw.index.values) > np.timedelta64(days, "D"))
+    return raw.iloc[gaps[-1] + 1:] if len(gaps) else raw
+
+
 def fetch(sym):
     import logging
 
     factors = sina_factors(sym)
-    bars = adjust(tencent_bars(sym), factors)
+    raw = tencent_bars(sym)
+    kept = after_long_halt(raw)
+    if len(kept) < len(raw):
+        logging.getLogger(__name__).warning("%s: no trading for over a year before %s; the %d bars before it are left out",
+                                            sym, kept.index[0].date(), len(raw) - len(kept))
+    bars = adjust(kept, factors)
     for day, ratio in missed_splits(bars, factors):
         logging.getLogger(__name__).warning("%s: split of %g on %s missing from the factor list; adjusting", sym, ratio, day.date())
         before = bars.index < day

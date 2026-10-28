@@ -714,6 +714,11 @@ export interface components {
             symbol: string;
             technical: components["schemas"]["Technical"];
             fundamentals: components["schemas"]["Fundamentals"] | null;
+            /**
+             * Fundamentals Note
+             * @description 没有基本面时的原因
+             */
+            fundamentals_note?: string | null;
             ai: components["schemas"]["AiInfo"] | null;
             model: components["schemas"]["ModelRank"] | null;
             portfolio: components["schemas"]["PortfolioFit"] | null;
@@ -792,6 +797,11 @@ export interface components {
             series: components["schemas"]["BacktestSeries"];
             /** Trades */
             trades: components["schemas"]["Trade"][];
+            /**
+             * Note
+             * @description 回测比要求的开始日期晚开始时的原因
+             */
+            note?: string | null;
         };
         /**
          * BacktestSeries
@@ -1111,10 +1121,43 @@ export interface components {
             cash: number;
             /** Held Value */
             held_value: number;
-            /** Max Buy */
+            /**
+             * Current Weight
+             * @description 现在占可投资资金的比例
+             */
+            current_weight: number | null;
+            /**
+             * Max Buy
+             * @description 规则允许的最大金额
+             */
             max_buy: number;
-            /** Amount */
+            /**
+             * Max Shares
+             * @description 最大金额按收盘价能买的股数（规则要求整股时向下取整）
+             */
+            max_shares: number | null;
+            /**
+             * Amount Given
+             * @description 是否填了打算买的金额
+             */
+            amount_given: boolean;
+            /**
+             * Amount
+             * @description 这次判断用的金额；按整股时是整股的花费
+             */
             amount: number;
+            /**
+             * Shares
+             * @description 这次判断用的股数
+             */
+            shares: number | null;
+            /** Whole Shares */
+            whole_shares: boolean;
+            /**
+             * Price
+             * @description 计算股数用的收盘价
+             */
+            price: number | null;
             /** Weight After */
             weight_after: number | null;
             /** Correlations */
@@ -1123,8 +1166,6 @@ export interface components {
             };
             /** Avg Correlation */
             avg_correlation: number | null;
-            /** Shares At Close */
-            shares_at_close: number | null;
         };
         /** Position */
         Position: {

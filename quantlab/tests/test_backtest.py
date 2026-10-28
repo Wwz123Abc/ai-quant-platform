@@ -80,3 +80,15 @@ def test_no_trades():
     assert r.trades.empty and r.trades[r.trades["open"]].empty
     s = metrics.summary(r)
     assert s["trades"] == 0 and s["total"] == 0
+
+
+def test_backtest_explains_a_later_start():
+    from quantlab.core import research
+
+    idx = pd.bdate_range("2011-03-01", periods=300)
+    b = pd.DataFrame({"open": 100.0, "high": 100.0, "low": 100.0, "close": [100.0 + i % 7 for i in range(300)], "volume": 0}, index=idx)
+    asked_early = research.backtest_ma("QQQ", b, 5, 200, start="2005-01-01", fee=0)
+    first = asked_early.summary["start"]
+    assert "开始日期 2005-01-01 早于" in asked_early.note and "QQQ 的数据从 2011-03-01 开始" in asked_early.note and str(first) in asked_early.note
+    assert "所以回测从 %s 开始" % first in research.backtest_ma("QQQ", b, 5, 200, fee=0).note
+    assert research.backtest_ma("QQQ", b, 5, 200, start="2012-01-02", fee=0).note is None

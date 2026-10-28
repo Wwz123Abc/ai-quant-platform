@@ -49,7 +49,8 @@ def cmd_backtest(a):
     run = research.backtest_ma(sym, data.load(sym, a.refresh), a.fast, a.slow, a.start, a.end, a.cash, a.fee, a.slippage, a.rf)
     s, b = run.summary, run.benchmark_summary
     print("\n%s  均线 %d/%d  %s → %s（%.1f 年）" % (sym, a.fast, a.slow, s["start"], s["end"], s["years"]))
-    print("初始资金 %s · %s · 滑点 %g bp · 信号按收盘价计算，下一个交易日开盘成交\n" % (money(a.cash), fees.describe(a.fee), a.slippage))
+    print("初始资金 %s · %s · 滑点 %g bp · 信号按收盘价计算，下一个交易日开盘成交" % (money(a.cash), fees.describe(a.fee), a.slippage))
+    print("%s\n" % (run.note or ""))
     dd = lambda m: "%s（%s → %s）" % (pct(m["mdd"]), m["mdd_peak"], m["mdd_trough"])
     table([("", "均线策略", "买入持有"),
            ("期末资产", money(s["final"]), money(b["final"])),
@@ -474,8 +475,8 @@ def cmd_analyze(a):
             big(f["revenue_ttm"]), big(f["net_income_ttm"]),
             _p(f["op_margin"], 0).lstrip("+"), _p(f["rev_growth"], 0), "%.0f" % f["pe"] if f["pe"] else "—",
             "%.1f" % f["sue"] if f["sue"] is not None else "—"))
-    else:
-        print("  基本面：没有 SEC 数据（非美国公司或已退市）")
+    elif r["fundamentals_note"]:
+        print("  基本面：%s" % r["fundamentals_note"])
     if r["ai"]:
         print("  AI 评级：%s（%s 收盘后，分析 #%d）" % (r["ai"]["rating"], r["ai"]["trade_date"], r["ai"]["id"]))
     if r["model"]:
@@ -483,6 +484,11 @@ def cmd_analyze(a):
     if pf:
         corr = "、".join("%s %.2f" % kv for kv in sorted(pf["correlations"].items(), key=lambda kv: -kv[1]))
         print("  和持仓的相关性：%s" % (corr or "—"))
+        lot = ""
+        if pf["max_buy"] > 0 and pf["max_shares"] is not None:
+            lot = "（按收盘价 %.2f %s）" % (pf["price"], "不到 1 股" if pf["max_shares"] < 1 else "约 %s 股" % (
+                "%d" % pf["max_shares"] if pf["whole_shares"] else "%.2f" % pf["max_shares"]))
+        print("  规则允许最多买 %s%s" % (money(pf["max_buy"]), lot))
         for c in r["checks"]:
             print("  %s %s：%s" % ("✓" if c["ok"] else "✗", c["rule"], c["text"]))
     print("\n%s" % r["verdict"])

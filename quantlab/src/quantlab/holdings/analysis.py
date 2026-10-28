@@ -5,6 +5,7 @@ The verdict comes only from your rules (cap per stock, cash reserve): whether a 
 much. Trend, fundamentals, AI rating and the model's ranking are information for you to weigh; none of them
 is turned into a recommendation to buy or sell."""
 import json
+import math
 
 import pandas as pd
 
@@ -49,6 +50,7 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True):
     load = load or data.load
     tech = signals.technical(sym, load)
     fund = signals.fundamentals(sym, tech.get("close")) if with_fundamentals else None
+    fund_note = signals.fundamentals_note(sym) if with_fundamentals and fund is None else None
     ai = signals.ai_rating(sym)
     pol = policy.load()
     try:
@@ -70,16 +72,32 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True):
         weights = {p["symbol"]: p["weight"] for p in val["positions"] if p["weight"]}
         weight_sum = sum(weights.get(s, 0) for s in corr)
         avg_corr = sum(corr[s] * weights.get(s, 0) for s in corr) / weight_sum if weight_sum > 0 else None  # weighted by holding size
-        amt = float(amount) if amount else max_buy
+        px, whole = tech.get("close"), pol["whole_shares"]
+        count = lambda dollars: (math.floor(dollars / px + 1e-9) if whole else dollars / px) if px else None
+        given = bool(amount)
+        amt = float(amount) if given else max_buy
+        shares = count(amt)
+        if whole and shares is not None:
+            amt = shares * px  # what the whole shares cost at the close
         after = (current + amt) / inv if inv > 0 else None
-        checks.append({"rule": "单只上限", "ok": after is not None and after <= cap + 1e-9,
-                       "text": "买入 $%.0f 后占可投资资金 %.1f%%（%s）" % (amt, (after or 0) * 100, "宽基 ETF，不设上限" if cap >= 1
-                                                                       else "上限 %.0f%%" % (pol["max_position"] * 100))})
-        checks.append({"rule": "现金储备", "ok": amt <= room_cash + 1e-6,
-                       "text": "可用现金（扣除 %.0f%% 储备后）$%.0f" % (pol["cash_reserve"] * 100, room_cash)})
-        portfolio = {"investable": inv, "cash": val["cash"], "held_value": current, "max_buy": max_buy, "amount": amt,
-                     "weight_after": after, "correlations": corr, "avg_correlation": avg_corr,
-                     "shares_at_close": amt / tech["close"] if tech.get("close") else None}
+        uncapped = cap >= 1
+        if given:
+            checks.append({"rule": "单只上限", "ok": after is not None and after <= cap + 1e-9,
+                           "text": "买入后占可投资资金 %.1f%%（%s）" % ((after or 0) * 100, "宽基 ETF，不设上限" if uncapped
+                                                                    else "上限 %.0f%%" % (pol["max_position"] * 100))})
+            checks.append({"rule": "现金储备", "ok": amt <= room_cash + 1e-6,
+                           "text": "要用 $%.0f，可用现金（扣除 %.0f%% 储备后）$%.0f" % (amt, pol["cash_reserve"] * 100, room_cash)})
+        else:
+            checks.append({"rule": "单只上限", "ok": uncapped or room_cap > 0,
+                           "text": "宽基 ETF，不设上限" if uncapped else "现在占 %.1f%%，上限 %.0f%%，还能买 $%.0f" % (
+                               current / inv * 100 if inv > 0 else 0, pol["max_position"] * 100, room_cap)})
+            checks.append({"rule": "现金储备", "ok": room_cash > 0,
+                           "text": "可用现金（扣除 %.0f%% 储备后）$%.0f" % (pol["cash_reserve"] * 100, room_cash)})
+        if whole and shares is not None and shares < 1 and all(c["ok"] for c in checks):
+            checks.append({"rule": "整股", "ok": False, "text": "$%.0f 按收盘价 %.2f 买不到 1 股" % (float(amount) if given else max_buy, px)})
+        portfolio = {"investable": inv, "cash": val["cash"], "held_value": current, "current_weight": current / inv if inv > 0 else None,
+                     "max_buy": max_buy, "max_shares": count(max_buy), "amount_given": given, "amount": amt, "shares": shares,
+                     "whole_shares": whole, "price": px, "weight_after": after, "correlations": corr, "avg_correlation": avg_corr}
     allowed = bool(checks) and all(c["ok"] for c in checks) and (portfolio or {}).get("amount", 0) > 0
     notes = []
     if tech.get("uptrend") is False:
@@ -97,9 +115,16 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True):
         notes.append({"kind": "分散", "text": "和你现有持仓高度相关（平均相关系数 %.2f），分散效果有限" % portfolio["avg_correlation"]})
     if ai:
         notes.append({"kind": "AI", "text": "最近一次 AI 评级 %s（%s 收盘后）" % (ai["rating"], ai["trade_date"])})
-    verdict = ("按你的规则：可以买入，最多约 $%.0f" % portfolio["max_buy"]) if allowed and portfolio else (
-        "按你的规则：现在不能买入（见下面未通过的规则）" if portfolio else "还没有同步持仓，无法按你的规则判断")
-    return {"symbol": sym, "technical": tech, "fundamentals": fund, "ai": ai, "model": model_rank(sym), "portfolio": portfolio,
-            "checks": checks, "allowed": allowed, "verdict": verdict, "notes": notes,
+    if allowed:
+        p = portfolio
+        lot = ("%d 股" % p["shares"] if p["whole_shares"] else "%.2f 股" % p["shares"]) if p["shares"] is not None else ""
+        if p["amount_given"]:
+            verdict = "按你的规则：可以买入 %s（约 $%.0f）" % (lot, p["amount"]) if lot else "按你的规则：可以买入 $%.0f" % p["amount"]
+        else:
+            verdict = "按你的规则：可以买入，最多约 $%.0f" % p["max_buy"] + ("（%s，约 $%.0f）" % (lot, p["amount"]) if lot else "")
+    else:
+        verdict = "按你的规则：现在不能买入（见下面未通过的规则）" if portfolio else "还没有同步持仓，无法按你的规则判断"
+    return {"symbol": sym, "technical": tech, "fundamentals": fund, "fundamentals_note": fund_note, "ai": ai, "model": model_rank(sym),
+            "portfolio": portfolio, "checks": checks, "allowed": allowed, "verdict": verdict, "notes": notes,
             "disclaimer": "结论只来自你设定的规则；其余是供你参考的信息，不是买卖建议。"}
 

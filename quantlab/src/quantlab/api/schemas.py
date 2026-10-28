@@ -82,6 +82,7 @@ class BacktestResponse(BaseModel):
     benchmark: Summary
     series: BacktestSeries
     trades: list[Trade]
+    note: str | None = Field(None, description="回测比要求的开始日期晚开始时的原因")
 
 
 class ScanRequest(Costs, Window):

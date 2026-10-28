@@ -81,6 +81,24 @@ def fundamentals(sym, close=None):
     }
 
 
+def fundamentals_note(sym):
+    """Why fundamentals() found nothing for sym, in words."""
+    from ..core import cn_data
+    from ..ml import sec
+    try:
+        if cn_data.is_etf(sym):
+            return "ETF 没有公司财报：它的涨跌取决于跟踪的指数和里面的股票。"
+    except QuantLabError:
+        pass  # the quote is only a hint; SEC still answers below
+    try:
+        cik = sec.cik_map().get(sym)
+    except QuantLabError as e:
+        return "暂时取不到 SEC 数据：%s" % e
+    if cik is None:
+        return "SEC 的公司名单里没有 %s：不在美国申报财报，或已经退市。" % sym
+    return "SEC 有这家公司，但它的财报里没有算这些指标要用的项目（比如按国际会计准则申报的外国公司）。"
+
+
 def ai_rating(sym):
     """The latest completed AI analysis of sym, or None."""
     from ..ai import ledger

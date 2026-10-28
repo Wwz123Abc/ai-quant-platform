@@ -5,6 +5,22 @@ import { type Analysis, api, type AiRun, post } from "../api/client";
 import { ErrorBox, Field, PageHead, Signed, Stat } from "../components/ui";
 import { big, money, num, pct, pctPlain } from "../lib/format";
 
+type Fit = NonNullable<Analysis["portfolio"]>;
+
+/** "约 6 股（按收盘价 296.96）", whole shares when your rules trade whole shares. */
+function lots(p: Fit, n: number | null): string {
+  if (n == null || p.price == null) return "没有收盘价，算不出股数";
+  if (p.whole_shares && n < 1) return `按收盘价 ${p.price.toFixed(2)} 不到 1 股`;
+  return `约 ${p.whole_shares ? n.toFixed(0) : n.toFixed(2)} 股（按收盘价 ${p.price.toFixed(2)}）`;
+}
+
+/** The weight after the purchase you asked about, after the most the rules allow, or now when nothing can be bought. */
+function AfterBuy({ p }: { p: Fit }) {
+  if (p.amount_given) return <Stat k={`买入 ${money(p.amount)} 后占比`} v={pctPlain(p.weight_after)} s={lots(p, p.shares)} />;
+  if ((p.shares ?? 0) > 0) return <Stat k="买到上限后占比" v={pctPlain(p.weight_after)} s={`${lots(p, p.shares)}，约 ${money(p.amount)}`} />;
+  return <Stat k="现在占比" v={pctPlain(p.current_weight)} s="按你的规则现在不能再买" />;
+}
+
 export default function Analyze() {
   const [symbol, setSymbol] = useState("");
   const [amount, setAmount] = useState("");
@@ -61,7 +77,7 @@ export default function Analyze() {
                   <Stat k="市盈率" v={r.fundamentals.pe ? r.fundamentals.pe.toFixed(0) : "—"} s={`市净率 ${r.fundamentals.pb ? r.fundamentals.pb.toFixed(1) : "—"} · 市值 ${big(r.fundamentals.market_cap)}`} />
                   <Stat k="SUE" v={num(r.fundamentals.sue, 1)} s="最近一季相对去年同季的盈利变化（标准化）" />
                 </div>
-              ) : <p className="empty">没有 SEC 数据（非美国公司或已退市）。</p>}
+              ) : <p className="empty">{r.fundamentals_note ?? "没有基本面数据。"}</p>}
             </div>
           </div>
           <div className="grid-2">
@@ -70,8 +86,9 @@ export default function Analyze() {
               {r.portfolio ? (
                 <>
                   <div className="stats">
-                    <Stat k="规则允许最多买" v={money(r.portfolio.max_buy)} s={`可投资资金 ${money(r.portfolio.investable)}，现金 ${money(r.portfolio.cash)}`} />
-                    <Stat k="按此金额买入后占比" v={pctPlain(r.portfolio.weight_after)} s={`约 ${num(r.portfolio.shares_at_close, 2)} 股（按收盘价）`} />
+                    <Stat k="规则允许最多买" v={money(r.portfolio.max_buy)}
+                      s={`${r.portfolio.max_buy > 0 ? lots(r.portfolio, r.portfolio.max_shares) + " · " : ""}可投资资金 ${money(r.portfolio.investable)}，现金 ${money(r.portfolio.cash)}`} />
+                    <AfterBuy p={r.portfolio} />
                     <Stat k="和持仓的平均相关" v={num(r.portfolio.avg_correlation)} s="按持仓市值加权，越接近 1 分散效果越差" />
                   </div>
                   <table style={{ marginTop: 10 }}>

@@ -136,12 +136,17 @@ class PortfolioFit(BaseModel):
     investable: float
     cash: float
     held_value: float
-    max_buy: float
-    amount: float
+    current_weight: float | None = Field(description="现在占可投资资金的比例")
+    max_buy: float = Field(description="规则允许的最大金额")
+    max_shares: float | None = Field(description="最大金额按收盘价能买的股数（规则要求整股时向下取整）")
+    amount_given: bool = Field(description="是否填了打算买的金额")
+    amount: float = Field(description="这次判断用的金额；按整股时是整股的花费")
+    shares: float | None = Field(description="这次判断用的股数")
+    whole_shares: bool
+    price: float | None = Field(description="计算股数用的收盘价")
     weight_after: float | None
     correlations: dict[str, float]
     avg_correlation: float | None
-    shares_at_close: float | None
 
 
 class Check(BaseModel):
@@ -159,6 +164,7 @@ class Analysis(BaseModel):
     symbol: str
     technical: Technical
     fundamentals: Fundamentals | None
+    fundamentals_note: str | None = Field(None, description="没有基本面时的原因")
     ai: AiInfo | None
     model: ModelRank | None
     portfolio: PortfolioFit | None

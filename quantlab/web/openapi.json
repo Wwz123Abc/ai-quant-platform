@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.10.6"
+    "version": "0.10.7"
   },
   "paths": {
     "/api/health": {
@@ -2585,6 +2585,18 @@
               }
             ]
           },
+          "fundamentals_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fundamentals Note",
+            "description": "没有基本面时的原因"
+          },
           "ai": {
             "anyOf": [
               {
@@ -2791,6 +2803,18 @@
             },
             "type": "array",
             "title": "Trades"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "回测比要求的开始日期晚开始时的原因"
           }
         },
         "type": "object",
@@ -3640,13 +3664,72 @@
             "type": "number",
             "title": "Held Value"
           },
+          "current_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Weight",
+            "description": "现在占可投资资金的比例"
+          },
           "max_buy": {
             "type": "number",
-            "title": "Max Buy"
+            "title": "Max Buy",
+            "description": "规则允许的最大金额"
+          },
+          "max_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Shares",
+            "description": "最大金额按收盘价能买的股数（规则要求整股时向下取整）"
+          },
+          "amount_given": {
+            "type": "boolean",
+            "title": "Amount Given",
+            "description": "是否填了打算买的金额"
           },
           "amount": {
             "type": "number",
-            "title": "Amount"
+            "title": "Amount",
+            "description": "这次判断用的金额；按整股时是整股的花费"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares",
+            "description": "这次判断用的股数"
+          },
+          "whole_shares": {
+            "type": "boolean",
+            "title": "Whole Shares"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price",
+            "description": "计算股数用的收盘价"
           },
           "weight_after": {
             "anyOf": [
@@ -3676,17 +3759,6 @@
               }
             ],
             "title": "Avg Correlation"
-          },
-          "shares_at_close": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shares At Close"
           }
         },
         "type": "object",
@@ -3694,12 +3766,17 @@
           "investable",
           "cash",
           "held_value",
+          "current_weight",
           "max_buy",
+          "max_shares",
+          "amount_given",
           "amount",
+          "shares",
+          "whole_shares",
+          "price",
           "weight_after",
           "correlations",
-          "avg_correlation",
-          "shares_at_close"
+          "avg_correlation"
         ],
         "title": "PortfolioFit"
       },

@@ -7,7 +7,7 @@ import { num, parseInts, pct } from "../lib/format";
 
 export default function Scan() {
   const [form, setForm] = useState({
-    symbol: "QQQ", start: "2005-01-01", split: "2019-01-01", by: "sharpe" as "sharpe" | "cagr",
+    symbol: "QQQ", start: "", split: "2019-01-01", by: "sharpe" as "sharpe" | "cagr",
     fasts: "5,10,15,20,30,40,50,75,100", slows: "50,75,100,125,150,175,200,250,300",
   });
   const run = useMutation({ mutationFn: (req: ScanRequest) => post<ScanResponse>("/api/scans", req) });
@@ -29,7 +29,7 @@ export default function Scan() {
       <div className="card">
         <form className="params" onSubmit={submit}>
           <Field label="代码"><input value={form.symbol} onChange={set("symbol")} required maxLength={10} /></Field>
-          <Field label="开始日期"><input type="date" value={form.start} onChange={set("start")} /></Field>
+          <Field label="开始日期（不填：从最早的数据）"><input type="date" value={form.start} onChange={set("start")} /></Field>
           <Field label="样本外开始日"><input type="date" value={form.split} onChange={set("split")} /></Field>
           <Field label="排名依据">
             <select value={form.by} onChange={set("by")}>

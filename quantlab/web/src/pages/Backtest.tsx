@@ -12,7 +12,7 @@ const fmtMoney = (v: number) => money(v);
 const fmtPct = (v: number) => pct(v);
 
 export default function Backtest() {
-  const [form, setForm] = useState({ symbol: "QQQ", fast: "50", slow: "200", start: "2005-01-01", end: "", cash: "10000", plan: "trade25" as FeePlan, fee: "0", slippage: "5" });
+  const [form, setForm] = useState({ symbol: "QQQ", fast: "50", slow: "200", start: "", end: "", cash: "10000", plan: "trade25" as FeePlan, fee: "0", slippage: "5" });
   const run = useMutation({ mutationFn: (req: BacktestRequest) => post<BacktestResponse>("/api/backtests", req) });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
 
@@ -35,7 +35,7 @@ export default function Backtest() {
           <Field label="代码"><input value={form.symbol} onChange={set("symbol")} required maxLength={10} /></Field>
           <Field label="短均线（天）"><input type="number" min={2} value={form.fast} onChange={set("fast")} /></Field>
           <Field label="长均线（天）"><input type="number" min={3} value={form.slow} onChange={set("slow")} /></Field>
-          <Field label="开始日期"><input type="date" value={form.start} onChange={set("start")} /></Field>
+          <Field label="开始日期（不填：从最早的数据）"><input type="date" value={form.start} onChange={set("start")} /></Field>
           <Field label="结束日期"><input type="date" value={form.end} onChange={set("end")} /></Field>
           <Field label="初始资金（$）"><input type="number" min={1} value={form.cash} onChange={set("cash")} /></Field>
           <FeeFields plan={form.plan} flat={form.fee} onPlan={set("plan")} onFlat={set("fee")} />
@@ -78,6 +78,7 @@ function Result({ r }: { r: BacktestResponse }) {
     <>
       <div className="card">
         <h2>{r.symbol} · 均线 {r.fast}/{r.slow} · {a.start} → {a.end}（{years} 年）</h2>
+        {r.note ? <p className="hint">{r.note}</p> : null}
         <div className="stats">
           <Stat k="均线策略年化" v={<Signed v={a.cagr} />} s={`期末 ${money(a.final)}`} />
           <Stat k="买入持有年化" v={<Signed v={b.cagr} />} s={`期末 ${money(b.final)}`} />
