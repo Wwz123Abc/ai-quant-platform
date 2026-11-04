@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     ai_analysts: list[str] = ["market", "social", "news", "fundamentals"]
     ai_language: str = "Chinese"
     ai_budget_cny: float = 100.0             # hard monthly limit on model spending
+    ai_auto_analysis: bool = True            # the daily job analyses the AI paper account's stocks (costs money); off: manual only
     ai_usd_cny: float = 7.3                  # for showing USD prices in CNY; set it near the current rate
     ai_first_estimate_cny: float = 2.0       # assumed cost of a run until real runs have been measured
     # USD per million tokens: [input from cache, input not from cache, output]. Peak-hour list prices, so the

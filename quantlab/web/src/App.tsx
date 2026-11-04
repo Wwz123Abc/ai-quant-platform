@@ -38,8 +38,7 @@ export default function App() {
         <NavLink to="/analyze">个股分析</NavLink>
         <NavLink to="/ai">AI 研报</NavLink>
         <NavLink to="/chat">问一问</NavLink>
-        <NavLink to="/backtest">均线回测</NavLink>
-        {/* 参数扫描、模拟盘、机器学习选股、自动交易 and the API docs stay reachable by address, off the menu */}
+        {/* 均线回测 (/backtest), 参数扫描、模拟盘、机器学习选股、自动交易 and the API docs stay reachable by address, off the menu */}
         {auth.data?.home_url ? <a href={auth.data.home_url}>← 持仓账本</a> : null}
         <div className="foot">v{auth.data?.version} · 仅用于研究，不构成投资建议</div>
       </nav>

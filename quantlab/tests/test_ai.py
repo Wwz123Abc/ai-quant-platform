@@ -418,3 +418,23 @@ def test_the_summary_conclusion_drops_the_markdown_label():
     text = ("**Rating**: Underweight\n\n**Executive Summary**: 对 QQQM 给出 Underweight：把敞口调降至约 70%，分批、限价、不追跌，"
             "并且这一句要足够长。\n\n**Thesis**: 其他")
     assert personal._conclusion(text).startswith("对 QQQM 给出 Underweight")
+
+
+def test_automatic_analysis_can_be_switched_off(monkeypatch):
+    monkeypatch.setattr(engine, "available", lambda: True)
+    monkeypatch.setattr(engine, "configured", lambda: True)
+    market = bars(300, seed=1)
+    load = lambda sym, refresh=False: market
+    pc, ac = paper.connect(), ledger.connect()
+    paper.create(pc, "AI", ["QQQM"], {"every_days": 5}, kind="ai_rating", load=load)
+    monkeypatch.setenv("QUANTLAB_AI_AUTO_ANALYSIS", "false")
+    get_settings.cache_clear()
+    try:
+        queued, notes = queue_due_analyses(pc, ac, load, NOW)
+        assert queued == [] and "已关闭" in notes[0]
+        assert ledger.runs(ac) == []                                  # nothing was queued, nothing is spent
+    finally:
+        monkeypatch.delenv("QUANTLAB_AI_AUTO_ANALYSIS")
+        get_settings.cache_clear()
+        pc.close()
+        ac.close()

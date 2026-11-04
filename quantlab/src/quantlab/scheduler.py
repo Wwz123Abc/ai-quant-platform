@@ -33,6 +33,8 @@ def is_due(now, last_run, at):
 def queue_due_analyses(paper_con, ai_con, load, now=None):
     """Queues an analysis of each AI account's symbols whose last one is at least every_days before the latest close."""
     queued, notes = [], []
+    if not get_settings().ai_auto_analysis:
+        return queued, ["AI 自动分析已关闭（QUANTLAB_AI_AUTO_ANALYSIS=false），只在你手动提交时分析"]
     if not (engine.available() and engine.configured()):
         return queued, ["AI 没有安装或没有配置密钥，跳过 AI 分析"]
     for acct in paper.accounts(paper_con):
