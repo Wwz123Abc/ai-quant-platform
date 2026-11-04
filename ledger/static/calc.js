@@ -180,7 +180,28 @@
   // money is back in savings.
   const fixedOn = (f, d) => (f.kind === "bond" ? bondAt(f, d, markOn(f, d)) : depositAt(f, d));
 
+  // All held stocks as one: rows are {shares, ccy, price, prev} with price and the previous close in the stock's own currency;
+  // toUSD converts. value is what the stocks are worth at these prices, change what they gained or lost against the previous
+  // closes, pct that change as a share of the previous value. A stock without a price is left out (missing); one without a
+  // previous close counts in the value but not in the change.
+  function portfolioQuote(rows, toUSD) {
+    let value = 0, count = 0, missing = 0, change = 0, base = 0, withPrev = 0;
+    for (const r of rows) {
+      if (!(r.shares > 0)) continue;
+      if (!(r.price > 0)) { missing++; continue; }
+      value += toUSD(r.price * r.shares, r.ccy);
+      count++;
+      if (r.prev > 0) {
+        change += toUSD((r.price - r.prev) * r.shares, r.ccy);
+        base += toUSD(r.prev * r.shares, r.ccy);
+        withPrev++;
+      }
+    }
+    return { value, count, missing, change, pct: base > 0 ? (change / base) * 100 : null, withPrev };
+  }
+
   root.LedgerCalc = {
+    portfolioQuote,
     SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust,
     parseD, fmtD, dayDiff, addMonths, coupons, bondAt, depositAt, markOn, fixedStart, fixedOn,
   };

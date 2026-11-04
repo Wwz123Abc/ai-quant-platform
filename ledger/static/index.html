@@ -230,6 +230,15 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .pnl-mark { font-size: 9px; font-weight: 600; fill: var(--surface); font-family: var(--f-num); }
 .pnl-note { font-size: 10.5px; font-family: var(--f-num); }
 #assetStats, #stkStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.quote { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; gap: 2px; }
+.q-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.q-top b { color: var(--ink); font-weight: 600; font-size: 14px; }
+.q-tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--wash, rgba(0,0,0,.05)); color: var(--muted); }
+.q-tag.live { background: var(--accent-soft, #e2eaf3); color: var(--accent, #2b5784); font-weight: 500; }
+.q-main { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.q-val { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.q-chg { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.quote .hint { margin: 2px 0 0; }
 .pnl-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .pnl-stats div { background: var(--surface); padding: 10px 14px; min-width: 0; }
 .pnl-stats dt { font-size: 12px; color: var(--muted); }
@@ -388,6 +397,12 @@ footer p { margin: 0 0 6px; }
     </div>
     <p class="status" id="status">正在读取记录…</p>
   </header>
+
+  <section class="quote" id="quoteBox" aria-label="我的股票组合行情" hidden>
+    <div class="q-top"><span><b>我的股票组合</b> <span id="qCount"></span></span><span class="q-tag" id="qTag"></span></div>
+    <div class="q-main"><span class="q-val" id="qVal">—</span><span class="q-chg" id="qChg"></span></div>
+    <p class="hint" id="qNote"></p>
+  </section>
 
   <section aria-labelledby="mix-h">
     <div class="head-row">
@@ -696,7 +711,7 @@ footer p { margin: 0 0 6px; }
       if (force || v !== version) { version = v; await Promise.all(subs.map(pull)); }
     } catch (e) { /* the next poll retries */ }
   }
-  setInterval(() => { if (!document.hidden) poll(); }, 30000);
+  setInterval(() => { if (!document.hidden) poll(); }, 15000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   const after = async (p) => { const r = await p; await poll(true); return r; };
   const enc = encodeURIComponent;
@@ -1768,9 +1783,39 @@ TAL|好未来|TAL Education
   let mySyms = [];
   function renderSymList(c) { mySyms = c.syms.map((s) => s.symbol); }
 
+  // Every stock you hold as one: what they are worth together, and how that moved against the previous closes. It follows
+  // the prices in the holdings table, so during a session (the server refreshes them every 30 seconds) it moves with them.
+  function renderQuote(c) {
+    const box = $("#quoteBox");
+    const rows = c.syms.filter((s) => s.shares > 0).map((s) => {
+      const qt = state.quotes[s.symbol];
+      return { symbol: s.symbol, shares: s.shares, ccy: s.ccy, price: Number(state.prices[s.symbol]) || 0,
+        prev: prevClose(s.symbol, qt && qt.date ? qt.date : todayUS()), kind: qt && qt.kind, date: qt && qt.date };
+    });
+    const q = LedgerCalc.portfolioQuote(rows, toUSD);
+    box.hidden = !q.count;
+    if (!q.count) return;
+    const priced = rows.filter((r) => r.price > 0), live = priced.some((r) => r.kind === "live" || r.kind === "open");
+    const date = priced.map((r) => r.date || "").sort().pop();
+    $("#qCount").textContent = "· " + q.count + " 只";
+    const tag = $("#qTag");
+    tag.className = "q-tag" + (live ? " live" : "");
+    tag.textContent = live ? "盘中 · 自动更新" : date ? md(date) + " 收盘" : "";
+    $("#qVal").textContent = money(q.value);
+    const chg = $("#qChg");
+    chg.className = "q-chg " + tone(q.change);
+    chg.textContent = q.withPrev ? signed(q.change) + (q.pct != null ? "  " + pct(q.pct) : "") : "";
+    const when = state.updatedAt ? new Date(state.updatedAt) : null;
+    const notes = [live ? "较上一收盘" : "当日涨跌", when && !isNaN(when) ? "更新于 " + when.toLocaleTimeString("zh-CN", { hour12: false }) : ""];
+    if (q.missing) notes.push(q.missing + " 只没有价格，未计入");
+    if (q.withPrev < q.count) notes.push((q.count - q.withPrev) + " 只缺上一收盘价，涨跌未含");
+    $("#qNote").textContent = notes.filter(Boolean).join(" · ");
+  }
+
   function render() {
     const list = sortedTrades();
     const c = compute(list);
+    renderQuote(c);
     renderMix(c);
     renderStocks(c);
     renderPnl(list);

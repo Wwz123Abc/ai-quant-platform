@@ -192,3 +192,24 @@ test("contract: Treasuries and deposits", () => {
     });
   }
 });
+
+test("all held stocks as one: value, change against the previous closes, and what it leaves out", () => {
+  const toUSD = (n, ccy) => (ccy === "HKD" ? n / 8 : n);
+  const q = C.portfolioQuote([
+    { shares: 2, ccy: "USD", price: 110, prev: 100 },        // +20 on 200
+    { shares: 10, ccy: "USD", price: 50, prev: 52 },         // -20 on 520
+    { shares: 100, ccy: "HKD", price: 80, prev: 80 },        // 1000 USD, flat
+    { shares: 5, ccy: "USD", price: 30, prev: 0 },           // no previous close: in the value, not in the change
+    { shares: 3, ccy: "USD", price: 0, prev: 10 },           // no price: left out
+    { shares: 0, ccy: "USD", price: 99, prev: 98 },          // sold out: ignored
+  ], toUSD);
+  near(q.value, 220 + 500 + 1000 + 150);
+  near(q.change, 0);
+  near(q.pct, 0);
+  assert.deepEqual([q.count, q.missing, q.withPrev], [4, 1, 3]);
+  const up = C.portfolioQuote([{ shares: 10, ccy: "USD", price: 102, prev: 100 }], toUSD);
+  near(up.change, 20);
+  near(up.pct, 2);
+  assert.equal(C.portfolioQuote([], toUSD).pct, null);
+  assert.equal(C.portfolioQuote([{ shares: 1, ccy: "USD", price: 10, prev: 0 }], toUSD).pct, null);
+});
