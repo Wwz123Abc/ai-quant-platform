@@ -244,7 +244,8 @@ def run(refresh=True, load=None, with_fundamentals=True, check=True):
             rid = con.execute("INSERT INTO reviews (at, synced, data) VALUES (?, ?, ?)",
                               (review["at"], review["synced"], json.dumps(review, ensure_ascii=False, default=str))).lastrowid
             for o in props:
-                con.execute("INSERT INTO proposals (review_id, symbol, side, shares, price, value, reason, basis, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
+                con.execute("INSERT INTO proposals (review_id, symbol, side, shares, price, value, reason, basis, status) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
                             (rid, o["symbol"], o["side"], o["shares"], o["price"], o["value"], o["reason"], o["basis"]))
         return latest(con)
     finally:

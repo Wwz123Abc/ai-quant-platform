@@ -387,6 +387,7 @@ def test_figures_missing_from_the_fetched_data_are_marked():
 
 def test_personal_summary_has_rating_conclusion_and_levels_from_our_data():
     import pandas as pd
+
     from quantlab.ai import personal
     close = pd.Series([100.0 + i * 0.1 for i in range(300)], index=pd.bdate_range(end="2026-10-16", periods=300))
     lv = personal.levels(close)
