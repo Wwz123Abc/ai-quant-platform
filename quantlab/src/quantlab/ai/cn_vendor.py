@@ -14,6 +14,8 @@ QuantLab's own data; DATA_VENDORS and TOOL_VENDORS select it in the config. Trad
 
 QuantLab analyses only the latest close, so the profile and fundamentals are today's; prices are cut at the
 analysis date like TradingAgents' own loader does."""
+import contextlib
+import functools
 import logging
 import os
 import threading
@@ -161,6 +163,32 @@ def _unreachable(what):
     return call
 
 
+_sink = None
+
+
+@contextlib.contextmanager
+def record_into(usage):
+    """While active, everything our data tools return is also kept in usage.tool_outputs, so the figures in a report can
+    be checked against what the agents were actually shown. TradingAgents does not pass callbacks to tool execution,
+    so this is where the data passes through. One analysis runs at a time in a process."""
+    global _sink
+    _sink, previous = usage, _sink
+    try:
+        yield
+    finally:
+        _sink = previous
+
+
+def _recorded(fn):
+    @functools.wraps(fn)
+    def call(*args, **kwargs):
+        out = fn(*args, **kwargs)
+        if _sink is not None:
+            _sink.add_tool_output(out)
+        return out
+    return call
+
+
 def install():
     """Registers the vendor and redirects TradingAgents' direct Yahoo calls. Safe to call more than once."""
     global _installed
@@ -185,7 +213,7 @@ def install():
             "get_prediction_markets": _unreachable("Polymarket"),
         }
         for method, fn in own.items():
-            methods[method][VENDOR] = fn
+            methods[method][VENDOR] = _recorded(fn)
         market.load_ohlcv = snapshot.load_ohlcv = load_ohlcv
         settlement.get_closes = get_closes
         context.get_company_profile = get_company_profile

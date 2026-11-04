@@ -54,9 +54,10 @@ def get(con, run_id, with_reports=True):
 
 
 def runs(con, symbol=None, limit=50):
-    sql, args = "SELECT %s FROM runs" % ", ".join(COLS), []
+    """Analyses, newest first. Questions to the assistant (source 'chat') are billed but are not analyses."""
+    sql, args = "SELECT %s FROM runs WHERE source != 'chat'" % ", ".join(COLS), []
     if symbol:
-        sql, args = sql + " WHERE symbol = ?", [symbol]
+        sql, args = sql + " AND symbol = ?", [symbol]
     rows = con.execute(sql + " ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()
     return [_row(r) for r in rows]
 
@@ -73,7 +74,8 @@ def spent_usd(con, now):
 def estimate_usd(con, s=None):
     """Expected cost of one run: the average of the last ten completed runs, or the configured first guess."""
     s = s or get_settings()
-    costs = [r[0] for r in con.execute("SELECT cost_usd FROM runs WHERE status = 'done' AND cost_usd > 0 ORDER BY id DESC LIMIT 10")]
+    costs = [r[0] for r in con.execute(
+        "SELECT cost_usd FROM runs WHERE status = 'done' AND source != 'chat' AND cost_usd > 0 ORDER BY id DESC LIMIT 10")]
     return sum(costs) / len(costs) if costs else s.ai_first_estimate_cny / s.ai_usd_cny
 
 
@@ -119,6 +121,17 @@ def _enqueue(con, symbol, trade_date, source, now, s):
         cur = con.execute("INSERT INTO runs (symbol, trade_date, status, source, quick_model, deep_model, created)"
                           " VALUES (?, ?, 'queued', ?, ?, ?, ?)", (symbol, trade_date, source, s.ai_quick_model, s.ai_deep_model, iso(now)))
     return cur.lastrowid
+
+
+def record_chat(con, usage, now=None, s=None):
+    """Books what one question to the assistant cost, so it counts against this month's budget like an analysis."""
+    s, now = s or get_settings(), now or utcnow()
+    with con:
+        return con.execute(
+            "INSERT INTO runs (symbol, trade_date, status, source, quick_model, deep_model, llm_calls, tokens_in, tokens_cached,"
+            " tokens_out, cost_usd, created, started, finished) VALUES ('问答', ?, 'done', 'chat', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (now.date().isoformat(), s.ai_quick_model, s.ai_deep_model, usage["llm_calls"], usage["tokens_in"],
+             usage["tokens_cached"], usage["tokens_out"], usage["cost_usd"], iso(now), iso(now), iso(now))).lastrowid
 
 
 def claim_next(con, now=None):

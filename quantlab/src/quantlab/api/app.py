@@ -13,6 +13,7 @@ from .. import __version__
 from ..ai.jobs import Worker
 from ..config import get_settings
 from ..errors import QuantLabError
+from .chat_routes import router as chat_router
 from .holdings_routes import router as holdings_router
 from .ml_routes import router as ml_router
 from .routes import api, public
@@ -87,6 +88,7 @@ def create_app(worker=None, scheduler=None):
     app.include_router(api)
     app.include_router(ml_router)
     app.include_router(holdings_router)
+    app.include_router(chat_router)
 
     if (WEB / "index.html").exists():
         app.mount("/assets", StaticFiles(directory=WEB / "assets"), name="assets")

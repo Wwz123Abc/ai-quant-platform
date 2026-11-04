@@ -72,7 +72,9 @@ def _conclusion(text):
              and "Rating" not in p[:12]]
     if not paras:
         return ""
-    p = re.sub(r"\s+", " ", paras[0]).strip(" *")
+    p = re.sub(r"\s+", " ", paras[0])
+    p = re.sub(r"^[\s*_#>-]*[^\s*:：]{1,40}(?: [A-Za-z]+)*\s*[*_]*\s*[:：]\s*", "", p)  # a leading "**Executive Summary**:" label
+    p = p.strip(" *_")
     return p if len(p) <= 260 else p[:260].rstrip() + "…"
 
 
@@ -91,7 +93,7 @@ def levels(close):
     return out
 
 
-def summary(rating, final_text, lv):
+def summary(rating, final_text, lv, near=None):
     """The personal summary as markdown: rating, the conclusion in the report's own words, key prices from our data."""
     lines = ["**评级：%s**" % RATING_CN.get(rating, rating)]
     why = _conclusion(final_text)
@@ -103,7 +105,12 @@ def summary(rating, final_text, lv):
             if key in lv:
                 parts.append("%s $%.2f（现价%s %.1f%%）" % (name, lv[key], "高于" if lv["close"] >= lv[key] else "低于",
                                                            abs(lv["close"] / lv[key] - 1) * 100))
-        parts.append("近一年区间 $%.2f – $%.2f" % (lv["low"], lv["high"]))
+        parts.append("近一年收盘价区间 $%.2f – $%.2f" % (lv["low"], lv["high"]))
+        res, sup = near or (None, None)
+        if res:
+            parts.append("最近压力 $%.2f（%+.1f%%）" % (res["price"], res["distance"] * 100))
+        if sup:
+            parts.append("最近支撑 $%.2f（%+.1f%%）" % (sup["price"], sup["distance"] * 100))
         lines.append("关键价位（本平台行情数据）：" + "；".join(parts))
     lines.append("*这只是研究参考。买不买、买多少，以你设定的持仓规则为准（见“个股分析”）；下面各节是模型的完整报告，"
                  "里面按机构操作写的期权、领口等建议不适用于个人持仓。*")

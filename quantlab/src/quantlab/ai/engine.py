@@ -3,6 +3,7 @@
 TradingAgents is an optional dependency pinned to one commit (pip install quantlab[ai]); nothing here imports it
 until an analysis actually runs. This module turns QuantLab settings into a TradingAgents config, runs one
 analysis, and measures the tokens every model call used so the run can be charged to the budget."""
+import contextlib
 import importlib.util
 import os
 import threading
@@ -12,7 +13,8 @@ from ..config import get_settings
 from ..core import data
 from ..core.data import yahoo_symbol
 from ..errors import Unavailable
-from . import personal
+from ..holdings import levels
+from . import cn_vendor, personal
 
 # The reports kept from a run, in reading order, with their Chinese titles.
 REPORTS = [
@@ -94,9 +96,6 @@ class Usage:
             def on_llm_end(self, response, **kwargs):
                 usage.add_result(response)
 
-            def on_tool_end(self, output, **kwargs):
-                usage.add_tool_output(getattr(output, "content", output))
-
         return Handler()
 
     def add_result(self, response):
@@ -166,7 +165,8 @@ def analyze(symbol, trade_date, usage, s=None):
 
     s = s or get_settings()
     graph = TradingAgentsGraph(tuple(s.ai_analysts), config=build_config(s), callbacks=[usage.handler()])
-    state, rating = graph.propagate(yahoo_symbol(symbol), str(trade_date))
+    with cn_vendor.record_into(usage) if s.price_source == "cn" else contextlib.nullcontext():
+        state, rating = graph.propagate(yahoo_symbol(symbol), str(trade_date))
     reports = {key: {"title": title, "text": str(state.get(key) or "")} for key, title in REPORTS}
     rating = rating if rating in RATINGS else "REVIEW"
     personal.mark_unsourced(reports, usage.tool_outputs)
@@ -175,11 +175,14 @@ def analyze(symbol, trade_date, usage, s=None):
 
 def personal_first(symbol, trade_date, rating, reports):
     """reports with the personal summary placed before the full reports."""
+    near = None
     try:
-        close = data.load(symbol)["close"]
-        lv = personal.levels(close[close.index <= str(trade_date)])
+        bars = data.load(symbol)
+        bars = bars[bars.index <= str(trade_date)]
+        lv = personal.levels(bars["close"])
+        near = levels.nearest(levels.compute(bars))
     except Exception:  # the summary still has the rating and the conclusion without prices
         lv = None
     head = {"personal_summary": {"title": "个人版摘要",
-                                 "text": personal.summary(rating, reports["final_trade_decision"]["text"], lv)}}
+                                 "text": personal.summary(rating, reports["final_trade_decision"]["text"], lv, near)}}
     return {**head, **reports}

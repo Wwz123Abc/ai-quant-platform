@@ -83,7 +83,7 @@ src/quantlab/errors.py             领域错误 → HTTP 状态码
 
 | 项目 | 采用方式 | 原因 |
 | --- | --- | --- |
-| [TradingAgents](https://github.com/TauricResearch/TradingAgents)（Apache-2.0） | **锁定提交的可选依赖**（`quantlab[ai]`，提交 e8f5503），通过 `ai/engine.py` 适配 | 代码质量高、更新频繁；复制源码会收不到上游修复。升级时修改 pyproject 里的提交哈希，跑完测试后再合并 |
+| [TradingAgents](https://github.com/TauricResearch/TradingAgents)（Apache-2.0） | **锁定提交的可选依赖**（`quantlab[ai]`，提交 c454491（0.7.1）），通过 `ai/engine.py` 适配 | 代码质量高、更新频繁；复制源码会收不到上游修复。升级时修改 pyproject 里的提交哈希，跑完测试后再合并 |
 | [DeltaFStation](https://github.com/Delta-F/deltafstation) / [deltafq](https://github.com/Delta-F/deltafq)（MIT） | **只借鉴功能设计，不复制代码** | 审阅时发现：仓库里写死了 API 密钥；默认在 0.0.0.0 上开启 Flask 调试模式；AI 工具会把大模型生成的代码写成文件并执行；回测按信号当天的收盘价成交，滑点参数未生效；依赖 pandas 2，与 TradingAgents 要求的 pandas 3 冲突 |
 
 借鉴 DeltaFStation 的部分：网页工作台的页面划分（回测、交易/模拟、策略运行、AI 助手）、模拟账户的概念、MCP 和 AI 工具调用的思路（后续批次）。

@@ -54,6 +54,26 @@ export default function Analyze() {
             {r.checks.map((c) => <div key={c.rule}>{c.ok ? "✓" : "✗"} {c.rule}：{c.text}</div>)}
             {!r.portfolio ? <div>到“<Link to="/holdings">我的持仓</Link>”同步账本后，这里会按你的规则判断。</div> : null}
           </div>
+          {r.levels ? (
+            <div className="card">
+              <h2>关键价位（{r.levels.date} 收盘 {num(r.levels.close)}，{r.levels.source}）</h2>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>类型</th><th>名称</th><th className="num">价位</th><th className="num">距收盘</th><th>怎么算的</th></tr></thead>
+                  <tbody>
+                    {[...r.levels.levels].sort((x, y) => y.price - x.price).map((l, i) => (
+                      <tr key={i}>
+                        <td>{l.group}</td><td>{l.name}</td><td className="num">{num(l.price)}</td>
+                        <td className="num"><Signed v={l.distance} digits={1} /></td>
+                        <td className="hint" style={{ whiteSpace: "normal" }}>{l.basis}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="hint">价位只是参考，不生成订单；行情是复权后的，较早的价位可能比当时的报价略低。</p>
+            </div>
+          ) : null}
           <div className="grid-2">
             <div className="card">
               <h2>趋势和风险（{r.technical.date} 收盘 {num(r.technical.close)}）</h2>

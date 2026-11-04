@@ -129,6 +129,21 @@ class Technical(BaseModel):
     beta: float | None = None
 
 
+class KeyLevel(BaseModel):
+    group: str = Field(description="前高前低、枢轴点、压力支撑、ATR 通道、整数关口")
+    name: str
+    price: float
+    distance: float = Field(description="相对收盘价的距离，0.05 表示高 5%")
+    basis: str = Field(description="算法和用到的日期")
+
+
+class KeyLevels(BaseModel):
+    date: str
+    close: float
+    source: str
+    levels: list[KeyLevel]
+
+
 class Fundamentals(BaseModel):
     revenue_ttm: float | None
     net_income_ttm: float | None
@@ -185,6 +200,7 @@ class Note(BaseModel):
 class Analysis(BaseModel):
     symbol: str
     technical: Technical
+    levels: KeyLevels | None = Field(None, description="关键价位；行情不足 30 天时没有")
     fundamentals: Fundamentals | None
     fundamentals_note: str | None = Field(None, description="没有基本面时的原因")
     ai: AiInfo | None

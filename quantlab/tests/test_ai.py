@@ -400,3 +400,21 @@ def test_usage_collects_tool_outputs():
     u = engine.Usage()
     u.add_tool_output("Close 612.34")
     assert u.tool_outputs == ["Close 612.34"]
+
+
+def test_vendor_outputs_are_recorded_only_while_an_analysis_runs():
+    from quantlab.ai import cn_vendor
+    u = engine.Usage()
+    fetch = cn_vendor._recorded(lambda x: "Close 612.34 " + x)
+    assert fetch("a") == "Close 612.34 a" and u.tool_outputs == []     # nothing is listening
+    with cn_vendor.record_into(u):
+        fetch("b")
+    fetch("c")                                                          # listening stopped with the analysis
+    assert u.tool_outputs == ["Close 612.34 b"]
+
+
+def test_the_summary_conclusion_drops_the_markdown_label():
+    from quantlab.ai import personal
+    text = ("**Rating**: Underweight\n\n**Executive Summary**: 对 QQQM 给出 Underweight：把敞口调降至约 70%，分批、限价、不追跌，"
+            "并且这一句要足够长。\n\n**Thesis**: 其他")
+    assert personal._conclusion(text).startswith("对 QQQM 给出 Underweight")
