@@ -62,7 +62,7 @@ export default function Holdings() {
                       <tr key={o.id}>
                         <td className={o.side === "buy" ? "up" : "down"}>{o.side === "buy" ? "买入" : "卖出"}</td>
                         <td>{o.symbol}</td><td className="num">{o.shares}</td><td className="num">{o.price.toFixed(2)}</td>
-                        <td className="num">{money(o.value)}</td><td style={{ whiteSpace: "normal" }}>{o.reason}</td>
+                        <td className="num">{money(o.value)}</td><td style={{ whiteSpace: "normal" }}>{o.reason}{o.basis ? <details><summary className="hint">依据</summary><span className="hint">{o.basis}</span></details> : null}</td>
                         <td>{STATUS[o.status] ?? o.status}</td>
                         <td>
                           {o.status === "pending" ? (
@@ -104,7 +104,7 @@ export default function Holdings() {
               <h2>提醒（只是信号，不生成订单）</h2>
               {r.reminders.length ? (
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {r.reminders.map((m, i) => <li key={i} className={m.level === "warn" ? "down" : undefined}>{m.symbol} [{m.kind}] {m.text}</li>)}
+                  {r.reminders.map((m, i) => <li key={i} className={m.level === "warn" ? "down" : undefined}>{m.symbol} [{m.kind}] {m.text}{m.basis ? <details><summary className="hint">依据</summary><span className="hint">{m.basis}</span></details> : null}</li>)}
                 </ul>
               ) : <p className="empty">没有提醒。</p>}
               <PriceCheckLine checks={r.price_check ?? []} />

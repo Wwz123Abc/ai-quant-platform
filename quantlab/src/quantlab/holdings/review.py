@@ -21,6 +21,7 @@ MIGRATIONS = [
                                side TEXT NOT NULL, shares REAL NOT NULL, price REAL NOT NULL, value REAL NOT NULL,
                                reason TEXT NOT NULL, status TEXT NOT NULL, decided_at TEXT, note TEXT);
        CREATE INDEX proposals_status ON proposals (status)""",
+    "ALTER TABLE proposals ADD COLUMN basis TEXT NOT NULL DEFAULT ''",
 ]
 CASH_LEVEL = {"Sell": "warn", "Underweight": "warn", "Buy": "info", "Overweight": "info", "Hold": "info"}
 DUE_DAYS, MATURED_DAYS = 14, 30  # remind of a Treasury or deposit this many days before and after its maturity
@@ -54,8 +55,19 @@ def valuation(snapshot, prices, day=None):
             "total": investable + fixed, "cash_weight": cash / investable if investable > 0 else None}
 
 
-def proposals(val, pol, prices):
-    """Orders that bring the holdings within your rules. Sells first; buys never take cash below the reserve."""
+def price_basis(sym, px, info):
+    """'SYM 2026-11-03 收盘价 $693.54（腾讯日线，已和第二来源核对一致）': the price and where it came from."""
+    info = info or {}
+    date = (info.get("dates") or {}).get(sym)
+    src = info.get("source") or "行情数据"
+    check = (info.get("checked") or {}).get(sym)
+    return "%s %s收盘价 $%.2f（%s%s）" % (sym, "%s " % date if date else "", px, src, "，%s" % check if check else "")
+
+
+def proposals(val, pol, prices, info=None):
+    """Orders that bring the holdings within your rules. Sells first; buys never take cash below the reserve.
+    Each order carries its basis: the rule, the figures it used, the data date and source. info (optional) names
+    the price dates, the source, the sync time and the cross-check results."""
     inv = val["investable"]
     if inv <= 0:
         return [], []
@@ -77,7 +89,7 @@ def proposals(val, pol, prices):
         if desired > cap + 1e-6:
             desired, why = cap, "超过单只上限 %.0f%%（当前 %.1f%%）" % (pol["max_position"] * 100, value / inv * 100)
         if why:
-            want[sym] = (desired - value, why)
+            want[sym] = (desired - value, why, value, desired)
     sells = {s: d for s, d in want.items() if d[0] < 0}
     buys = {s: d for s, d in want.items() if d[0] > 0}
     available = val["cash"] + sum(-d[0] for d in sells.values()) - pol["cash_reserve"] * inv
@@ -87,7 +99,7 @@ def proposals(val, pol, prices):
         scale = max(0.0, available / need)
         notes.append("现金（扣除 %.0f%% 储备后）不够，买入按 %.0f%% 比例缩减" % (pol["cash_reserve"] * 100, scale * 100))
     out = []
-    for sym, (delta, why) in sorted(sells.items()) + sorted(buys.items()):
+    for sym, (delta, why, cur, desired) in sorted(sells.items()) + sorted(buys.items()):
         px = prices.get(sym)
         if not px:
             notes.append("%s 没有价格，无法计算股数" % sym)
@@ -107,47 +119,71 @@ def proposals(val, pol, prices):
         if shares * px < pol["min_trade_usd"]:
             notes.append("%s 需要调整约 $%.0f，不到最小下单金额 $%.0f，暂不建议" % (sym, shares * px, pol["min_trade_usd"]))
             continue
+        synced = "（%s 同步）" % info["synced"] if info and info.get("synced") else ""
+        cut = "，现金不足，按 %.0f%% 缩减" % (scale * 100) if delta > 0 and scale < 1 else ""
+        basis = ("规则：你设定的持仓规则（目标占比和偏离带、单只上限、现金储备）。数据：%s；持仓来自账本%s；"
+                 "可投资资金 $%.2f（股票 $%.2f + 现金 $%.2f），%s 现值 $%.2f。计算：应持有 $%.2f，差 $%.2f%s，"
+                 "按 $%.2f 折合 %s 股%s。"
+                 % (price_basis(sym, px, info), synced, inv, val["stocks"], val["cash"], sym, cur, desired,
+                    abs(delta), cut, px, "%.4g" % shares, "（整股）" if pol["whole_shares"] else ""))
         out.append({"symbol": sym, "side": "sell" if delta < 0 else "buy", "shares": round(shares, 6), "price": px,
-                    "value": round(shares * px, 2), "reason": why})
+                    "value": round(shares * px, 2), "reason": why, "basis": basis})
     return out, notes
 
 
-def reminders(val, pol, load=None, with_fundamentals=True):
-    """Signals about each holding. Reminders only: none of these creates an order."""
+def reminders(val, pol, load=None, with_fundamentals=True, info=None):
+    """Signals about each holding. Reminders only: none of these creates an order. Each says what it rests on."""
     out = []
-    add = lambda sym, level, kind, text: out.append({"symbol": sym, "level": level, "kind": kind, "text": text})
+    src = (info or {}).get("source") or "行情数据"
+    synced = "，%s 同步" % info["synced"] if info and info.get("synced") else ""
+    add = lambda sym, level, kind, text, basis="": out.append(
+        {"symbol": sym, "level": level, "kind": kind, "text": text, "basis": basis})
     if val["cash_weight"] is not None and val["cash_weight"] < pol["cash_reserve"] - 1e-9:
-        add("现金", "warn", "规则", "现金只占 %.1f%%，低于储备 %.0f%%" % (val["cash_weight"] * 100, pol["cash_reserve"] * 100))
+        add("现金", "warn", "规则", "现金只占 %.1f%%，低于储备 %.0f%%" % (val["cash_weight"] * 100, pol["cash_reserve"] * 100),
+            "规则：现金占可投资资金不低于 %.0f%%。数据：现金 $%.2f ÷ 可投资资金 $%.2f（账本%s）。"
+            % (pol["cash_reserve"] * 100, val["cash"], val["investable"], synced))
     for f in val.get("fixed_items", []):
         if f["matured"] and f["days_left"] >= -MATURED_DAYS:
-            add(f["name"], "info", "到期", "%s 已到期，本息回到储蓄账户，不再算在国债定存里；在账本里更新现金后，可投资资金才会算上这笔钱" % f["maturity"])
+            add(f["name"], "info", "到期", "%s 已到期，本息回到储蓄账户，不再算在国债定存里；在账本里更新现金后，可投资资金才会算上这笔钱" % f["maturity"],
+                "数据：账本里这笔的到期日 %s；到期后 %d 天内提醒。" % (f["maturity"], MATURED_DAYS))
         elif f["started"] and not f["matured"] and f["days_left"] <= DUE_DAYS:
-            add(f["name"], "info", "到期", "%s 到期（还有 %d 天）" % (f["maturity"], f["days_left"]))
+            add(f["name"], "info", "到期", "%s 到期（还有 %d 天）" % (f["maturity"], f["days_left"]),
+                "数据：账本里这笔的到期日 %s；到期前 %d 天内提醒。" % (f["maturity"], DUE_DAYS))
     for p in val["positions"]:
         sym = p["symbol"]
         if p["gain"] is not None and p["gain"] <= -pol["alert_drawdown_from_cost"]:
-            add(sym, "warn", "亏损", "比平均成本 %.2f 低 %.0f%%" % (p["avg_cost"], -p["gain"] * 100))
+            add(sym, "warn", "亏损", "比平均成本 %.2f 低 %.0f%%" % (p["avg_cost"], -p["gain"] * 100),
+                "规则：比平均成本低 %.0f%% 提醒。数据：平均成本 $%.2f（账本移动平均法），%s。"
+                % (pol["alert_drawdown_from_cost"] * 100, p["avg_cost"], price_basis(sym, p["price"], info)))
         try:
             t = signals.technical(sym, load)
         except QuantLabError as e:
             add(sym, "warn", "数据", "取不到行情：%s" % e)
             continue
         if t.get("from_high") is not None and t["from_high"] <= -pol["alert_drawdown_from_high"]:
-            add(sym, "warn", "回撤", "比一年内最高点低 %.0f%%" % (-t["from_high"] * 100))
+            add(sym, "warn", "回撤", "比一年内最高点低 %.0f%%" % (-t["from_high"] * 100),
+                "规则：比一年内最高点低 %.0f%% 提醒。数据：%s 收盘 $%.2f，近一年最高 $%.2f（%s，近 252 个交易日）。"
+                % (pol["alert_drawdown_from_high"] * 100, t["date"], t["close"], t["close"] / (1 + t["from_high"]), src))
         if t.get("uptrend") is False:
-            add(sym, "info", "趋势", "50 日线在 200 日线下方%s" % ("（%s 死叉）" % t["last_cross"] if t.get("last_cross") else ""))
+            add(sym, "info", "趋势", "50 日线在 200 日线下方%s" % ("（%s 死叉）" % t["last_cross"] if t.get("last_cross") else ""),
+                "数据：%s 的 50 日线 $%.2f、200 日线 $%.2f（收盘价的简单移动平均，%s）。只是提醒，不生成订单。"
+                % (t["date"], t["ma50"], t["ma200"], src))
         ai = signals.ai_rating(sym)
         if ai:
-            add(sym, CASH_LEVEL.get(ai["rating"], "info"), "AI", "最近一次 AI 评级 %s（%s 收盘后，分析 #%d）" % (ai["rating"], ai["trade_date"], ai["id"]))
+            add(sym, CASH_LEVEL.get(ai["rating"], "info"), "AI", "最近一次 AI 评级 %s（%s 收盘后，分析 #%d）" % (ai["rating"], ai["trade_date"], ai["id"]),
+                "数据：AI 研报 #%d（%s 收盘后的分析，完整报告在“AI 研报”页）。AI 评级只是提醒，不生成订单。" % (ai["id"], ai["trade_date"]))
         if with_fundamentals:
             f = signals.fundamentals(sym, t.get("close"))
             if f:
                 if f["net_income_ttm"] is not None and f["net_income_ttm"] < 0:
-                    add(sym, "warn", "基本面", "最近 12 个月净利润为负")
+                    add(sym, "warn", "基本面", "最近 12 个月净利润为负",
+                        "数据：SEC EDGAR 财报，最近 12 个月净利润 $%.0f（按披露日期取数，不用未来数据）。" % f["net_income_ttm"])
                 if f["sue"] is not None and f["sue"] < -2:
-                    add(sym, "warn", "基本面", "最近一季盈利明显低于去年同期（SUE %.1f）" % f["sue"])
+                    add(sym, "warn", "基本面", "最近一季盈利明显低于去年同期（SUE %.1f）" % f["sue"],
+                        "数据：SEC EDGAR 财报；SUE 是本季盈利相对去年同期的意外程度，低于 -2 提醒（当前 %.1f）。" % f["sue"])
                 if f["rev_growth"] is not None and f["rev_growth"] < 0:
-                    add(sym, "info", "基本面", "收入同比下降 %.0f%%" % (-f["rev_growth"] * 100))
+                    add(sym, "info", "基本面", "收入同比下降 %.0f%%" % (-f["rev_growth"] * 100),
+                        "数据：SEC EDGAR 财报，最近 12 个月收入相对前一年 %.1f%%。" % (f["rev_growth"] * 100))
     return out
 
 
@@ -168,6 +204,14 @@ def prices_for(symbols, load=None):
     return out
 
 
+def _price_dates(symbols, load):
+    out = {}
+    for s in symbols:
+        with contextlib.suppress(QuantLabError):
+            out[s] = load(s).index[-1].date().isoformat()
+    return out
+
+
 def run(refresh=True, load=None, with_fundamentals=True, check=True):
     """Syncs (when a key is configured), reviews, and records the review and its proposals. check cross-checks the
     held stocks' recent closes with a second source.
@@ -183,9 +227,12 @@ def run(refresh=True, load=None, with_fundamentals=True, check=True):
         with contextlib.suppress(QuantLabError):
             dates.append(load(s).index[-1].date().isoformat())
     val = valuation(snap, prices)
-    props, notes = proposals(val, pol, prices)
-    rem = reminders(val, pol, load, with_fundamentals)
     checks = check_prices({p["symbol"] for p in val["positions"]}) if check else []
+    info = {"dates": _price_dates(syms, load), "synced": snap.get("synced"),
+            "source": "腾讯日线" if get_settings().price_source == "cn" else "Yahoo 日线",
+            "checked": {c["symbol"]: "已和第二来源核对一致" for c in checks if c["ok"]}}
+    props, notes = proposals(val, pol, prices, info)
+    rem = reminders(val, pol, load, with_fundamentals, info)
     rem += [{"symbol": c["symbol"], "level": "info" if c["ok"] is None else "warn", "kind": "核对", "text": c["text"]} for c in checks if not c["ok"]]
     review = {"at": now_iso(), "synced": snap.get("synced"), "account": snap.get("account"), "policy": pol,
               "price_date": min(dates) if dates else None,  # the oldest close the review used
@@ -197,14 +244,14 @@ def run(refresh=True, load=None, with_fundamentals=True, check=True):
             rid = con.execute("INSERT INTO reviews (at, synced, data) VALUES (?, ?, ?)",
                               (review["at"], review["synced"], json.dumps(review, ensure_ascii=False, default=str))).lastrowid
             for o in props:
-                con.execute("INSERT INTO proposals (review_id, symbol, side, shares, price, value, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')",
-                            (rid, o["symbol"], o["side"], o["shares"], o["price"], o["value"], o["reason"]))
+                con.execute("INSERT INTO proposals (review_id, symbol, side, shares, price, value, reason, basis, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
+                            (rid, o["symbol"], o["side"], o["shares"], o["price"], o["value"], o["reason"], o["basis"]))
         return latest(con)
     finally:
         con.close()
 
 
-PCOLS = ["id", "review_id", "symbol", "side", "shares", "price", "value", "reason", "status", "decided_at", "note"]
+PCOLS = ["id", "review_id", "symbol", "side", "shares", "price", "value", "reason", "basis", "status", "decided_at", "note"]
 
 
 def latest(con=None):

@@ -105,8 +105,28 @@ def test_buys_scaled_to_cash_after_reserve():
     v = review.valuation(snap, prices)                       # investable 2850; reserve 285; available 215
     pol = policy.validate({"targets": {"CCC": 0.25}, "max_position": 1.0, "cash_reserve": 0.1, "min_trade_usd": 10})
     props, notes = review.proposals(v, pol, prices)
-    assert props == [{"symbol": "CCC", "side": "buy", "shares": 5, "price": 40.0, "value": 200.0, "reason": props[0]["reason"]}]
+    assert props == [{"symbol": "CCC", "side": "buy", "shares": 5, "price": 40.0, "value": 200.0, "reason": props[0]["reason"],
+                      "basis": props[0]["basis"]}]
     assert any("缩减" in n for n in notes)
+
+
+def test_every_order_and_reminder_says_what_it_rests_on(monkeypatch):
+    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
+    snap = {**SNAP, "cash": [{"currency": "USD", "amount": 500}]}
+    v = review.valuation(snap, prices)
+    pol = policy.validate({"targets": {"CCC": 0.25}, "max_position": 1.0, "cash_reserve": 0.1, "min_trade_usd": 10})
+    info = {"dates": {"CCC": "2026-11-03"}, "source": "腾讯日线", "synced": "2026-11-04T03:00:00+00:00",
+            "checked": {"CCC": "已和第二来源核对一致"}}
+    basis = review.proposals(v, pol, prices, info)[0][0]["basis"]
+    # the rule, the figures that went into it, the data date and source, and the arithmetic
+    for part in ("规则", "CCC 2026-11-03 收盘价 $40.00", "腾讯日线", "已和第二来源核对一致", "2026-11-04T03:00:00",
+                 "可投资资金 $2850.00", "应持有 $712.50", "缩减", "折合 5 股"):
+        assert part in basis, part
+    monkeypatch.setattr(signals, "ai_rating", lambda s: {"id": 3, "rating": "Sell", "trade_date": "2026-10-16"} if s == "BBB" else None)
+    v = review.valuation({**SNAP, "cash": []}, {"AAA": 150.0, "BBB": 25.0})
+    rem = review.reminders(v, policy.validate({"cash_reserve": 0.1}), load, with_fundamentals=False, info=info)
+    assert rem and all(x["basis"] for x in rem if x["kind"] in ("规则", "亏损", "AI", "回撤", "趋势"))
+    assert "#3" in next(x["basis"] for x in rem if x["kind"] == "AI")
 
 
 def test_no_order_inside_the_band_or_below_minimum():

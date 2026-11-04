@@ -1255,6 +1255,11 @@ export interface components {
             value: number;
             /** Reason */
             reason: string;
+            /**
+             * Basis
+             * @default
+             */
+            basis: string;
             /** Status */
             status: string;
             /** Decided At */
@@ -1283,6 +1288,11 @@ export interface components {
             kind: string;
             /** Text */
             text: string;
+            /**
+             * Basis
+             * @default
+             */
+            basis: string;
         };
         /** Report */
         Report: {

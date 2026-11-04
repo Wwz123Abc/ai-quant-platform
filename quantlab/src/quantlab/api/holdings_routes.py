@@ -65,6 +65,7 @@ class Proposal(BaseModel):
     price: float
     value: float
     reason: str
+    basis: str = ""
     status: str
     decided_at: str | None
     note: str | None
@@ -75,6 +76,7 @@ class Reminder(BaseModel):
     level: Literal["info", "warn"]
     kind: str
     text: str
+    basis: str = ""
 
 
 class PriceCheck(BaseModel):

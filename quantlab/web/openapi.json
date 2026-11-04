@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.10.9"
+    "version": "0.10.10"
   },
   "paths": {
     "/api/health": {
@@ -3981,6 +3981,11 @@
             "type": "string",
             "title": "Reason"
           },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "default": ""
+          },
           "status": {
             "type": "string",
             "title": "Status"
@@ -4074,6 +4079,11 @@
           "text": {
             "type": "string",
             "title": "Text"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "default": ""
           }
         },
         "type": "object",
