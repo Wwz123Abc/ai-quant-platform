@@ -5,11 +5,11 @@
 #   2. backs up the running files and the database on the server
 #   3. installs, restarts, and checks the service answers; if it does not, puts the previous files back
 #
-# Usage: ledger/deploy/deploy.sh            (LEDGER_HOST overrides ubuntu@42.194.244.252)
+# Usage: ledger/deploy/deploy.sh            (LEDGER_HOST overrides the ssh alias wwz)
 #        ledger/deploy/deploy.sh --from SHA  the first time, naming the commit the server runs now
 set -euo pipefail
 
-HOST="${LEDGER_HOST:-ubuntu@42.194.244.252}"
+HOST="${LEDGER_HOST:-wwz}"   # ssh alias of the new server (ubuntu, with its own key)
 SUDO=""; case "$HOST" in root@*) ;; *) SUDO="sudo" ;; esac   # the new server logs in as ubuntu
 DIR=/opt/stock-ledger
 cd "$(dirname "$0")/.."                                     # ledger/

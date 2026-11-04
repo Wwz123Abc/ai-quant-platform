@@ -6,7 +6,7 @@
 #
 # Usage: ledger/deploy/restore-drill.sh     (LEDGER_HOST and LEDGER_OFFSITE override the two machines)
 set -euo pipefail
-LIVE="${LEDGER_HOST:-ubuntu@42.194.244.252}"      # the live ledger (new server): a sudo user, the data is not world-readable
+LIVE="${LEDGER_HOST:-wwz}"      # the live ledger (new server): a sudo user, the data is not world-readable
 OFFSITE="${LEDGER_OFFSITE:-root@49.232.210.129}"  # the off-site backups (old server)
 sudo_for() { case "$1" in root@*) echo "" ;; *) echo "sudo" ;; esac; }
 LIVE_SUDO=$(sudo_for "$LIVE"); OFF_SUDO=$(sudo_for "$OFFSITE")
