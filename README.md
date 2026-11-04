@@ -49,6 +49,8 @@ cd ledger && python3 app.py serve
 cd quantlab && pip install -e ".[ml]" && python -m quantlab serve
 ```
 
+**怎么用：[使用手册](docs/用户手册.md)**
+
 各模块的完整说明：[持仓账本](ledger/README.md) · [量化分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [目标说明](docs/goals.md) · [路线图](docs/roadmap.md) · [市场调研](docs/research/2026-10-market-research.md)
 
 ## 测试
