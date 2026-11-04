@@ -1915,7 +1915,7 @@ TAL|好未来|TAL Education
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", "分时线，" + d.date);
     const add = (name, attrs, text) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; svg.appendChild(n); return n; };
-    const fmt = (v) => (d.money ? money(v) : price(v, d.ccy));
+    const fmt = (v) => (d.money ? money(v) : cur(d.ccy) + nf2.format(v));
     const pts = d.t.map((t, i) => X(t).toFixed(1) + "," + Y(d.v[i]).toFixed(1));
     add("polygon", { points: X(d.t[0]).toFixed(1) + "," + Y(d.base).toFixed(1) + " " + pts.join(" ") + " " + X(d.t[d.t.length - 1]).toFixed(1) + "," + Y(d.base).toFixed(1), fill: color, "fill-opacity": "0.10" });
     add("line", { x1: L, x2: L + w, y1: Y(d.base), y2: Y(d.base), stroke: "var(--muted)", "stroke-dasharray": "4 4", "stroke-width": "1", opacity: "0.7" });
