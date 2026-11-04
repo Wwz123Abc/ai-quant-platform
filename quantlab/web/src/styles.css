@@ -148,6 +148,7 @@ main {
   }
   table th,
   table td {
+    font-size: 13px;
     padding: 7px 6px; /* tables get tighter so the main columns fit (more specific than the base rule, which comes later) */
   }
   .hide-sm {
