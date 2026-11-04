@@ -60,6 +60,10 @@ ledger/deploy/restore-drill.sh
 3. 放回去：`install -o stockledger -g stockledger -m 644 备份文件 /opt/stock-ledger/data/ledger.db`，并删掉旁边旧的 `ledger.db-wal`、`ledger.db-shm`。
 4. 启动并检查：`systemctl start stock-ledger`，打开网站核对持仓；备份之后录入的记录需要重新录。
 
+## 分时线
+
+首页“我的股票组合”卡片里的分时线用腾讯财经的分钟线（美股 UsMinute、港股 hkMinute）。账本接口 `GET /api/intraday?symbols=VOO,QQQM` 返回每只股票最近一场的分钟价（时间已转成秒级时间戳，附这一场的开收盘时间）；只返回你自己持有的股票，每只在服务器内存里缓存 20 秒，所以多个页面同时打开也不会多取。组合线在浏览器里算：每分钟把每只股票的股数乘以截至该分钟的最新价（还没成交的用上一收盘价）再相加。代码：`app.py` 的 `minute_series`，`static/calc.js` 的 `intradayPortfolio`。
+
 ## 价格自动更新
 
 服务器在开市时每 30 秒自动取一次腾讯的实时报价（美股 9:30–16:00 美东，港股 9:30–12:00、13:00–16:00 香港），只更新持仓里正在交易的股票的现价，标“盘中”；页面每 15 秒读一次服务器，所以打开着的页面会自己变；首页最上面的“我的股票组合”卡片把所有持仓股票合成一个标的，显示合计现值和较上一收盘的涨跌。价格没变就不写库，页面不会白刷新。收盘后补取一次，把“盘中”改成“收盘”。收盘价、历史行情、汇率、价格核对仍然只在点“刷新数据”和每天的检查里更新。你手动填写的价格不会被盖掉（手动的日期更晚时保留）。关闭：给账本服务设环境变量 `LEDGER_AUTO_QUOTES=0`。代码：`app.py` 的 `refresh_quotes`、`quote_loop`。

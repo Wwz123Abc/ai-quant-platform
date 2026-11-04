@@ -200,7 +200,29 @@
     return { value, count, missing, change, pct: base > 0 ? (change / base) * 100 : null, withPrev };
   }
 
+  // The held stocks as one intraday line. stocks: [{shares, ccy, prev, points: [[ts, price], ...]}] with ts ascending; toUSD
+  // converts. At every minute any stock has a price, the value is each stock's shares times its latest price so far (its
+  // previous close before its first minute), converted to USD. base is the same sum at the previous closes. Stocks without
+  // a previous close or without minutes are left out (skipped).
+  function intradayPortfolio(stocks, toUSD) {
+    const used = stocks.filter((s) => s.shares > 0 && s.prev > 0 && s.points && s.points.length);
+    const times = [...new Set(used.flatMap((s) => s.points.map((p) => p[0])))].sort((a, b) => a - b);
+    const at = used.map(() => 0), cur = used.map((s) => s.prev), v = [];
+    let base = 0;
+    used.forEach((s) => { base += toUSD(s.shares * s.prev, s.ccy); });
+    for (const t of times) {
+      let total = 0;
+      used.forEach((s, i) => {
+        while (at[i] < s.points.length && s.points[at[i]][0] <= t) cur[i] = s.points[at[i]++][1];
+        total += toUSD(s.shares * cur[i], s.ccy);
+      });
+      v.push(total);
+    }
+    return { t: times, v, base, used: used.length, skipped: stocks.length - used.length };
+  }
+
   root.LedgerCalc = {
+    intradayPortfolio,
     portfolioQuote,
     SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust,
     parseD, fmtD, dayDiff, addMonths, coupons, bondAt, depositAt, markOn, fixedStart, fixedOn,

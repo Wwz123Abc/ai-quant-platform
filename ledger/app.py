@@ -425,6 +425,45 @@ def tq_code(sym):
     return "hk" + sym.zfill(5) if is_hk(sym) else "us" + sym
 
 
+INTRADAY_TTL = 20        # seconds a stock's minute prices are reused between requests
+_minutes = {}            # sym -> (fetched at, series)
+_minutes_lock = threading.Lock()
+
+
+def minute_series(sym):
+    """The minute-by-minute prices of the latest session of one stock, from Tencent:
+    {"date", "open", "close", "points": [[epoch seconds, price], ...]}. open and close are the session's regular hours
+    (09:30-16:00 in New York or Hong Kong) so a chart can leave room for the minutes still to come."""
+    now = time.time()
+    with _minutes_lock:
+        hit = _minutes.get(sym)
+        if hit and now - hit[0] < INTRADAY_TTL:
+            return hit[1]
+    hk, code = is_hk(sym), tq_code(sym)
+    j = json.loads(fetch("https://web.ifzq.gtimg.cn/appstock/app/%s/query?code=%s" % ("hkMinute" if hk else "UsMinute", code)))
+    inner = ((list((j.get("data") or {}).values()) or [{}])[0] or {}).get("data") or {}
+    rows, stamp = inner.get("data") or [], str(inner.get("date") or "")
+    if not rows or not re.fullmatch(r"\d{8}", stamp):
+        raise ValueError("腾讯财经没有返回分时数据")
+    tz = HK if hk else NY
+    y, m, d = int(stamp[:4]), int(stamp[4:6]), int(stamp[6:])
+    at = lambda hh, mm: int(dt.datetime(y, m, d, hh, mm, tzinfo=tz).timestamp())
+    points = []
+    for line in rows:
+        f = line.split()
+        try:
+            price = float(f[1])
+            ts = at(int(f[0][:2]), int(f[0][2:4]))
+        except (IndexError, ValueError):
+            continue
+        if price > 0:
+            points.append([ts, price])
+    out = {"date": "%04d-%02d-%02d" % (y, m, d), "open": at(9, 30), "close": at(16, 0), "points": points}
+    with _minutes_lock:
+        _minutes[sym] = (now, out)
+    return out
+
+
 def in_session(sym, now=None):
     """Whether the stock's regular session is under way right now."""
     if is_hk(sym):
@@ -1092,6 +1131,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(401, {"error": "密码不对。"})
             delete_user(uid)
             return self.send_json(200, {"ok": True}, {"Set-Cookie": "sid=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict"})
+        if parts == ["intraday"] and method == "GET":
+            qs = urllib.parse.parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+            asked = [x.strip().upper() for x in ",".join(qs.get("symbols", [])).split(",") if x.strip()]
+            cfg = get_doc(uid, "config", "main") or {}
+            mine = {str(t["data"].get("symbol", "")).upper() for t in list_docs(uid, "trades")} | set(cfg.get("prices") or {})
+            series, errors = {}, {}
+            for s in asked[:20]:
+                if not SYMBOL_RE.match(s) or s not in mine:  # only your own stocks: this is not a general quote proxy
+                    errors[s] = "不是你持有的股票"
+                    continue
+                try:
+                    series[s] = minute_series(s)
+                except Exception as e:
+                    errors[s] = str(e)[:120]
+            return self.send_json(200, {"series": series, "errors": errors})
         if parts == ["version"] and method == "GET":
             return self.send_json(200, {"version": "%s-%s" % (get_meta("version:0") or "0", get_meta("version:%d" % uid) or "0")})
         if parts == ["refresh"] and method == "POST":

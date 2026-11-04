@@ -239,6 +239,14 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .q-val { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .q-chg { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .quote .hint { margin: 2px 0 0; }
+.tl { margin-top: 10px; display: grid; gap: 6px; }
+.tl-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tl-tabs button { font: inherit; font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.tl-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 500; }
+.tl-read { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 18px; }
+.tl-chart { position: relative; touch-action: pan-y; }
+.tl-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tl-chart .empty { margin: 0; padding: 40px 0; text-align: center; font-size: 13px; color: var(--muted); }
 .pnl-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .pnl-stats div { background: var(--surface); padding: 10px 14px; min-width: 0; }
 .pnl-stats dt { font-size: 12px; color: var(--muted); }
@@ -402,6 +410,12 @@ footer p { margin: 0 0 6px; }
     <div class="q-top"><span><b>我的股票组合</b> <span id="qCount"></span></span><span class="q-tag" id="qTag"></span></div>
     <div class="q-main"><span class="q-val" id="qVal">—</span><span class="q-chg" id="qChg"></span></div>
     <p class="hint" id="qNote"></p>
+    <div class="tl" id="tl" hidden>
+      <div class="tl-tabs" id="tlTabs" role="group" aria-label="分时线：组合或单只股票"></div>
+      <div class="tl-read" id="tlRead"></div>
+      <div class="tl-chart" id="tlChart"></div>
+      <p class="hint" id="tlNote"></p>
+    </div>
   </section>
 
   <section aria-labelledby="mix-h">
@@ -1794,6 +1808,8 @@ TAL|好未来|TAL Education
     });
     const q = LedgerCalc.portfolioQuote(rows, toUSD);
     box.hidden = !q.count;
+    lastHeld = rows.filter((r) => r.price > 0);
+    tlSetup(lastHeld);
     if (!q.count) return;
     const priced = rows.filter((r) => r.price > 0), live = priced.some((r) => r.kind === "live" || r.kind === "open");
     const date = priced.map((r) => r.date || "").sort().pop();
@@ -1810,6 +1826,131 @@ TAL|好未来|TAL Education
     if (q.missing) notes.push(q.missing + " 只没有价格，未计入");
     if (q.withPrev < q.count) notes.push((q.count - q.withPrev) + " 只缺上一收盘价，涨跌未含");
     $("#qNote").textContent = notes.filter(Boolean).join(" · ");
+  }
+
+  // ---------- intraday line (分时线) of the held stocks as one, or of a single stock ----------
+  const TL = { series: {}, errors: {}, tab: "ALL", at: 0, loading: false, syms: [], plot: null };
+  const bjTime = (ts) => new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(ts * 1000));
+  async function loadIntraday(force) {
+    if (!db || !TL.syms.length || TL.loading) return;
+    const live = TL.syms.some((s) => { const q = state.quotes[s]; return q && (q.kind === "live" || q.kind === "open"); });
+    if (!force && Date.now() - TL.at < (live ? 25000 : 600000)) return;
+    TL.loading = true;
+    try {
+      const r = await window.ledgerApi("GET", "/api/intraday?symbols=" + encodeURIComponent(TL.syms.join(",")));
+      TL.series = r.series || {};
+      TL.errors = r.errors || {};
+      TL.at = Date.now();
+      drawIntraday();
+    } catch (e) { /* the next round retries */ }
+    TL.loading = false;
+  }
+  setInterval(() => { if (!document.hidden) loadIntraday(); }, 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadIntraday(); });
+
+  function tlSetup(rows) {
+    const syms = rows.map((r) => r.symbol);
+    const changed = syms.join() !== TL.syms.join();
+    TL.syms = syms;
+    if (changed) {
+      if (TL.tab !== "ALL" && !syms.includes(TL.tab)) TL.tab = "ALL";
+      TL.at = 0;
+    }
+    $("#tl").hidden = !syms.length;
+    const tabs = $("#tlTabs");
+    if (syms.length && (changed || !tabs.children.length)) {
+      tabs.innerHTML = ["ALL"].concat(syms).map((s) => '<button type="button" data-tab="' + esc(s) + '" aria-pressed="' + (s === TL.tab) + '">' + (s === "ALL" ? "组合" : esc(s)) + "</button>").join("");
+    }
+    if (changed) loadIntraday(true); else loadIntraday();
+  }
+  $("#tlTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tab]");
+    if (!b) return;
+    TL.tab = b.dataset.tab;
+    $("#tlTabs").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.tab === TL.tab)));
+    drawIntraday();
+  });
+
+  // What one tab plots: {t, v, base, ccy, label, x0, x1} or null when there is nothing to plot.
+  function tlData() {
+    const have = TL.syms.filter((s) => TL.series[s] && TL.series[s].points.length);
+    if (!have.length) return null;
+    const x0 = Math.min(...have.map((s) => TL.series[s].open)), x1 = Math.max(...have.map((s) => TL.series[s].close));
+    const sess = TL.series[have[0]].date;
+    if (TL.tab !== "ALL") {
+      const s = TL.series[TL.tab];
+      if (!s || !s.points.length) return null;
+      const base = prevClose(TL.tab, s.date);
+      return { t: s.points.map((p) => p[0]), v: s.points.map((p) => p[1]), base, money: false, ccy: tradeCcyOf(TL.tab), x0: s.open, x1: s.close, date: s.date };
+    }
+    const held = new Map(heldRows().map((r) => [r.symbol, r]));
+    const stocks = have.map((s) => {
+      const r = held.get(s);
+      return { shares: r.shares, ccy: r.ccy, prev: prevClose(s, TL.series[s].date), points: TL.series[s].points };
+    });
+    const p = LedgerCalc.intradayPortfolio(stocks, toUSD);
+    if (!p.used) return null;
+    return { t: p.t, v: p.v, base: p.base, money: true, ccy: "USD", x0, x1, date: sess, skipped: p.skipped + (TL.syms.length - have.length) };
+  }
+  let lastHeld = [];
+  const heldRows = () => lastHeld;
+  const tradeCcyOf = (sym) => { const r = lastHeld.find((x) => x.symbol === sym); return r ? r.ccy : "USD"; };
+
+  function drawIntraday() {
+    const box = $("#tlChart"), d = tlData();
+    if (!$("#tl") || $("#tl").hidden) return;
+    $("#tlRead").textContent = "";
+    TL.plot = null;
+    if (!d || !(d.base > 0)) {
+      box.innerHTML = '<p class="empty">' + (TL.at ? "暂时没有分时数据。" : "正在读取分时数据…") + "</p>";
+      $("#tlNote").textContent = "";
+      return;
+    }
+    const W = Math.max(280, box.clientWidth || 600), H = 168, L = 6, R = 64, T = 10, B = 22, w = W - L - R, h = H - T - B;
+    const dev = Math.max(Math.max(...d.v.map((x) => Math.abs(x - d.base))) * 1.15, d.base * 0.0005);
+    const X = (t) => L + ((t - d.x0) / (d.x1 - d.x0)) * w, Y = (v) => T + (1 - (v - (d.base - dev)) / (2 * dev)) * h;
+    const last = d.v[d.v.length - 1], up = last >= d.base, color = up ? "var(--up)" : "var(--down)";
+    const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "分时线，" + d.date);
+    const add = (name, attrs, text) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; svg.appendChild(n); return n; };
+    const fmt = (v) => (d.money ? money(v) : price(v, d.ccy));
+    const pts = d.t.map((t, i) => X(t).toFixed(1) + "," + Y(d.v[i]).toFixed(1));
+    add("polygon", { points: X(d.t[0]).toFixed(1) + "," + Y(d.base).toFixed(1) + " " + pts.join(" ") + " " + X(d.t[d.t.length - 1]).toFixed(1) + "," + Y(d.base).toFixed(1), fill: color, "fill-opacity": "0.10" });
+    add("line", { x1: L, x2: L + w, y1: Y(d.base), y2: Y(d.base), stroke: "var(--muted)", "stroke-dasharray": "4 4", "stroke-width": "1", opacity: "0.7" });
+    add("polyline", { points: pts.join(" "), fill: "none", stroke: color, "stroke-width": "1.6", "stroke-linejoin": "round" });
+    const lab = (y, text, anchor) => add("text", { x: L + w + 6, y: y, "font-size": "10.5", fill: "var(--muted)", "dominant-baseline": anchor || "middle" }, text);
+    lab(T + 4, fmt(d.base + dev));
+    lab(Y(d.base), fmt(d.base));
+    lab(T + h - 4, fmt(d.base - dev));
+    const tick = (t, anchor) => add("text", { x: X(t), y: H - 6, "font-size": "10.5", fill: "var(--muted)", "text-anchor": anchor }, bjTime(t));
+    tick(d.x0, "start");
+    tick((d.x0 + d.x1) / 2, "middle");
+    tick(d.x1, "end");
+    const cross = add("line", { x1: 0, x2: 0, y1: T, y2: T + h, stroke: "var(--ink)", "stroke-width": "1", opacity: "0", "pointer-events": "none" });
+    const dot = add("circle", { r: "3.5", fill: color, opacity: "0", "pointer-events": "none" });
+    add("circle", { cx: X(d.t[d.t.length - 1]), cy: Y(last), r: "3", fill: color });
+    box.innerHTML = "";
+    box.appendChild(svg);
+    const read = (i) => {
+      const v = d.v[i], ch = v - d.base;
+      $("#tlRead").innerHTML = bjTime(d.t[i]) + " &nbsp;<b>" + fmt(v) + '</b> &nbsp;<span class="' + tone(ch) + '">' + (d.money ? signed(ch) : signed(ch, d.ccy)) + " " + pct((ch / d.base) * 100) + "</span>";
+    };
+    read(d.v.length - 1);
+    TL.plot = { d, X, Y, read, cross, dot, svg, W };
+    const at = (ev) => {
+      const r = svg.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * W;
+      let lo = 0, hi = d.t.length - 1;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (X(d.t[m]) < x) lo = m + 1; else hi = m; }
+      if (lo > 0 && Math.abs(X(d.t[lo - 1]) - x) < Math.abs(X(d.t[lo]) - x)) lo--;
+      cross.setAttribute("x1", X(d.t[lo])); cross.setAttribute("x2", X(d.t[lo])); cross.setAttribute("opacity", "0.35");
+      dot.setAttribute("cx", X(d.t[lo])); dot.setAttribute("cy", Y(d.v[lo])); dot.setAttribute("opacity", "1");
+      read(lo);
+    };
+    svg.addEventListener("pointermove", at);
+    svg.addEventListener("pointerleave", () => { cross.setAttribute("opacity", "0"); dot.setAttribute("opacity", "0"); read(d.v.length - 1); });
+    $("#tlNote").textContent = [d.date + " 这一场", "北京时间", "虚线是上一收盘" + (d.money ? "（组合）" : ""), d.skipped ? d.skipped + " 只没有分时数据或上一收盘价，未计入" : ""].filter(Boolean).join(" · ");
   }
 
   function render() {

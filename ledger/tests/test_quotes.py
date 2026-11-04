@@ -89,3 +89,41 @@ class RefreshQuotes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MinuteSeries(unittest.TestCase):
+    US = '{"code":0,"data":{"usVOO.AM":{"data":{"data":["0930 692.10 1189108","0931 692.39 1440682","0932 bad","0933 0 5","1559 693.50 9"],"date":"20261103"}}}}'
+
+    def setUp(self):
+        app._minutes.clear()
+
+    def test_minutes_become_epoch_seconds_in_the_market_timezone(self):
+        with mock.patch.object(app, "fetch", lambda url, **kw: self.US):
+            s = app.minute_series("VOO")
+        self.assertEqual(s["date"], "2026-11-03")
+        # 09:30 in New York on 2026-11-03 is EST (UTC-5): 14:30 UTC
+        self.assertEqual(s["open"], 1793716200)
+        self.assertEqual(s["close"] - s["open"], 6.5 * 3600)
+        self.assertEqual(s["points"], [[1793716200, 692.1], [1793716260, 692.39], [1793716200 + 389 * 60, 693.5]])  # junk rows are skipped
+
+    def test_hong_kong_uses_its_own_clock(self):
+        hk = '{"code":0,"data":{"hk00700":{"data":{"data":["0930 397.800 6 7"],"date":"20261104"}}}}'
+        with mock.patch.object(app, "fetch", lambda url, **kw: hk) as f:
+            s = app.minute_series("0700")
+        self.assertEqual(s["open"], 1793755800)  # 09:30 HKT = 01:30 UTC
+
+    def test_the_same_request_within_the_ttl_is_served_from_memory(self):
+        calls = []
+        def fake(url, **kw):
+            calls.append(url)
+            return self.US
+        with mock.patch.object(app, "fetch", fake):
+            app.minute_series("VOO")
+            app.minute_series("VOO")
+        self.assertEqual(len(calls), 1)
+        self.assertIn("UsMinute", calls[0])
+
+    def test_no_data_is_an_error_not_an_empty_chart(self):
+        with mock.patch.object(app, "fetch", lambda url, **kw: '{"code":0,"data":{"usVOO":{"data":{"data":[],"date":"20261103"}}}}'):
+            with self.assertRaises(ValueError):
+                app.minute_series("VOO")

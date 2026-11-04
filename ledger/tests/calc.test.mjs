@@ -213,3 +213,23 @@ test("all held stocks as one: value, change against the previous closes, and wha
   assert.equal(C.portfolioQuote([], toUSD).pct, null);
   assert.equal(C.portfolioQuote([{ shares: 1, ccy: "USD", price: 10, prev: 0 }], toUSD).pct, null);
 });
+
+test("the held stocks as one intraday line: forward-filled per minute, the previous close before a stock's first minute", () => {
+  const toUSD = (n, ccy) => (ccy === "HKD" ? n / 8 : n);
+  const r = C.intradayPortfolio([
+    { shares: 2, ccy: "USD", prev: 100, points: [[60, 101], [120, 103]] },
+    { shares: 1, ccy: "USD", prev: 50, points: [[120, 49], [180, 52]] },
+    { shares: 5, ccy: "USD", prev: 0, points: [[60, 9]] },                 // no previous close: skipped
+    { shares: 1, ccy: "USD", prev: 10, points: [] },                       // no minutes: skipped
+  ], toUSD);
+  assert.deepEqual([...r.t], [60, 120, 180]);
+  near(r.base, 250);
+  near(r.v[0], 2 * 101 + 50);        // the second stock has not traded yet: it counts at its previous close
+  near(r.v[1], 2 * 103 + 49);
+  near(r.v[2], 2 * 103 + 52);        // the first stock keeps its last price
+  assert.deepEqual([r.used, r.skipped], [2, 2]);
+  const hk = C.intradayPortfolio([{ shares: 80, ccy: "HKD", prev: 10, points: [[60, 12]] }], toUSD);
+  near(hk.base, 100);
+  near(hk.v[0], 120);
+  assert.equal(C.intradayPortfolio([], toUSD).t.length, 0);
+});
