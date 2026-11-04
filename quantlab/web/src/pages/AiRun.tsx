@@ -36,7 +36,7 @@ export default function AiRun() {
       {sections.length ? (
         <div className="card">
           {sections.map(([key, sec], i) => (
-            <details key={key} className="report-section" open={i === sections.length - 1}>
+            <details key={key} className="report-section" open={i === sections.length - 1 || key === "personal_summary"}>
               <summary>{sec.title}</summary>
               <div className="report">
                 {/* Model output is untrusted: raw HTML is dropped and links are sanitized by react-markdown. */}

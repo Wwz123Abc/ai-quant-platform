@@ -9,8 +9,10 @@ import threading
 from pathlib import Path
 
 from ..config import get_settings
+from ..core import data
 from ..core.data import yahoo_symbol
 from ..errors import Unavailable
+from . import personal
 
 # The reports kept from a run, in reading order, with their Chinese titles.
 REPORTS = [
@@ -81,6 +83,7 @@ class Usage:
     def __init__(self):
         self._lock = threading.Lock()
         self.models = {}  # model -> [calls, input, cached input, output]
+        self.tool_outputs = []  # what the data tools returned, so the report's figures can be checked against it
 
     def handler(self):
         from langchain_core.callbacks import BaseCallbackHandler
@@ -90,6 +93,9 @@ class Usage:
         class Handler(BaseCallbackHandler):
             def on_llm_end(self, response, **kwargs):
                 usage.add_result(response)
+
+            def on_tool_end(self, output, **kwargs):
+                usage.add_tool_output(getattr(output, "content", output))
 
         return Handler()
 
@@ -106,6 +112,10 @@ class Usage:
         meta = meta or {}
         cached = (meta.get("input_token_details") or {}).get("cache_read") or 0
         self.add(model, meta.get("input_tokens", 0), cached, meta.get("output_tokens", 0))
+
+    def add_tool_output(self, text):
+        with self._lock:
+            self.tool_outputs.append(str(text)[:200_000])
 
     def add(self, model, tokens_in, tokens_cached, tokens_out):
         with self._lock:
@@ -158,4 +168,18 @@ def analyze(symbol, trade_date, usage, s=None):
     graph = TradingAgentsGraph(tuple(s.ai_analysts), config=build_config(s), callbacks=[usage.handler()])
     state, rating = graph.propagate(yahoo_symbol(symbol), str(trade_date))
     reports = {key: {"title": title, "text": str(state.get(key) or "")} for key, title in REPORTS}
-    return (rating if rating in RATINGS else "REVIEW"), reports
+    rating = rating if rating in RATINGS else "REVIEW"
+    personal.mark_unsourced(reports, usage.tool_outputs)
+    return rating, personal_first(symbol, trade_date, rating, reports)
+
+
+def personal_first(symbol, trade_date, rating, reports):
+    """reports with the personal summary placed before the full reports."""
+    try:
+        close = data.load(symbol)["close"]
+        lv = personal.levels(close[close.index <= str(trade_date)])
+    except Exception:  # the summary still has the rating and the conclusion without prices
+        lv = None
+    head = {"personal_summary": {"title": "个人版摘要",
+                                 "text": personal.summary(rating, reports["final_trade_decision"]["text"], lv)}}
+    return {**head, **reports}

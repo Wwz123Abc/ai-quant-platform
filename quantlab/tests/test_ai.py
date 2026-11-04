@@ -366,3 +366,36 @@ def test_summary_while_first_ai_decision_waits():
     assert by["QQQM"]["decision"] is True and by["VOO"]["decision"] is None and by["VOO"]["decision_date"] is None
     assert [o["symbol"] for o in s["pending"]] == ["QQQM"]
     pc.close()
+
+
+def test_figures_missing_from_the_fetched_data_are_marked():
+    from quantlab.ai import personal
+    sources = ["Close 2026-10-16: 612.34  50 SMA: 598.71\nPE ratio 27.4  dividend yield 0.0123\nVolume 1,234,567"]
+    reports = {"market_report": {"title": "技术", "text":
+        "收盘价 $612.34，50 日均线 598.71；市盈率 27.4；股息率 1.23%；前五大权重 30.8%，盈利收益率约 4.5%；"
+        "2026-10-16 共 3 个信号；成交 1,234,567 股；市值 $1.2万亿。"}}
+    personal.mark_unsourced(reports, sources)
+    text = reports["market_report"]["text"]
+    assert "30.8%、4.5%" in text.split("找不到")[1]
+    for ok in ("612.34", "598.71", "27.4", "1.23%"):
+        assert ok not in text.split("找不到")[1]
+    assert "1.2" not in text.split("找不到")[1]  # a figure with a scale unit is not checked
+    # no recorded tool output: nothing can be said, so the report is left alone
+    again = {"x": {"title": "t", "text": "约 4.5%"}}
+    assert personal.mark_unsourced(again, [])["x"]["text"] == "约 4.5%"
+
+
+def test_personal_summary_has_rating_conclusion_and_levels_from_our_data():
+    import pandas as pd
+    from quantlab.ai import personal
+    close = pd.Series([100.0 + i * 0.1 for i in range(300)], index=pd.bdate_range(end="2026-10-16", periods=300))
+    lv = personal.levels(close)
+    assert lv["date"] == "2026-10-16" and lv["high"] == lv["close"] and "ma200" in lv
+    text = personal.summary("Underweight", "## 最终决定\n\n评级：减持\n\n建议把仓位降到目标以下，因为估值偏高且趋势转弱，等待回调再看。\n", lv)
+    assert "减持" in text and "估值偏高" in text and "200 日线" in text and "评级：减持" not in text.split("理由")[1]
+
+
+def test_usage_collects_tool_outputs():
+    u = engine.Usage()
+    u.add_tool_output("Close 612.34")
+    assert u.tool_outputs == ["Close 612.34"]
