@@ -109,7 +109,7 @@ export default function Ai() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>编号</th><th>代码</th><th>收盘日</th><th>来源</th><th>状态</th><th>评级</th><th className="num">模型调用</th><th className="num">token（输入/输出）</th><th className="num">费用</th></tr>
+                <tr><th>编号</th><th>代码</th><th>收盘日</th><th className="hide-sm">来源</th><th>状态</th><th>评级</th><th className="num hide-sm">模型调用</th><th className="num hide-sm">token（输入/输出）</th><th className="num">费用</th></tr>
               </thead>
               <tbody>
                 {runs.data.map((r) => (
@@ -117,11 +117,11 @@ export default function Ai() {
                     <td><Link to={`/ai/runs/${r.id}`}>#{r.id}</Link></td>
                     <td>{r.symbol}</td>
                     <td>{r.trade_date}</td>
-                    <td className="hint">{{ manual: "手动", schedule: "每日任务", cli: "命令行" }[r.source] ?? r.source}</td>
+                    <td className="hint hide-sm">{{ manual: "手动", schedule: "每日任务", cli: "命令行" }[r.source] ?? r.source}</td>
                     <td className={r.status === "failed" ? "down" : undefined} title={r.error ?? undefined}>{STATUS[r.status]}</td>
                     <td>{r.rating ? RATING[r.rating] ?? r.rating : "—"}</td>
-                    <td className="num">{r.llm_calls}</td>
-                    <td className="num">{r.tokens_in.toLocaleString()} / {r.tokens_out.toLocaleString()}</td>
+                    <td className="num hide-sm">{r.llm_calls}</td>
+                    <td className="num hide-sm">{r.tokens_in.toLocaleString()} / {r.tokens_out.toLocaleString()}</td>
                     <td className="num">{yuan(r.cost_cny)}</td>
                   </tr>
                 ))}

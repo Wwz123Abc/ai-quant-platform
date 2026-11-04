@@ -57,20 +57,17 @@ export default function Analyze() {
           {r.levels ? (
             <div className="card">
               <h2>关键价位（{r.levels.date} 收盘 {num(r.levels.close)}，{r.levels.source}）</h2>
-              <div className="table-wrap">
-                <table>
-                  <thead><tr><th>类型</th><th>名称</th><th className="num">价位</th><th className="num">距收盘</th><th>怎么算的</th></tr></thead>
-                  <tbody>
-                    {[...r.levels.levels].sort((x, y) => y.price - x.price).map((l, i) => (
-                      <tr key={i}>
-                        <td>{l.group}</td><td>{l.name}</td><td className="num">{num(l.price)}</td>
-                        <td className="num"><Signed v={l.distance} digits={1} /></td>
-                        <td className="hint" style={{ whiteSpace: "normal" }}>{l.basis}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="levels">
+                {[...r.levels.levels].sort((x, y) => y.price - x.price).map((l, i) => (
+                  <li key={i}>
+                    <div className="top">
+                      <span className="name"><small>{l.group}</small>{l.name}</span>
+                      <span className="val">{num(l.price)} <Signed v={l.distance} digits={1} /></span>
+                    </div>
+                    <div className="hint">{l.basis}</div>
+                  </li>
+                ))}
+              </ul>
               <p className="hint">价位只是参考，不生成订单；行情是复权后的，较早的价位可能比当时的报价略低。</p>
             </div>
           ) : null}

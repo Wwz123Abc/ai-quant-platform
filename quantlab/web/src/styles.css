@@ -146,6 +146,15 @@ main {
   .shell {
     grid-template-columns: minmax(0, 1fr); /* plain 1fr would let a wide table stretch the page */
   }
+  .hide-sm {
+    display: none; /* secondary table columns: the rest fit without sideways scrolling */
+  }
+  /* iPhone zooms the page when an input under 16px gets focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
   .nav {
     position: static;
     height: auto;
@@ -505,4 +514,33 @@ ul.todo li {
 }
 ul.todo li.warn-item {
   color: var(--warn);
+}
+
+/* Key price levels: one entry per level, the way it was computed on the line below, so nothing needs sideways scrolling */
+.levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.levels li {
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.levels .top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.levels .top .name {
+  font-weight: 600;
+}
+.levels .top .name small {
+  font-weight: 400;
+  color: var(--muted);
+  margin-right: 6px;
+}
+.levels .top .val {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
