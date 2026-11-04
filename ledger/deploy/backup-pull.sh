@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Off-site backup of the ledger onto this computer: pulls the newest database backup from the server, checks it is an
+# Off-site backup of the ledger onto this computer: has the server make a fresh backup, pulls it, checks it is an
 # intact SQLite database, keeps the newest 60 in the backup folder, and records the outcome on the server
 # (data/offsite.json), which the ledger shows under 系统状态.
 #
@@ -20,6 +20,8 @@ os.replace(path + ".tmp", path)
 PY
 }
 
+# a fresh online backup first, so what is pulled is the ledger as it is now, not as it was at 03:30
+ssh -o BatchMode=yes "$HOST" "sudo -u stockledger python3 /opt/stock-ledger/app.py backup >/dev/null" || true
 latest=$(ssh -o BatchMode=yes "$HOST" "sudo ls -1 /opt/stock-ledger/data/backups | grep '^ledger-.*\.db\$' | sort | tail -n 1")
 [ -n "$latest" ] || { record failed "服务器上没有找到备份" none; echo "服务器上没有找到备份" >&2; exit 1; }
 if [ ! -f "$latest" ]; then

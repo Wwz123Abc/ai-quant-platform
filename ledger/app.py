@@ -72,6 +72,7 @@ MAX_IMPORT = 1000        # records in one import
 MAX_USERS = 2000
 MAX_DOCS = 5000          # records per account
 REFRESH_GAP = 30         # seconds between two refreshes of one account
+QUOTE_EVERY = 60         # seconds between automatic price updates while a market is open
 RESET_HOURS = 24
 HK, NY = ZoneInfo("Asia/Hong_Kong"), ZoneInfo("America/New_York")
 write_lock = threading.Lock()
@@ -795,6 +796,56 @@ def refresh_market(uid):
     return report
 
 
+def refresh_quotes(uid, now=None):
+    """Live prices only: updates the prices of this account's stocks whose regular session is under way (and, once, those
+    whose session just ended, so "盘中" turns into "收盘"), from Tencent's quote. Nothing else is touched (no closes, bars, rates or checks: the refresh button does those) and nothing is
+    written when no price changed, so the page's version only moves when there is something new. Returns what changed."""
+    trades = [d["data"] for d in list_docs(uid, "trades")]
+    cfg = get_doc(uid, "config", "main") or {}
+    symbols = sorted({s for s in (str(t.get("symbol", "")).upper() for t in trades) if SYMBOL_RE.match(s)}
+                     | {s for s in (cfg.get("prices") or {}) if SYMBOL_RE.match(s)})
+    was_live = {s for s, m in (cfg.get("quotes") or {}).items() if (m or {}).get("kind") == "live"}
+    live = [s for s in symbols if in_session(s, now) or s in was_live]  # a stock whose session just ended gets its close once
+    if not live:
+        return {}
+    q, _ = quotes(live)
+    prices, meta, changed = dict(cfg.get("prices") or {}), dict(cfg.get("quotes") or {}), {}
+    for s, x in q.items():
+        old = meta.get(s) or {}
+        if (x["kind"] != "live" and old.get("kind") != "live") or (old.get("source") == "手动" and str(old.get("date", "")) > x["date"]):
+            continue
+        if prices.get(s) == x["price"] and old.get("kind") == x["kind"] and old.get("date") == x["date"]:
+            continue
+        prices[s] = x["price"]
+        meta[s] = {"date": x["date"], "kind": x["kind"], "source": "腾讯财经", "currency": x["currency"], "name": x["name"] or old.get("name", "")}
+        changed[s] = x["price"]
+    if changed:
+        put_doc(uid, "config", "main", {"prices": prices, "quotes": meta, "updatedAt": now_iso()}, merge=True)
+    return changed
+
+
+def quote_loop():
+    """Every QUOTE_EVERY seconds, refresh the live prices of every account. Skips a round while a refresh is running."""
+    last_error = None
+    while True:
+        time.sleep(QUOTE_EVERY)
+        try:
+            if not refresh_lock.acquire(blocking=False):
+                continue
+            try:
+                with db() as con:
+                    uids = [r["id"] for r in con.execute("SELECT id FROM users")]
+                for uid in uids:
+                    refresh_quotes(uid)
+            finally:
+                refresh_lock.release()
+            last_error = None
+        except Exception as e:  # keep going; say so once per kind of failure, not every minute
+            if str(e) != last_error:
+                print("automatic price update failed: %s" % e, flush=True)
+                last_error = str(e)
+
+
 # ---------------------------------------------------------------- import and screenshot recognition
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -1201,6 +1252,8 @@ def main():
         host = sys.argv[sys.argv.index("--host") + 1] if "--host" in sys.argv else "127.0.0.1"
         port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 5090
         print("%d accounts, registration %s; listening on %s:%d" % (user_count(), "open" if registration_open() else "closed", host, port), flush=True)
+        if os.environ.get("LEDGER_AUTO_QUOTES", "1") != "0":
+            threading.Thread(target=quote_loop, name="quote-loop", daemon=True).start()
         ThreadingHTTPServer((host, port), Handler).serve_forever()
     elif cmd == "users":
         with db() as con:

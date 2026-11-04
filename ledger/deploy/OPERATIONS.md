@@ -25,9 +25,9 @@ ledger/deploy/deploy.sh
 | 什么 | 什么时候 | 在哪里 | 保留 |
 | --- | --- | --- | --- |
 | 本地备份（SQLite 在线备份，运行中也能拿到一致的快照） | 每天 03:30（服务器） | `/opt/stock-ledger/data/backups` | 30 份 |
-| 异地备份：拉到你的电脑，检查完整后保存 | 手动运行 `ledger/deploy/backup-pull.sh`（建议每周至少一次） | `Desktop/stock-projects/ledger-backups` | 60 份 |
+| 异地备份：让服务器先做一份最新备份，再拉到你的电脑，检查完整后保存 | Windows 计划任务 `LedgerBackupPull`：每天 9:30 和每次登录时（电脑当时没开机，开机后补跑）；也可手动运行 `ledger/deploy/backup-pull.sh` | `Desktop/stock-projects/ledger-backups`（日志 `pull.log`） | 60 份 |
 
-- 拉取的结果写在服务器 `/opt/stock-ledger/data/offsite.json`，系统状态里显示；太久没拉会标 ⚠。
+- 拉取的结果写在服务器 `/opt/stock-ledger/data/offsite.json`，系统状态里显示；太久没拉会标 ⚠。计划任务在“任务计划程序”里叫 `LedgerBackupPull`，可以改时间或删除。
 - 旧的“服务器发到旧服务器”方式（[backup-push.sh](backup-push.sh)、[backup-receive.sh](backup-receive.sh)）已停用，脚本留作参考。
 
 ## 行情接口自检
@@ -59,3 +59,7 @@ ledger/deploy/restore-drill.sh
 2. 选备份：本地的在 `data/backups/`，异地的在新服务器 `/var/backups/ledger/`（文件名是时间）。
 3. 放回去：`install -o stockledger -g stockledger -m 644 备份文件 /opt/stock-ledger/data/ledger.db`，并删掉旁边旧的 `ledger.db-wal`、`ledger.db-shm`。
 4. 启动并检查：`systemctl start stock-ledger`，打开网站核对持仓；备份之后录入的记录需要重新录。
+
+## 价格自动更新
+
+服务器在开市时每 60 秒自动取一次腾讯的实时报价（美股 9:30–16:00 美东，港股 9:30–12:00、13:00–16:00 香港），只更新持仓里正在交易的股票的现价，标“盘中”；页面每 30 秒读一次服务器，所以打开着的页面会自己变。价格没变就不写库，页面不会白刷新。收盘后补取一次，把“盘中”改成“收盘”。收盘价、历史行情、汇率、价格核对仍然只在点“刷新数据”和每天的检查里更新。你手动填写的价格不会被盖掉（手动的日期更晚时保留）。关闭：给账本服务设环境变量 `LEDGER_AUTO_QUOTES=0`。代码：`app.py` 的 `refresh_quotes`、`quote_loop`。
