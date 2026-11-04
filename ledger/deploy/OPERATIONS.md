@@ -54,7 +54,7 @@ sudo -u stockledger python3 /opt/stock-ledger/app.py check-sources
 ledger/deploy/restore-drill.sh
 ```
 
-在新服务器上把最新的异地备份恢复成一个临时账本（用当前提交的代码），启动、检查能响应，并和线上的记录数逐类对比，然后删掉临时账本。结果写进 `data/drill.json`，系统状态里显示；超过 90 天会标 ⚠。
+在异地备份所在的旧服务器上把最新的异地备份恢复成一个临时账本（用当前提交的代码），启动、检查能响应，并和线上的记录数逐类对比，然后删掉临时账本。结果写进 `data/drill.json`，系统状态里显示；超过 90 天会标 ⚠。
 
 ## 真的需要恢复时
 
