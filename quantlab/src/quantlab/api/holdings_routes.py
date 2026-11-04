@@ -35,12 +35,24 @@ class HoldingPosition(BaseModel):
     weight: float | None
 
 
+class FixedItem(BaseModel):
+    name: str
+    kind: Literal["bond", "deposit"]
+    currency: str
+    maturity: str
+    started: bool
+    matured: bool
+    days_left: int = Field(description="距到期的天数，已到期是负数")
+    value: float | None = Field(description="按账本的算法折成美元的价值：持有到期、含应计利息；未开始是 null，已到期是 0")
+
+
 class Valuation(BaseModel):
     positions: list[HoldingPosition]
     cash: float
     stocks: float
     investable: float
     fixed: float
+    fixed_items: list[FixedItem] = Field(default_factory=list)
     total: float
     cash_weight: float | None
 
@@ -65,6 +77,13 @@ class Reminder(BaseModel):
     text: str
 
 
+class PriceCheck(BaseModel):
+    symbol: str
+    against: str = Field(description="第二个来源：新浪财经或东方财富；没能核对时为空")
+    ok: bool | None = Field(description="一致、不一致，或没能核对（null）")
+    text: str
+
+
 class Review(BaseModel):
     id: int
     at: str
@@ -76,6 +95,7 @@ class Review(BaseModel):
     proposals: list[Proposal]
     notes: list[str]
     reminders: list[Reminder]
+    price_check: list[PriceCheck] = Field(default_factory=list, description="持有股票最近 5 个交易日的收盘价和第二个来源的核对（规则和账本相同）")
 
 
 class HoldingsStatus(BaseModel):

@@ -45,7 +45,7 @@ def model_rank(sym):
     return {"rank": int(order[sym]), "of": len(scores), "signal_date": folders[-1].parent.name}
 
 
-def analyze(sym, amount=None, load=None, with_fundamentals=True):
+def analyze(sym, amount=None, load=None, with_fundamentals=True, check=True):
     sym = data.normalize(sym)
     load = load or data.load
     tech = signals.technical(sym, load)
@@ -99,7 +99,7 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True):
                      "max_buy": max_buy, "max_shares": count(max_buy), "amount_given": given, "amount": amt, "shares": shares,
                      "whole_shares": whole, "price": px, "weight_after": after, "correlations": corr, "avg_correlation": avg_corr}
     allowed = bool(checks) and all(c["ok"] for c in checks) and (portfolio or {}).get("amount", 0) > 0
-    notes = []
+    notes = [{"kind": "核对", "text": c["text"]} for c in (review.check_prices({sym}) if check else [])]
     if tech.get("uptrend") is False:
         notes.append({"kind": "趋势", "text": "50 日线在 200 日线下方（空头排列）"})
     elif tech.get("uptrend"):

@@ -525,6 +525,11 @@ def _print_review(r):
         print("\n没有建议订单：持仓符合你的规则。")
     for n in r["notes"]:
         print("  · %s" % n)
+    checks = r.get("price_check") or []
+    if checks:
+        good = [c["symbol"] for c in checks if c["ok"]]
+        print("\n价格核对（规则和账本相同）：%s" % ("%s 最近 5 个交易日的收盘价和%s一致" % ("、".join(good), checks[0]["against"] or "第二来源")
+                                                if len(good) == len(checks) else "%d 只一致，%d 只有问题（见提醒）" % (len(good), len(checks) - len(good))))
     if r["reminders"]:
         print("\n提醒（只是信号，不会生成订单）：")
         for m in r["reminders"]:

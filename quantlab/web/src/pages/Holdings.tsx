@@ -107,12 +107,47 @@ export default function Holdings() {
                   {r.reminders.map((m, i) => <li key={i} className={m.level === "warn" ? "down" : undefined}>{m.symbol} [{m.kind}] {m.text}</li>)}
                 </ul>
               ) : <p className="empty">没有提醒。</p>}
+              <PriceCheckLine checks={r.price_check ?? []} />
             </div>
           </div>
+          {v.fixed_items?.length ? (
+            <div className="card">
+              <h2>国债和定期存款（{money(v.fixed)}，按账本的算法）</h2>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>名称</th><th>到期日</th><th className="num">价值</th><th>状态</th></tr></thead>
+                  <tbody>
+                    {v.fixed_items.map((f, i) => (
+                      <tr key={i}>
+                        <td>{f.name}</td><td>{f.maturity}</td>
+                        <td className="num">{f.value == null ? "—" : money(f.value)}</td>
+                        <td>{!f.started ? "未开始" : f.matured ? "已到期，回到储蓄账户" : `还有 ${f.days_left} 天`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="hint">持有到期：国债按买入净价逐日拉向面值再加应计利息，定存按天数平摊利息，和账本首页一样；港币按设定的汇率折成美元。已到期的不再计入，钱回到储蓄账户。</p>
+            </div>
+          ) : null}
         </>
       ) : review.isPending ? <p className="empty">正在读取…</p> : <p className="empty">还没有检查过持仓。</p>}
       <PolicyCard />
     </>
+  );
+}
+
+/** One line on the cross-check of the held stocks' closes; the problems themselves are in the reminders. */
+function PriceCheckLine({ checks }: { checks: HoldingsReview["price_check"] }) {
+  if (!checks?.length) return null;
+  const good = checks.filter((c) => c.ok);
+  const against = good[0]?.against || "第二个来源";
+  return (
+    <p className="hint" style={{ marginTop: 12 }}>
+      价格核对（规则和账本相同）：{good.length === checks.length
+        ? `${good.map((c) => c.symbol).join("、")} 最近 5 个交易日的收盘价和${against}一致，差异不超过 0.2%。`
+        : `${good.length} 只一致，${checks.length - good.length} 只有问题（见上面标“核对”的提醒）。`}
+    </p>
   );
 }
 

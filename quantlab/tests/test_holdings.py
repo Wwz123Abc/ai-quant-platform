@@ -16,8 +16,12 @@ SNAP = {
         {"date": "2026-09-15", "side": "buy", "symbol": "BBB", "shares": 4, "price": 50, "fees": 0, "currency": "USD"},
     ],
     "cash": [{"name": "储蓄", "currency": "USD", "amount": 1000}],
-    "fixed": [{"kind": "deposit", "principal": 2000, "currency": "USD"}, {"kind": "bond", "face": 1000, "price": 98, "accruedPaid": 5}],
+    "fixed": [{"kind": "deposit", "principal": 2000, "interest": 40, "start": "2026-07-01", "maturity": "2027-07-01", "currency": "USD"},
+              {"kind": "bond", "face": 1000, "price": 98, "coupon": 4, "freq": 2, "settle": "2026-01-01", "maturity": "2027-01-01",
+               "accruedPaid": 0, "currency": "USD"}],
 }
+DAY = "2026-07-01"   # the deposit starts; the bond is on a coupon date, its clean price halfway to par
+FIXED = 2000 + 980 + 20 * 181 / 365
 
 
 def bars(level, n=300, seed=0, end="2026-10-16"):
@@ -37,14 +41,14 @@ def test_positions_average_cost():
     a = pos["AAA"]
     assert a["shares"] == 15 and a["avg_cost"] == pytest.approx((1000 + 1 + 1200) / 20)  # selling keeps the average cost
     assert pos["BBB"]["shares"] == 4
-    assert ledger.cash_usd(SNAP) == 1000 and ledger.fixed_usd(SNAP) == pytest.approx(2000 + 980 + 5)
+    assert ledger.cash_usd(SNAP) == 1000 and ledger.fixed_usd(SNAP, DAY) == pytest.approx(FIXED)
 
 
 def test_valuation():
-    v = review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0})
+    v = review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0}, DAY)
     assert v["stocks"] == 15 * 150 + 4 * 25 and v["investable"] == 2350 + 1000
     w = {p["symbol"]: p["weight"] for p in v["positions"]}
-    assert w["AAA"] == pytest.approx(2250 / 3350) and v["total"] == pytest.approx(3350 + 2985)
+    assert w["AAA"] == pytest.approx(2250 / 3350) and v["total"] == pytest.approx(3350 + FIXED)
 
 
 def test_policy_validation():
@@ -209,3 +213,42 @@ def test_api(monkeypatch):
     j = a.json()
     assert j["portfolio"]["shares"] == 2 and j["portfolio"]["amount"] == 80 and j["technical"]["symbol"] == "CCC"   # $100 buys 2 whole shares
     assert j["fundamentals"] is None and j["fundamentals_note"] == "ETF 没有公司财报"
+
+
+def test_fixed_income_by_the_ledgers_rules():
+    status = {f["kind"]: f for f in ledger.fixed_status(SNAP, "2026-12-25")}
+    assert status["bond"]["days_left"] == 7 and not status["bond"]["matured"]
+    after = {f["kind"]: f for f in ledger.fixed_status(SNAP, "2027-01-05")}
+    assert after["bond"]["matured"] and after["bond"]["value"] == 0      # back in savings: no longer counted
+    assert ledger.fixed_usd(SNAP, "2026-06-30") == pytest.approx(980 + 20 * 180 / 365 + 20 * 180 / 181)  # the deposit has not started
+    broken = {**SNAP, "fixed": [{"kind": "deposit", "principal": 100},
+                                {"kind": "bond", "face": 1000, "price": 0, "settle": "2026-01-01", "maturity": "2027-01-01"}]}
+    assert ledger.fixed_items(broken) == []                               # records the ledger cannot value are left out
+    hkd = {"fixed": [{"kind": "deposit", "currency": "HKD", "principal": "7800", "interest": "0", "start": "2026-01-01", "maturity": "2027-01-01"}]}
+    assert ledger.fixed_usd(hkd, "2026-06-01") == pytest.approx(7800 / 7.8)
+
+
+def test_maturity_reminders():
+    pol = policy.validate({})
+    due = review.reminders(review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0}, "2026-12-25"), pol, load, with_fundamentals=False)
+    assert any(r["kind"] == "到期" and "还有 7 天" in r["text"] for r in due)
+    gone = review.reminders(review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0}, "2027-01-05"), pol, load, with_fundamentals=False)
+    assert any(r["kind"] == "到期" and "已到期" in r["text"] for r in gone)
+
+
+def test_price_checks_become_reminders(monkeypatch):
+    from quantlab.config import get_settings
+    from quantlab.core import price_check
+
+    monkeypatch.setattr(ledger, "load", lambda refresh=False: {**SNAP, "synced": "2026-10-19T00:00:00+00:00"})
+    monkeypatch.setattr(signals, "ai_rating", lambda s: None)
+    monkeypatch.setattr(price_check, "check", lambda s: {"symbol": s, "against": "新浪财经", "ok": s != "BBB", "text": "%s 核对结果" % s})
+    first = review.run(refresh=False, load=load, with_fundamentals=False)
+    assert first["price_check"] == []                                       # Yahoo prices: Tencent's are not what we used
+    monkeypatch.setenv("QUANTLAB_PRICE_SOURCE", "cn")
+    get_settings.cache_clear()
+    r = review.run(refresh=False, load=load, with_fundamentals=False)
+    assert [c["symbol"] for c in r["price_check"]] == ["AAA", "BBB"]
+    assert [(m["symbol"], m["level"]) for m in r["reminders"] if m["kind"] == "核对"] == [("BBB", "warn")]
+    a = analysis.analyze("CCC", load=load, with_fundamentals=False)
+    assert {"kind": "核对", "text": "CCC 核对结果"} in a["notes"]

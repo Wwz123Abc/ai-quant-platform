@@ -883,6 +883,34 @@ export interface components {
             /** Price */
             price: number;
         };
+        /** FixedItem */
+        FixedItem: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bond" | "deposit";
+            /** Currency */
+            currency: string;
+            /** Maturity */
+            maturity: string;
+            /** Started */
+            started: boolean;
+            /** Matured */
+            matured: boolean;
+            /**
+             * Days Left
+             * @description 距到期的天数，已到期是负数
+             */
+            days_left: number;
+            /**
+             * Value
+             * @description 按账本的算法折成美元的价值：持有到期、含应计利息；未开始是 null，已到期是 0
+             */
+            value: number | null;
+        };
         /** Fundamentals */
         Fundamentals: {
             /** Revenue Ttm */
@@ -1191,6 +1219,23 @@ export interface components {
             /** Benchmark Return */
             benchmark_return: number;
         };
+        /** PriceCheck */
+        PriceCheck: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Against
+             * @description 第二个来源：新浪财经或东方财富；没能核对时为空
+             */
+            against: string;
+            /**
+             * Ok
+             * @description 一致、不一致，或没能核对（null）
+             */
+            ok: boolean | null;
+            /** Text */
+            text: string;
+        };
         /** Proposal */
         Proposal: {
             /** Id */
@@ -1269,6 +1314,11 @@ export interface components {
             notes: string[];
             /** Reminders */
             reminders: components["schemas"]["Reminder"][];
+            /**
+             * Price Check
+             * @description 持有股票最近 5 个交易日的收盘价和第二个来源的核对（规则和账本相同）
+             */
+            price_check?: components["schemas"]["PriceCheck"][];
         };
         /** RunRequest */
         RunRequest: {
@@ -1801,6 +1851,8 @@ export interface components {
             investable: number;
             /** Fixed */
             fixed: number;
+            /** Fixed Items */
+            fixed_items?: components["schemas"]["FixedItem"][];
             /** Total */
             total: number;
             /** Cash Weight */

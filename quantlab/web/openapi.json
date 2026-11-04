@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.10.7"
+    "version": "0.10.8"
   },
   "paths": {
     "/api/health": {
@@ -3069,6 +3069,67 @@
         ],
         "title": "Fill"
       },
+      "FixedItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bond",
+              "deposit"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "maturity": {
+            "type": "string",
+            "title": "Maturity"
+          },
+          "started": {
+            "type": "boolean",
+            "title": "Started"
+          },
+          "matured": {
+            "type": "boolean",
+            "title": "Matured"
+          },
+          "days_left": {
+            "type": "integer",
+            "title": "Days Left",
+            "description": "距到期的天数，已到期是负数"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "按账本的算法折成美元的价值：持有到期、含应计利息；未开始是 null，已到期是 0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "currency",
+          "maturity",
+          "started",
+          "matured",
+          "days_left",
+          "value"
+        ],
+        "title": "FixedItem"
+      },
       "Fundamentals": {
         "properties": {
           "revenue_ttm": {
@@ -3849,6 +3910,43 @@
         ],
         "title": "Position"
       },
+      "PriceCheck": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "against": {
+            "type": "string",
+            "title": "Against",
+            "description": "第二个来源：新浪财经或东方财富；没能核对时为空"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok",
+            "description": "一致、不一致，或没能核对（null）"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "against",
+          "ok",
+          "text"
+        ],
+        "title": "PriceCheck"
+      },
       "Proposal": {
         "properties": {
           "id": {
@@ -4075,6 +4173,14 @@
             },
             "type": "array",
             "title": "Reminders"
+          },
+          "price_check": {
+            "items": {
+              "$ref": "#/components/schemas/PriceCheck"
+            },
+            "type": "array",
+            "title": "Price Check",
+            "description": "持有股票最近 5 个交易日的收盘价和第二个来源的核对（规则和账本相同）"
           }
         },
         "type": "object",
@@ -5640,6 +5746,13 @@
           "fixed": {
             "type": "number",
             "title": "Fixed"
+          },
+          "fixed_items": {
+            "items": {
+              "$ref": "#/components/schemas/FixedItem"
+            },
+            "type": "array",
+            "title": "Fixed Items"
           },
           "total": {
             "type": "number",

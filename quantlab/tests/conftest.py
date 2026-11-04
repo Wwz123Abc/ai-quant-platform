@@ -11,6 +11,7 @@ def isolated_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("QUANTLAB_REPORTS_DIR", str(tmp_path / "reports"))
     monkeypatch.setenv("QUANTLAB_API_TOKEN", "test-token")
     monkeypatch.setenv("QUANTLAB_SCHEDULE_ENABLED", "false")
+    monkeypatch.setenv("QUANTLAB_PRICE_SOURCE", "yahoo")  # as in CI, whatever a local .env says; tests that need cn set it
     get_settings.cache_clear()
     security.api_token.cache_clear()
     yield

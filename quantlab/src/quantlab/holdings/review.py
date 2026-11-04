@@ -7,10 +7,11 @@ import contextlib
 import datetime as dt
 import json
 import math
+import re
 
 from .. import storage
 from ..config import get_settings
-from ..core import data
+from ..core import data, price_check
 from ..errors import NotFound, QuantLabError
 from . import ledger, policy, signals
 
@@ -22,6 +23,7 @@ MIGRATIONS = [
        CREATE INDEX proposals_status ON proposals (status)""",
 ]
 CASH_LEVEL = {"Sell": "warn", "Underweight": "warn", "Buy": "info", "Overweight": "info", "Hold": "info"}
+DUE_DAYS, MATURED_DAYS = 14, 30  # remind of a Treasury or deposit this many days before and after its maturity
 
 
 def connect():
@@ -32,8 +34,9 @@ def now_iso():
     return dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
 
 
-def valuation(snapshot, prices):
-    """Positions at the latest prices, with weights of the investable money (stocks + cash)."""
+def valuation(snapshot, prices, day=None):
+    """Positions at the latest prices, with weights of the investable money (stocks + cash). Treasuries and deposits
+    are valued as the ledger values them on day (default today in New York)."""
     pos = ledger.positions(snapshot)
     cash = ledger.cash_usd(snapshot)
     for p in pos:
@@ -45,8 +48,9 @@ def valuation(snapshot, prices):
     investable = stocks + cash
     for p in pos:
         p["weight"] = (p["value"] / investable) if p["value"] and investable > 0 else None
-    fixed = ledger.fixed_usd(snapshot)
-    return {"positions": pos, "cash": cash, "stocks": stocks, "investable": investable, "fixed": fixed,
+    items = ledger.fixed_status(snapshot, day)
+    fixed = sum(f["value"] or 0.0 for f in items)
+    return {"positions": pos, "cash": cash, "stocks": stocks, "investable": investable, "fixed": fixed, "fixed_items": items,
             "total": investable + fixed, "cash_weight": cash / investable if investable > 0 else None}
 
 
@@ -114,6 +118,11 @@ def reminders(val, pol, load=None, with_fundamentals=True):
     add = lambda sym, level, kind, text: out.append({"symbol": sym, "level": level, "kind": kind, "text": text})
     if val["cash_weight"] is not None and val["cash_weight"] < pol["cash_reserve"] - 1e-9:
         add("现金", "warn", "规则", "现金只占 %.1f%%，低于储备 %.0f%%" % (val["cash_weight"] * 100, pol["cash_reserve"] * 100))
+    for f in val.get("fixed_items", []):
+        if f["matured"] and f["days_left"] >= -MATURED_DAYS:
+            add(f["name"], "info", "到期", "%s 已到期，本息回到储蓄账户，不再算在国债定存里；在账本里更新现金后，可投资资金才会算上这笔钱" % f["maturity"])
+        elif f["started"] and not f["matured"] and f["days_left"] <= DUE_DAYS:
+            add(f["name"], "info", "到期", "%s 到期（还有 %d 天）" % (f["maturity"], f["days_left"]))
     for p in val["positions"]:
         sym = p["symbol"]
         if p["gain"] is not None and p["gain"] <= -pol["alert_drawdown_from_cost"]:
@@ -142,6 +151,14 @@ def reminders(val, pol, load=None, with_fundamentals=True):
     return out
 
 
+def check_prices(symbols):
+    """Each US stock's recent closes checked against a second source by the ledger's rule (core/price_check.py).
+    Only with the mainland price source, whose closes are Tencent's: Yahoo's are not what the check looks at."""
+    if get_settings().price_source != "cn":
+        return []
+    return [price_check.check(s) for s in sorted(symbols) if re.fullmatch(r"[A-Z][A-Z.\-]*", s)]
+
+
 def prices_for(symbols, load=None):
     load = load or data.load
     out = {}
@@ -151,8 +168,9 @@ def prices_for(symbols, load=None):
     return out
 
 
-def run(refresh=True, load=None, with_fundamentals=True):
-    """Syncs (when a key is configured), reviews, and records the review and its proposals.
+def run(refresh=True, load=None, with_fundamentals=True, check=True):
+    """Syncs (when a key is configured), reviews, and records the review and its proposals. check cross-checks the
+    held stocks' recent closes with a second source.
 
     Pending proposals from earlier reviews are superseded: each review stands on the latest holdings."""
     load = load or data.load
@@ -167,9 +185,11 @@ def run(refresh=True, load=None, with_fundamentals=True):
     val = valuation(snap, prices)
     props, notes = proposals(val, pol, prices)
     rem = reminders(val, pol, load, with_fundamentals)
+    checks = check_prices({p["symbol"] for p in val["positions"]}) if check else []
+    rem += [{"symbol": c["symbol"], "level": "info" if c["ok"] is None else "warn", "kind": "核对", "text": c["text"]} for c in checks if not c["ok"]]
     review = {"at": now_iso(), "synced": snap.get("synced"), "account": snap.get("account"), "policy": pol,
               "price_date": min(dates) if dates else None,  # the oldest close the review used
-              "valuation": val, "notes": notes, "reminders": rem}
+              "valuation": val, "notes": notes, "reminders": rem, "price_check": checks}
     con = connect()
     try:
         with con:
