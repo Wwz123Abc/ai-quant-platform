@@ -16,11 +16,12 @@
   :root { --bg: #11161C; --surface: #19212A; --ink: #E5EAF0; --muted: #95A2AF; --line: #2B3540; --accent: #82ABDA; --accent-soft: #1F2D3C; --on-accent: #0E1620; --warn: #E0A84A; color-scheme: dark; }
 }
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
+body { margin: 0; min-height: 100vh; display: grid; grid-template-rows: 1fr auto; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
 main { width: min(100%, 380px); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; display: grid; gap: 16px; }
 h1 { margin: 0; font-size: 24px; font-weight: 600; }
 p { margin: 0; color: var(--muted); font-size: 13px; }
 a { color: var(--accent); }
+.icp { margin-top: 16px; font-size: 12px; text-align: center; }
 label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
 label small { font-size: 12px; }
 label.check { display: flex; align-items: flex-start; gap: 8px; }
@@ -61,6 +62,7 @@ button:disabled { opacity: .6; cursor: default; }
     </div>
   </form>
 </main>
+<p class="icp"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">津ICP备2025042145号-2</a></p>
 <script>
 (async () => {
   const $ = (s) => document.querySelector(s);
