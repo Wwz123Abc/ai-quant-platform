@@ -146,9 +146,9 @@ main {
   .shell {
     grid-template-columns: minmax(0, 1fr); /* plain 1fr would let a wide table stretch the page */
   }
-  th,
-  td {
-    padding: 7px 6px; /* tables get tighter so the main columns fit */
+  table th,
+  table td {
+    padding: 7px 6px; /* tables get tighter so the main columns fit (more specific than the base rule, which comes later) */
   }
   .hide-sm {
     display: none; /* secondary table columns: the rest fit without sideways scrolling */
