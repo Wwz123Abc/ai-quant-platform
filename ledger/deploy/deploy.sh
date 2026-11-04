@@ -5,11 +5,12 @@
 #   2. backs up the running files and the database on the server
 #   3. installs, restarts, and checks the service answers; if it does not, puts the previous files back
 #
-# Usage: ledger/deploy/deploy.sh            (LEDGER_HOST overrides root@49.232.210.129)
+# Usage: ledger/deploy/deploy.sh            (LEDGER_HOST overrides ubuntu@42.194.244.252)
 #        ledger/deploy/deploy.sh --from SHA  the first time, naming the commit the server runs now
 set -euo pipefail
 
-HOST="${LEDGER_HOST:-root@49.232.210.129}"
+HOST="${LEDGER_HOST:-ubuntu@42.194.244.252}"
+SUDO=""; case "$HOST" in root@*) ;; *) SUDO="sudo" ;; esac   # the new server logs in as ubuntu
 DIR=/opt/stock-ledger
 cd "$(dirname "$0")/.."                                     # ledger/
 REPO_PATH=ledger
@@ -50,7 +51,7 @@ git -C "$(git rev-parse --show-toplevel)" archive --format=tar.gz -o "${TMPDIR:-
 scp -q "${TMPDIR:-/tmp}/ledger-$TS.tgz" "$HOST:$PKG"
 rm -f "${TMPDIR:-/tmp}/ledger-$TS.tgz"
 
-ssh -o BatchMode=yes "$HOST" "TS=$TS PKG=$PKG DIR=$DIR COMMIT=$COMMIT bash -s" <<'REMOTE'
+ssh -o BatchMode=yes "$HOST" "$SUDO env TS=$TS PKG=$PKG DIR=$DIR COMMIT=$COMMIT bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$DIR"
 BK="page-backups/deploy-$TS"
