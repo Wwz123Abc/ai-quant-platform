@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     trading_paper_weeks_before_live: int = 8
 
     # Your real holdings, read from the stock ledger with its read-only key (LEDGER_TOKEN in .env).
-    ledger_url: str = "https://stock.wwz.cool"
+    ledger_url: str = "https://wwz.hk.cn"
     hkd_per_usd: float = 7.8                 # Hong Kong dollars are pegged near this rate
 
     # Daily job: AI analyses for AI accounts, then a decision for every paper account. Runs inside `serve`.

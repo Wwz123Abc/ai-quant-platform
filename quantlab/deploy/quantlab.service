@@ -1,5 +1,5 @@
 [Unit]
-Description=QuantLab quant platform (served at stock.wwz.cool/lab/ behind the ledger sign-in)
+Description=QuantLab quant platform (served at wwz.hk.cn/lab/ behind the ledger sign-in)
 After=network-online.target stock-ledger.service
 Wants=network-online.target
 

@@ -1,4 +1,4 @@
-"""Your real holdings, read from the stock ledger (stock.wwz.cool) with its read-only key.
+"""Your real holdings, read from the stock ledger (wwz.hk.cn) with its read-only key.
 
 The key (LEDGER_TOKEN) is read from the environment or .env, like the other provider keys; it can only read
 trades, Treasuries and deposits, and cash. Each sync is saved, so analysis also works when the ledger cannot

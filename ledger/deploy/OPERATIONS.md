@@ -1,6 +1,6 @@
 # 持仓账本运维手册
 
-线上：https://wwz.hk.cn （服务器 42.194.244.252，代码和数据在 `/opt/stock-ledger`；2026-11-04 从旧服务器搬来）。不再使用旧服务器。异地备份在你的电脑上：`ledger/deploy/backup-pull.sh` 从服务器拉取最新备份到 `Desktop/stock-projects/ledger-backups`（保留 60 份），电脑开着时运行才会更新。**下面“备份”一节还是旧服务器时的写法（服务器发往旧服务器的任务已停）；脚本默认连 ssh 别名 `wwz`（新服务器，ubuntu + sudo）。恢复演练脚本还没改成从本机备份恢复。**
+线上：https://wwz.hk.cn （服务器 42.194.244.252，代码和数据在 `/opt/stock-ledger`；2026-11-04 从旧服务器搬来）。不再使用旧服务器。异地备份在你的电脑上：`ledger/deploy/backup-pull.sh` 从服务器拉取最新备份到 `Desktop/stock-projects/ledger-backups`（保留 60 份），电脑开着时运行才会更新。脚本默认连 ssh 别名 `wwz`（新服务器，ubuntu + sudo）。证书（腾讯云免费，放在 `/etc/nginx/ssl/`）2027-02-02 到期，到期前重新申请并替换。
 
 首页底部的“系统状态”（只有平台所有者能看到）显示下面各项最近一次的结果，超时或失败会标 ⚠。
 
@@ -24,14 +24,11 @@ ledger/deploy/deploy.sh
 
 | 什么 | 什么时候 | 在哪里 | 保留 |
 | --- | --- | --- | --- |
-| 本地备份（SQLite 在线备份，运行中也能拿到一致的快照） | 每天 03:30 | `/opt/stock-ledger/data/backups` | 30 份 |
-| 异地备份：发送前检查完整，收到后再检查一次 | 每天 03:45 | 新服务器 `/var/backups/ledger` | 60 份 |
+| 本地备份（SQLite 在线备份，运行中也能拿到一致的快照） | 每天 03:30（服务器） | `/opt/stock-ledger/data/backups` | 30 份 |
+| 异地备份：拉到你的电脑，检查完整后保存 | 手动运行 `ledger/deploy/backup-pull.sh`（建议每周至少一次） | `Desktop/stock-projects/ledger-backups` | 60 份 |
 
-- 发送用旧服务器上的专用密钥 `/root/.ssh/ledger_backup`，它在新服务器上只能执行“接收备份”这一条命令（`restrict,command=...`），不能登录、不能转发端口。
-- 结果写在 `/opt/stock-ledger/data/offsite.json`，系统状态里显示。
-- 脚本：[backup-push.sh](backup-push.sh)（发送，装在旧服务器的 `/usr/local/bin/ledger-backup-push`）、[backup-receive.sh](backup-receive.sh)（接收，装在新服务器的 `/usr/local/bin/ledger-backup-receive`）。定时任务在旧服务器的 `/etc/cron.d/stock-ledger`。
-
-> 平台搬到新服务器以后，异地备份要改成发回旧服务器（或另一台机器），不能和数据放在同一台。
+- 拉取的结果写在服务器 `/opt/stock-ledger/data/offsite.json`，系统状态里显示；太久没拉会标 ⚠。
+- 旧的“服务器发到旧服务器”方式（[backup-push.sh](backup-push.sh)、[backup-receive.sh](backup-receive.sh)）已停用，脚本留作参考。
 
 ## 行情接口自检
 

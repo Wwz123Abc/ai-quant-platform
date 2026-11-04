@@ -30,9 +30,9 @@ cd /opt/quantlab && sudo -u quantlab /opt/quantlab/venv/bin/quantlab secrets set
 
 `quantlab secrets status` 只显示每个密钥是否已配置。改完 `sudo systemctl restart quantlab`。
 
-## 备案前在新服务器试运行（2026-10-23 起）
+## 现在的部署（2026-11-04 起）
 
-新服务器（42.194.244.252）的域名还在备案，网页不对外开放；量化分析先在上面跑每天的任务，网页通过 SSH 隧道看。和正式部署的区别都在 `/etc/systemd/system/quantlab.service.d/trial.conf` 里：用访问令牌登录（这台还没有账本）、从线上账本 `https://stock.wwz.cool` 同步持仓、打开每日任务。切换到正式部署时删掉这个文件，`systemctl daemon-reload` 后重启。
+账本和量化分析都在新服务器（42.194.244.252），网址 https://wwz.hk.cn（量化分析在 `/lab/`，nginx 先问账本是不是平台所有者）。备案通过前用的试运行配置 `trial.conf` 已删除；每天的任务由 `quantlab.service.d/schedule.conf` 打开。证书是腾讯云免费证书，放在 `/etc/nginx/ssl/`，90 天到期（下一次 2027-02-02），到期前在腾讯云重新申请、下载 Nginx 版、替换两个文件后 `sudo nginx -t && sudo systemctl reload nginx`。
 
 更新代码：本地打 wheel，传到服务器后用 root 安装（虚拟环境属于 root）：`sudo /opt/quantlab/venv/bin/pip install --no-deps --force-reinstall quantlab-*.whl`，再 `sudo systemctl restart quantlab`。
 
