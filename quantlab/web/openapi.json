@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.12.0"
+    "version": "0.13.0"
   },
   "paths": {
     "/api/health": {
@@ -2645,6 +2645,17 @@
             ],
             "description": "关键价位；行情不足 30 天时没有"
           },
+          "ma_rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MaRules"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "均线规则：每条的状态和历史检验结果，只是描述，不是买卖建议"
+          },
           "fundamentals": {
             "anyOf": [
               {
@@ -3784,6 +3795,160 @@
           "busy"
         ],
         "title": "Limits"
+      },
+      "MaEvidence": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "description": "历史检验的结论：通过、只降回撤、未通过"
+          },
+          "cagr": {
+            "type": "number",
+            "title": "Cagr",
+            "description": "规则的年化收益（12 只美股的中位数）"
+          },
+          "bh_cagr": {
+            "type": "number",
+            "title": "Bh Cagr"
+          },
+          "mdd": {
+            "type": "number",
+            "title": "Mdd"
+          },
+          "bh_mdd": {
+            "type": "number",
+            "title": "Bh Mdd"
+          },
+          "sharpe": {
+            "type": "number",
+            "title": "Sharpe"
+          },
+          "bh_sharpe": {
+            "type": "number",
+            "title": "Bh Sharpe"
+          },
+          "buys": {
+            "type": "number",
+            "title": "Buys",
+            "description": "每年买入次数"
+          },
+          "exposure": {
+            "type": "number",
+            "title": "Exposure",
+            "description": "持有时间占比"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict",
+          "cagr",
+          "bh_cagr",
+          "mdd",
+          "bh_mdd",
+          "sharpe",
+          "bh_sharpe",
+          "buys",
+          "exposure"
+        ],
+        "title": "MaEvidence"
+      },
+      "MaRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "says": {
+            "type": "string",
+            "title": "Says",
+            "description": "规则的文字定义"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On",
+            "description": "现在是否处于规则的持有状态；历史不够时为空"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since",
+            "description": "这个状态从哪天开始"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/MaEvidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "says",
+          "on",
+          "since",
+          "days",
+          "evidence"
+        ],
+        "title": "MaRule"
+      },
+      "MaRules": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/MaRule"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "on_count": {
+            "type": "integer",
+            "title": "On Count"
+          },
+          "ready_count": {
+            "type": "integer",
+            "title": "Ready Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "rules",
+          "on_count",
+          "ready_count"
+        ],
+        "title": "MaRules"
       },
       "ModeRequest": {
         "properties": {

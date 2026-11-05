@@ -50,7 +50,7 @@ def market(monkeypatch):
 
 
 def test_the_tools_are_read_only_and_listed():
-    assert set(chat.TOOLS) == {"holdings", "latest_review", "stock_analysis", "ai_report", "prices"}
+    assert set(chat.TOOLS) == {"holdings", "latest_review", "stock_analysis", "ai_report", "prices", "ma_rules"}
     assert {t.name for t in chat.langchain_tools()} == set(chat.TOOLS)
     for forbidden in ("order", "approve", "reject", "sync", "write", "trade"):
         assert not any(forbidden in name for name in chat.TOOLS)

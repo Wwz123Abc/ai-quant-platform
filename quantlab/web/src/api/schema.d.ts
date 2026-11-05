@@ -732,6 +732,8 @@ export interface components {
             technical: components["schemas"]["Technical"];
             /** @description 关键价位；行情不足 30 天时没有 */
             levels?: components["schemas"]["KeyLevels"] | null;
+            /** @description 均线规则：每条的状态和历史检验结果，只是描述，不是买卖建议 */
+            ma_rules?: components["schemas"]["MaRules"] | null;
             fundamentals: components["schemas"]["Fundamentals"] | null;
             /**
              * Fundamentals Note
@@ -1135,6 +1137,75 @@ export interface components {
             paper_weeks_before_live: number;
             /** Busy */
             busy: boolean;
+        };
+        /** MaEvidence */
+        MaEvidence: {
+            /**
+             * Verdict
+             * @description 历史检验的结论：通过、只降回撤、未通过
+             */
+            verdict: string;
+            /**
+             * Cagr
+             * @description 规则的年化收益（12 只美股的中位数）
+             */
+            cagr: number;
+            /** Bh Cagr */
+            bh_cagr: number;
+            /** Mdd */
+            mdd: number;
+            /** Bh Mdd */
+            bh_mdd: number;
+            /** Sharpe */
+            sharpe: number;
+            /** Bh Sharpe */
+            bh_sharpe: number;
+            /**
+             * Buys
+             * @description 每年买入次数
+             */
+            buys: number;
+            /**
+             * Exposure
+             * @description 持有时间占比
+             */
+            exposure: number;
+        };
+        /** MaRule */
+        MaRule: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Says
+             * @description 规则的文字定义
+             */
+            says: string;
+            /**
+             * On
+             * @description 现在是否处于规则的持有状态；历史不够时为空
+             */
+            on: boolean | null;
+            /**
+             * Since
+             * @description 这个状态从哪天开始
+             */
+            since: string | null;
+            /** Days */
+            days: number | null;
+            evidence: components["schemas"]["MaEvidence"];
+        };
+        /** MaRules */
+        MaRules: {
+            /** Date */
+            date: string;
+            /** Rules */
+            rules: components["schemas"]["MaRule"][];
+            /** On Count */
+            on_count: number;
+            /** Ready Count */
+            ready_count: number;
         };
         /** ModeRequest */
         ModeRequest: {

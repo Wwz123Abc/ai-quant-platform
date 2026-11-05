@@ -12,7 +12,7 @@ import pandas as pd
 from ..config import get_settings
 from ..core import data
 from ..errors import QuantLabError
-from . import ledger, levels, policy, review, signals
+from . import ledger, levels, ma_rules, policy, review, signals
 
 
 def correlations(sym, others, load=None, days=252):
@@ -49,6 +49,14 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True, check=True):
     sym = data.normalize(sym)
     load = load or data.load
     tech = signals.technical(sym, load)
+    try:
+        bars = load(sym)
+        states = ma_rules.state_now(bars["close"])
+        ma = {"date": bars.index[-1].date().isoformat(),
+              "rules": [{**x, "evidence": ma_rules.EVIDENCE[x["id"]]} for x in states],
+              "on_count": sum(1 for x in states if x["on"]), "ready_count": sum(1 for x in states if x["on"] is not None)}
+    except QuantLabError:
+        ma = None
     try:
         key_levels = levels.compute(load(sym), "腾讯日线" if get_settings().price_source == "cn" else "Yahoo 日线")
     except QuantLabError:
@@ -128,7 +136,8 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True, check=True):
             verdict = "按你的规则：可以买入，最多约 $%.0f" % p["max_buy"] + ("（%s，约 $%.0f）" % (lot, p["amount"]) if lot else "")
     else:
         verdict = "按你的规则：现在不能买入（见下面未通过的规则）" if portfolio else "还没有同步持仓，无法按你的规则判断"
-    return {"symbol": sym, "technical": tech, "levels": key_levels, "fundamentals": fund, "fundamentals_note": fund_note, "ai": ai, "model": model_rank(sym),
-            "portfolio": portfolio, "checks": checks, "allowed": allowed, "verdict": verdict, "notes": notes,
+    return {"symbol": sym, "technical": tech, "levels": key_levels, "ma_rules": ma, "fundamentals": fund,
+            "fundamentals_note": fund_note, "ai": ai, "model": model_rank(sym), "portfolio": portfolio, "checks": checks, "allowed": allowed,
+            "verdict": verdict, "notes": notes,
             "disclaimer": "结论只来自你设定的规则；其余是供你参考的信息，不是买卖建议。"}
 

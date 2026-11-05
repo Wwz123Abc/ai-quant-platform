@@ -137,6 +137,35 @@ class KeyLevel(BaseModel):
     basis: str = Field(description="算法和用到的日期")
 
 
+class MaEvidence(BaseModel):
+    verdict: str = Field(description="历史检验的结论：通过、只降回撤、未通过")
+    cagr: float = Field(description="规则的年化收益（12 只美股的中位数）")
+    bh_cagr: float
+    mdd: float
+    bh_mdd: float
+    sharpe: float
+    bh_sharpe: float
+    buys: float = Field(description="每年买入次数")
+    exposure: float = Field(description="持有时间占比")
+
+
+class MaRule(BaseModel):
+    id: str
+    name: str
+    says: str = Field(description="规则的文字定义")
+    on: bool | None = Field(description="现在是否处于规则的持有状态；历史不够时为空")
+    since: str | None = Field(description="这个状态从哪天开始")
+    days: int | None
+    evidence: MaEvidence
+
+
+class MaRules(BaseModel):
+    date: str
+    rules: list[MaRule]
+    on_count: int
+    ready_count: int
+
+
 class KeyLevels(BaseModel):
     date: str
     close: float
@@ -201,6 +230,7 @@ class Analysis(BaseModel):
     symbol: str
     technical: Technical
     levels: KeyLevels | None = Field(None, description="关键价位；行情不足 30 天时没有")
+    ma_rules: MaRules | None = Field(None, description="均线规则：每条的状态和历史检验结果，只是描述，不是买卖建议")
     fundamentals: Fundamentals | None
     fundamentals_note: str | None = Field(None, description="没有基本面时的原因")
     ai: AiInfo | None

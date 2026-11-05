@@ -71,6 +71,36 @@ export default function Analyze() {
               <p className="hint">价位只是参考，不生成订单；行情是复权后的，较早的价位可能比当时的报价略低。</p>
             </div>
           ) : null}
+          {r.ma_rules ? (
+            <div className="card">
+              <h2>均线规则（{r.ma_rules.date} 收盘）</h2>
+              <p className="hint">
+                9 条常见的均线“口诀”里，现在有 <b>{r.ma_rules.on_count}</b> 条处于“满足”状态（共 {r.ma_rules.ready_count} 条能判断）。
+                这只是在描述走势，<b>不是买卖建议</b>：我们用 12 只美股、2008 年以来的数据逐条检验过，没有一条在风险调整后胜过买入持有，
+                短周期的明显更差；长周期的（200 日线）只是回撤小一些、收益也低一些。详情见使用手册和 docs/research/2026-11-ma-rules.md。
+              </p>
+              <ul className="levels">
+                {r.ma_rules.rules.map((m) => (
+                  <li key={m.id}>
+                    <div className="top">
+                      <span className="name">{m.name}</span>
+                      <span className="val">
+                        {m.on == null ? "历史不够，无法判断" : m.on ? "满足" : "不满足"}
+                        {m.since ? <small className="hint">（自 {m.since}，{m.days} 天）</small> : null}
+                      </span>
+                    </div>
+                    <div className="hint">规则：{m.says}。</div>
+                    <div className="hint">
+                      历史检验：<b>{m.evidence.verdict}</b> · 年化 {(m.evidence.cagr * 100).toFixed(0)}% 对买入持有 {(m.evidence.bh_cagr * 100).toFixed(0)}%
+                      · 最大回撤 {(m.evidence.mdd * 100).toFixed(0)}% 对 {(m.evidence.bh_mdd * 100).toFixed(0)}%
+                      · 夏普 {m.evidence.sharpe.toFixed(2)} 对 {m.evidence.bh_sharpe.toFixed(2)} · 每年买入 {m.evidence.buys.toFixed(1)} 次
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="hint">检验按汇丰 Trade25 收费、收盘出信号次日开盘成交，数字是 12 只股票的中位数；过去的表现不代表以后。均线规则不会生成建议订单。</p>
+            </div>
+          ) : null}
           <div className="grid-2">
             <div className="card">
               <h2>趋势和风险（{r.technical.date} 收盘 {num(r.technical.close)}）</h2>
