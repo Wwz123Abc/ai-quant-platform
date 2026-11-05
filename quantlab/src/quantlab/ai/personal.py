@@ -93,9 +93,25 @@ def levels(close):
     return out
 
 
-def summary(rating, final_text, lv, near=None):
+def holding_line(mine):
+    """What the report did and did not know about the owner's position, in plain words."""
+    if not mine:
+        return "**你的持仓**：这份报告**不知道**你有没有这只股票、买了多少（没读到账本），评级和仓位说法只能当通用参考。"
+    cap = "宽基 ETF，不设单只上限" if mine["uncapped"] else "单只上限 %.0f%%" % (mine["cap"] * 100)
+    room = "按你的规则，现在最多还能买入约 $%.0f（%s；现金扣掉 %.0f%% 储备后可用 $%.0f）。" % (
+        mine["max_buy"], cap, mine["reserve"] * 100, mine["room_cash"])
+    warn = "（注意：%s 没取到价格，没算进总额，下面的占比会偏高）" % "、".join(mine["unpriced"]) if mine.get("unpriced") else ""
+    room += warn
+    if mine["held"]:
+        gain = "，浮动盈亏 %+.1f%%" % (mine["gain"] * 100) if mine["gain"] is not None else ""
+        return "**你的持仓**：持有 %s 股，平均成本 $%.2f，现值 $%.2f（占可投资资金 %.1f%%%s）。%s" % (
+            format(mine["shares"], ",.4g"), mine["avg_cost"] or 0, mine["value"], (mine["weight"] or 0) * 100, gain, room)
+    return ("**你的持仓**：你现在**没有持有**这只股票。报告里的“减持”“卖出”对没持有的股票只能理解成“不买”。%s" % room)
+
+
+def summary(rating, final_text, lv, near=None, mine=None):
     """The personal summary as markdown: rating, the conclusion in the report's own words, key prices from our data."""
-    lines = ["**评级：%s**" % RATING_CN.get(rating, rating)]
+    lines = ["**评级：%s**" % RATING_CN.get(rating, rating), holding_line(mine)]
     why = _conclusion(final_text)
     if why:
         lines.append("理由（摘自最终决定）：" + why)

@@ -5,6 +5,7 @@ until an analysis actually runs. This module turns QuantLab settings into a Trad
 analysis, and measures the tokens every model call used so the run can be charged to the budget."""
 import contextlib
 import importlib.util
+import logging
 import os
 import threading
 from pathlib import Path
@@ -15,6 +16,9 @@ from ..core.data import yahoo_symbol
 from ..errors import Unavailable
 from ..holdings import levels
 from . import cn_vendor, personal
+from . import portfolio as acct
+
+log = logging.getLogger(__name__)
 
 # The reports kept from a run, in reading order, with their Chinese titles.
 REPORTS = [
@@ -165,15 +169,21 @@ def analyze(symbol, trade_date, usage, s=None):
 
     s = s or get_settings()
     graph = TradingAgentsGraph(tuple(s.ai_analysts), config=build_config(s), callbacks=[usage.handler()])
+    try:
+        book, mine = acct.build(symbol)  # what the owner holds and the rules they follow: without it the agents only guess
+    except Exception:  # a ledger that cannot be read must not stop the analysis; the report says it was written without holdings
+        log.exception("could not read the holdings for the AI analysis of %s", symbol)
+        book, mine = None, None
     with cn_vendor.record_into(usage) if s.price_source == "cn" else contextlib.nullcontext():
-        state, rating = graph.propagate(yahoo_symbol(symbol), str(trade_date))
+        state, rating = graph.propagate(yahoo_symbol(symbol), str(trade_date), portfolio=book)
     reports = {key: {"title": title, "text": str(state.get(key) or "")} for key, title in REPORTS}
     rating = rating if rating in RATINGS else "REVIEW"
     personal.mark_unsourced(reports, usage.tool_outputs)
-    return rating, personal_first(symbol, trade_date, rating, reports)
+    given = {"portfolio_context": {"title": "分析时交给 AI 的持仓信息", "text": acct.describe(book, symbol)}}
+    return rating, personal_first(symbol, trade_date, rating, {**given, **reports}, mine)
 
 
-def personal_first(symbol, trade_date, rating, reports):
+def personal_first(symbol, trade_date, rating, reports, mine=None):
     """reports with the personal summary placed before the full reports."""
     near = None
     try:
@@ -184,5 +194,5 @@ def personal_first(symbol, trade_date, rating, reports):
     except Exception:  # the summary still has the rating and the conclusion without prices
         lv = None
     head = {"personal_summary": {"title": "个人版摘要",
-                                 "text": personal.summary(rating, reports["final_trade_decision"]["text"], lv, near)}}
+                                 "text": personal.summary(rating, reports["final_trade_decision"]["text"], lv, near, mine)}}
     return {**head, **reports}
