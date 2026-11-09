@@ -863,6 +863,49 @@ def refresh_quotes(uid, now=None):
     return changed
 
 
+MISSING_TRIES, MISSING_RETRY = 3, 300   # a stock without data is fetched for at most 3 times, 5 minutes apart
+
+
+def held_symbols(uid):
+    """Stocks the account holds now (bought and not all sold), by the trade records."""
+    net = {}
+    for d in list_docs(uid, "trades"):
+        t = d["data"]
+        s, n = str(t.get("symbol", "")).upper(), float(t.get("shares") or 0)
+        if SYMBOL_RE.match(s):
+            net[s] = net.get(s, 0.0) + (n if t.get("side") == "buy" else -n if t.get("side") == "sell" else 0.0)
+    return sorted(s for s, n in net.items() if n > 1e-9)
+
+
+def missing_market_data(uid):
+    """Held stocks that have no price yet or no daily history: a stock bought for the first time is one until it is fetched."""
+    cfg = get_doc(uid, "config", "main") or {}
+    prices = cfg.get("prices") or {}
+    return [s for s in held_symbols(uid) if not (float(prices.get(s) or 0) > 0) or not get_doc(0, "history", s)]
+
+
+_missing_tries = {}   # (uid, symbols) -> [attempts, last attempt]
+
+
+def fill_missing(uid, now=None):
+    """Fetches prices, history and the checks for a newly bought stock without waiting for the refresh button. Does the full
+    refresh once, at most MISSING_TRIES times for the same stocks, MISSING_RETRY seconds apart, so a symbol that cannot be
+    fetched does not keep the server busy. Returns the symbols it fetched for, or []."""
+    now = now or time.time()
+    missing = missing_market_data(uid)
+    if not missing:
+        return []
+    key = (uid, tuple(missing))
+    tries = _missing_tries.setdefault(key, [0, 0.0])
+    if tries[0] >= MISSING_TRIES or now - tries[1] < MISSING_RETRY:
+        return []
+    tries[0] += 1
+    tries[1] = now
+    last_refresh[uid] = now
+    refresh_market(uid)
+    return missing
+
+
 def quote_loop():
     """Every QUOTE_EVERY seconds, refresh the live prices of every account. Skips a round while a refresh is running."""
     last_error = None
@@ -875,6 +918,7 @@ def quote_loop():
                 with db() as con:
                     uids = [r["id"] for r in con.execute("SELECT id FROM users")]
                 for uid in uids:
+                    fill_missing(uid)       # a stock just bought for the first time: its price and history, right away
                     refresh_quotes(uid)
             finally:
                 refresh_lock.release()

@@ -127,3 +127,51 @@ class MinuteSeries(unittest.TestCase):
         with mock.patch.object(app, "fetch", lambda url, **kw: '{"code":0,"data":{"usVOO":{"data":{"data":[],"date":"20261103"}}}}'):
             with self.assertRaises(ValueError):
                 app.minute_series("VOO")
+
+
+class NewStock(unittest.TestCase):
+    """A stock bought for the first time gets its price and history by itself (app.fill_missing)."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.patches = [mock.patch.object(app, "DATA", self.dir.name), mock.patch.object(app, "DB_PATH", os.path.join(self.dir.name, "ledger.db"))]
+        for p in self.patches:
+            p.start()
+        app.init_db()
+        app._missing_tries.clear()
+        self.uid = app.create_user("tester", "x")
+        app.put_doc(self.uid, "trades", "t1", {"symbol": "VOO", "side": "buy", "shares": 3, "price": 690, "date": "2026-10-13"})
+        app.put_doc(self.uid, "trades", "t2", {"symbol": "PEP", "side": "buy", "shares": 2, "price": 131, "date": "2026-10-15"})
+        app.put_doc(self.uid, "trades", "t3", {"symbol": "PEP", "side": "sell", "shares": 2, "price": 137, "date": "2026-10-22"})   # sold out
+        app.put_doc(self.uid, "config", "main", {"prices": {"VOO": 693.54}})
+        app.put_doc(0, "history", "VOO", {"symbol": "VOO", "closes": {"2026-11-03": 693.54}})
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.dir.cleanup()
+
+    def test_only_stocks_held_now_are_wanted(self):
+        self.assertEqual(app.held_symbols(self.uid), ["VOO"])           # PEP was bought and sold: not held
+        self.assertEqual(app.missing_market_data(self.uid), [])
+
+    def test_a_new_buy_without_a_price_is_fetched_once_and_not_hammered(self):
+        app.put_doc(self.uid, "trades", "t4", {"symbol": "BAC", "side": "buy", "shares": 1, "price": 50, "date": "2026-11-06"})
+        self.assertEqual(app.missing_market_data(self.uid), ["BAC"])
+        calls = []
+        with mock.patch.object(app, "refresh_market", lambda uid: calls.append(uid)):
+            self.assertEqual(app.fill_missing(self.uid, now=1000.0), ["BAC"])
+            self.assertEqual(app.fill_missing(self.uid, now=1010.0), [])            # too soon to try again
+            self.assertEqual(app.fill_missing(self.uid, now=1000.0 + app.MISSING_RETRY + 1), ["BAC"])
+            self.assertEqual(app.fill_missing(self.uid, now=2000.0 + 2 * app.MISSING_RETRY), ["BAC"])
+            self.assertEqual(app.fill_missing(self.uid, now=9e6), [])               # three tries and it still has no data: stop
+        self.assertEqual(len(calls), 3)
+
+    def test_nothing_is_fetched_when_every_held_stock_has_data(self):
+        with mock.patch.object(app, "refresh_market", lambda uid: self.fail("should not run")):
+            self.assertEqual(app.fill_missing(self.uid), [])
+
+    def test_a_stock_with_a_price_but_no_history_still_counts_as_missing(self):
+        app.put_doc(self.uid, "trades", "t5", {"symbol": "KO", "side": "buy", "shares": 1, "price": 60, "date": "2026-11-06"})
+        app.put_doc(self.uid, "config", "main", {"prices": {"VOO": 693.54, "KO": 61.0}}, merge=True)
+        self.assertEqual(app.missing_market_data(self.uid), ["KO"])

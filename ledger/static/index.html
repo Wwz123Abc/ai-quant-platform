@@ -2280,7 +2280,8 @@ TAL|好未来|TAL Education
       const paid = acc ? await moveCash(acc, delta) : "";
       const fresh = LedgerCalc.isTrade(rec) && !(Number(state.prices[symbol]) > 0);
       formMsg("已保存：" + md(date) + " " + recordText(rec) + "。" + paid +
-        (fresh ? "点“刷新数据”后这只股票会有价格。" : ""), "ok");
+        (fresh ? "这只股票还没有价格，正在自动取行情……" : ""), "ok");
+      if (fresh && !$("#refreshBtn").disabled) $("#refreshBtn").click();   // a stock bought for the first time gets its price at once
       $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = "0"; $("#f-note").value = ""; $("#f-to").value = "";
     } catch (err) {
       formMsg(errText(err), "err");
@@ -2636,7 +2637,8 @@ TAL|好未来|TAL Education
       applyTrades(t); applyHistory(hi); applyConfig(c); applyFixed(fx);
       $("#impReview").hidden = true;
       $("#impText").value = ""; $("#impImg").value = "";
-      impSay("#impMsg", "已导入 " + r.trades + " 笔交易" + (r.fixed ? "、" + r.fixed + " 条国债或定期存款" : "") + "。新股票点“刷新数据”后会有价格。", "ok");
+      impSay("#impMsg", "已导入 " + r.trades + " 笔交易" + (r.fixed ? "、" + r.fixed + " 条国债或定期存款" : "") + "。新股票的价格正在自动获取……", "ok");
+      if (r.trades && !$("#refreshBtn").disabled) $("#refreshBtn").click();
     } catch (err) {
       impSay("#impSaveMsg", err.code === "invalid_argument" || err.code === "quota_exceeded" ? err.message : errText(err), "err");
     } finally {

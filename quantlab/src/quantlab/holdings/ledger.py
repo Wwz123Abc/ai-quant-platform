@@ -5,6 +5,7 @@ trades, Treasuries and deposits, and cash. Each sync is saved, so analysis also 
 be reached."""
 import calendar
 import datetime as dt
+import hashlib
 import json
 import math
 import os
@@ -59,6 +60,29 @@ def sync():
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     return data
+
+
+def fingerprint(snapshot):
+    """A digest of what the holdings are made of (trades, cash, Treasuries and deposits), not of when they were read."""
+    body = {k: snapshot.get(k, []) for k in ("trades", "cash", "fixed")}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
+
+
+def changed():
+    """Reads the ledger and, when its trades, cash or Treasuries and deposits differ from the saved copy (or there is none),
+    saves the new copy as a sync. Returns whether it did."""
+    data = fetch()
+    p = snapshot_path()
+    if p.exists():
+        try:
+            if fingerprint(json.loads(p.read_text(encoding="utf-8"))) == fingerprint(data):
+                return False
+        except ValueError:  # an unreadable copy is replaced
+            pass
+    data["synced"] = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return True
 
 
 def load(refresh=False):

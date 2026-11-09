@@ -23,6 +23,7 @@ BEIJING = ZoneInfo("Asia/Shanghai")
 RUN_DAYS = {1, 2, 3, 4, 5}  # Tuesday to Saturday in Beijing: the morning after each US trading day
 PROBE = "QQQ"  # the symbol whose bars tell whether the latest close has arrived
 RETRY = dt.timedelta(minutes=30)
+WATCH_EVERY = dt.timedelta(minutes=3)  # how often the ledger is looked at for a new trade (its read key allows 120 reads an hour)
 
 
 def is_due(now, last_run, at):
@@ -83,6 +84,7 @@ class Scheduler:
         self.clock = clock or (lambda: dt.datetime.now(dt.UTC))
         self.market = market or market_date
         self._next_check = None
+        self._next_watch = None
         self._probe = None  # (bars end, market closed) from the last check
         self._busy = threading.Lock()
         self._stop = threading.Event()
@@ -125,6 +127,32 @@ class Scheduler:
         now = self.clock()
         if is_due(now, last, get_settings().schedule_time) and self.data_ready(now):
             self.run_daily(now)
+        elif get_settings().schedule_enabled:
+            self.watch()
+
+    def watch(self):
+        """When the ledger's trades, cash or deposits changed (a new buy, say), syncs and re-checks the holdings now instead of
+        waiting for the daily job. Looks every WATCH_EVERY; does nothing while the daily job runs (it syncs itself) or when no
+        ledger key is configured. Returns the new review's id, or None."""
+        now = self.clock()
+        if self._next_watch and now < self._next_watch:
+            return None
+        self._next_watch = now + WATCH_EVERY
+        from .holdings import ledger as hledger
+        from .holdings import review as hreview
+        if not hledger.configured() or not self._busy.acquire(blocking=False):
+            return None
+        try:
+            if not hledger.changed():
+                return None
+            r = hreview.run(refresh=False, load=self.load)
+            log.info("the ledger changed: synced and re-checked the holdings (review #%d, %d proposals)", r["id"], len(r["proposals"]))
+            return r["id"]
+        except QuantLabError as e:  # the ledger is unreachable or a price is missing: try again at the next look
+            log.warning("watching the ledger: %s", e)
+            return None
+        finally:
+            self._busy.release()
 
     def data_ready(self, now):
         """True once the probe's daily bars reach the latest finished session, or from the give-up time on."""
