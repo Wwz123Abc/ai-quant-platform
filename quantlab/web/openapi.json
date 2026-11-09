@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.14.1"
+    "version": "0.16.1"
   },
   "paths": {
     "/api/health": {
@@ -2019,65 +2019,6 @@
           }
         }
       }
-    },
-    "/api/ai/chat": {
-      "post": {
-        "tags": [
-          "ai"
-        ],
-        "summary": "向助手提问（只读，费用计入 AI 预算）",
-        "operationId": "ai_chat_api_ai_chat_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatAnswer"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -3043,120 +2984,6 @@
           "volume"
         ],
         "title": "Bars"
-      },
-      "ChatAnswer": {
-        "properties": {
-          "answer": {
-            "type": "string",
-            "title": "Answer"
-          },
-          "steps": {
-            "items": {
-              "$ref": "#/components/schemas/ChatStep"
-            },
-            "type": "array",
-            "title": "Steps"
-          },
-          "llm_calls": {
-            "type": "integer",
-            "title": "Llm Calls"
-          },
-          "tokens_in": {
-            "type": "integer",
-            "title": "Tokens In"
-          },
-          "tokens_out": {
-            "type": "integer",
-            "title": "Tokens Out"
-          },
-          "cost_cny": {
-            "type": "number",
-            "title": "Cost Cny"
-          }
-        },
-        "type": "object",
-        "required": [
-          "answer",
-          "steps",
-          "llm_calls",
-          "tokens_in",
-          "tokens_out",
-          "cost_cny"
-        ],
-        "title": "ChatAnswer"
-      },
-      "ChatMessage": {
-        "properties": {
-          "role": {
-            "type": "string",
-            "enum": [
-              "user",
-              "assistant"
-            ],
-            "title": "Role"
-          },
-          "content": {
-            "type": "string",
-            "maxLength": 4000,
-            "title": "Content"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role",
-          "content"
-        ],
-        "title": "ChatMessage"
-      },
-      "ChatRequest": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "maxLength": 1000,
-            "minLength": 1,
-            "title": "Message"
-          },
-          "history": {
-            "items": {
-              "$ref": "#/components/schemas/ChatMessage"
-            },
-            "type": "array",
-            "maxItems": 20,
-            "title": "History",
-            "description": "之前的几轮对话"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "ChatRequest"
-      },
-      "ChatStep": {
-        "properties": {
-          "tool": {
-            "type": "string",
-            "title": "Tool",
-            "description": "调用的只读工具"
-          },
-          "args": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Args"
-          },
-          "result": {
-            "type": "string",
-            "title": "Result",
-            "description": "工具返回的开头部分，供核对"
-          }
-        },
-        "type": "object",
-        "required": [
-          "tool",
-          "args",
-          "result"
-        ],
-        "title": "ChatStep"
       },
       "Check": {
         "properties": {

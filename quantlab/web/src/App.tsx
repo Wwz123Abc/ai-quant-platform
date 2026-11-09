@@ -7,7 +7,6 @@ import Analyze from "./pages/Analyze";
 import Holdings from "./pages/Holdings";
 import Rules from "./pages/Rules";
 import Ai from "./pages/Ai";
-import Chat from "./pages/Chat";
 import AiRun from "./pages/AiRun";
 import Ml from "./pages/Ml";
 import Trading, { TradingAccountPage } from "./pages/Trading";
@@ -37,7 +36,6 @@ export default function App() {
         <NavLink to="/rules">持仓规则</NavLink>
         <NavLink to="/analyze">个股分析</NavLink>
         <NavLink to="/ai">AI 研报</NavLink>
-        <NavLink to="/chat">问一问</NavLink>
         {/* 均线回测 (/backtest), 参数扫描、模拟盘、机器学习选股、自动交易 and the API docs stay reachable by address, off the menu */}
         {auth.data?.home_url ? <a href={auth.data.home_url}>← 持仓账本</a> : null}
         <div className="foot">v{auth.data?.version} · 仅用于研究，不构成投资建议</div>
@@ -53,7 +51,6 @@ export default function App() {
           <Route path="/paper" element={<Paper />} />
           <Route path="/paper/:name" element={<Account />} />
           <Route path="/ai" element={<Ai />} />
-          <Route path="/chat" element={<Chat />} />
           <Route path="/ai/runs/:id" element={<AiRun />} />
           <Route path="/ml" element={<Ml />} />
           <Route path="/trading" element={<Trading />} />

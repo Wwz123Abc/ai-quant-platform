@@ -487,23 +487,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/ai/chat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 向助手提问（只读，费用计入 AI 预算） */
-        post: operations["ai_chat_api_ai_chat_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -858,58 +841,6 @@ export interface components {
             close: number[];
             /** Volume */
             volume: number[];
-        };
-        /** ChatAnswer */
-        ChatAnswer: {
-            /** Answer */
-            answer: string;
-            /** Steps */
-            steps: components["schemas"]["ChatStep"][];
-            /** Llm Calls */
-            llm_calls: number;
-            /** Tokens In */
-            tokens_in: number;
-            /** Tokens Out */
-            tokens_out: number;
-            /** Cost Cny */
-            cost_cny: number;
-        };
-        /** ChatMessage */
-        ChatMessage: {
-            /**
-             * Role
-             * @enum {string}
-             */
-            role: "user" | "assistant";
-            /** Content */
-            content: string;
-        };
-        /** ChatRequest */
-        ChatRequest: {
-            /** Message */
-            message: string;
-            /**
-             * History
-             * @description 之前的几轮对话
-             */
-            history?: components["schemas"]["ChatMessage"][];
-        };
-        /** ChatStep */
-        ChatStep: {
-            /**
-             * Tool
-             * @description 调用的只读工具
-             */
-            tool: string;
-            /** Args */
-            args: {
-                [key: string]: unknown;
-            };
-            /**
-             * Result
-             * @description 工具返回的开头部分，供核对
-             */
-            result: string;
         };
         /** Check */
         Check: {
@@ -3225,41 +3156,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Analysis"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    ai_chat_api_ai_chat_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChatAnswer"];
                 };
             };
             /** @description Validation Error */

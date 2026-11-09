@@ -123,17 +123,6 @@ def _enqueue(con, symbol, trade_date, source, now, s):
     return cur.lastrowid
 
 
-def record_chat(con, usage, now=None, s=None):
-    """Books what one question to the assistant cost, so it counts against this month's budget like an analysis."""
-    s, now = s or get_settings(), now or utcnow()
-    with con:
-        return con.execute(
-            "INSERT INTO runs (symbol, trade_date, status, source, quick_model, deep_model, llm_calls, tokens_in, tokens_cached,"
-            " tokens_out, cost_usd, created, started, finished) VALUES ('问答', ?, 'done', 'chat', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (now.date().isoformat(), s.ai_quick_model, s.ai_deep_model, usage["llm_calls"], usage["tokens_in"],
-             usage["tokens_cached"], usage["tokens_out"], usage["cost_usd"], iso(now), iso(now), iso(now))).lastrowid
-
-
 def claim_next(con, now=None):
     """Marks the oldest queued run as running and returns it, or None.
 
