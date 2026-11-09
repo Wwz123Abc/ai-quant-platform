@@ -91,8 +91,8 @@ export default function Analyze() {
                     </div>
                     <div className="hint">规则：{m.says}。</div>
                     <div className="hint">
-                      历史检验：<b>{m.evidence.verdict}</b> · 按它操作每年约赚 {(m.evidence.cagr * 100).toFixed(0)}%，一直拿着不动是 {(m.evidence.bh_cagr * 100).toFixed(0)}%
-                      · 最惨时账面跌 {(m.evidence.mdd * 100).toFixed(0)}%（一直拿着是 {(m.evidence.bh_mdd * 100).toFixed(0)}%）
+                      历史检验：<b>{m.evidence.verdict}</b> · 年化 {(m.evidence.cagr * 100).toFixed(0)}%（按它操作每年约赚多少），一直拿着不动（买入持有）是 {(m.evidence.bh_cagr * 100).toFixed(0)}%
+                      · 最大回撤 {(m.evidence.mdd * 100).toFixed(0)}%（最惨时账面跌多少；一直拿着是 {(m.evidence.bh_mdd * 100).toFixed(0)}%）· 夏普 {m.evidence.sharpe.toFixed(2)} 对 {m.evidence.bh_sharpe.toFixed(2)}（每承担一份风险赚多少，越高越好）
                     </div>
                   </li>
                 ))}
@@ -105,12 +105,12 @@ export default function Analyze() {
               <h2>趋势和风险（{r.technical.date} 收盘 {num(r.technical.close)}）</h2>
               <div className="stats">
                 <Stat k="近 1 个月涨跌" v={<Signed v={r.technical.r1m} />} s="和一个月前的收盘价比" />
-                <Stat k="近 1 年涨跌" v={<Signed v={r.technical.r1y} />} s={`一年前到一个月前这段涨了 ${pct(r.technical.mom_12_1)}（不算最近一个月）`} />
-                <Stat k="价格波动有多大" v={pctPlain(r.technical.vol, 0)} s={`一年里价格大致上下摆动这么多，越大越颠簸。和纳指 QQQ 比：${r.technical.beta == null ? "—" : r.technical.beta > 1.1 ? `大盘涨跌 1% 它约 ${num(r.technical.beta, 1)}%，比大盘更颠簸` : r.technical.beta < 0.9 ? `大盘涨跌 1% 它约 ${num(r.technical.beta, 1)}%，比大盘稳` : "和大盘差不多"}`} />
-                <Stat k="比一年最高价低多少" v={<Signed v={r.technical.from_high} digits={0} />} s={`这一年里最深的一次，从高点跌到低点跌了 ${pct(r.technical.max_dd_1y, 0)}`} />
+                <Stat k="近 1 年涨跌（1 年收益）" v={<Signed v={r.technical.r1y} />} s={`12-1 月动量 ${pct(r.technical.mom_12_1)}：一年前到一个月前这段的涨幅，不算最近一个月`} />
+                <Stat k="价格波动有多大（年化波动率）" v={pctPlain(r.technical.vol, 0)} s={`一年里价格大致上下摆动这么多，越大越颠簸。相对 QQQ 的 β ${num(r.technical.beta)}：${r.technical.beta == null ? "—" : r.technical.beta > 1.1 ? `大盘涨跌 1% 它约 ${num(r.technical.beta, 1)}%，比大盘更颠簸` : r.technical.beta < 0.9 ? `大盘涨跌 1% 它约 ${num(r.technical.beta, 1)}%，比大盘稳` : "和大盘差不多"}`} />
+                <Stat k="比一年最高价低多少（距 52 周高点）" v={<Signed v={r.technical.from_high} digits={0} />} s={`一年最大回撤 ${pct(r.technical.max_dd_1y, 0)}：这一年里最深的一次，从高点跌到低点跌了这么多`} />
               </div>
               <p className="hint" style={{ marginTop: 10 }}>
-                {r.technical.uptrend == null ? "均线数据不足" : r.technical.uptrend ? "近 50 天平均价在近 200 天平均价上方：中期趋势向上" : "近 50 天平均价在近 200 天平均价下方：中期趋势向下"}
+                {r.technical.uptrend == null ? "均线数据不足" : r.technical.uptrend ? "50 日线在 200 日线上方（多头排列）：中期趋势向上" : "50 日线在 200 日线下方（空头排列）：中期趋势向下"}
                 {r.technical.last_cross ? `（两条线最近一次交叉在 ${r.technical.last_cross}）` : ""}
               </p>
             </div>
@@ -118,10 +118,10 @@ export default function Analyze() {
               <h2>基本面（SEC 财报，按公告日）</h2>
               {r.fundamentals ? (
                 <div className="stats">
-                  <Stat k="最近 12 个月收入" v={big(r.fundamentals.revenue_ttm)} s={`比去年同期 ${pct(r.fundamentals.rev_growth, 0)}`} />
-                  <Stat k="净利润" v={big(r.fundamentals.net_income_ttm)} s={`每 100 元收入里，主业赚 ${r.fundamentals.op_margin == null ? "—" : (r.fundamentals.op_margin * 100).toFixed(0)} 元`} />
-                  <Stat k="市盈率（贵不贵）" v={r.fundamentals.pe ? r.fundamentals.pe.toFixed(0) : "—"} s={`股价是一年盈利的这么多倍，越大越贵（美股常见 15–30）· 市值 ${big(r.fundamentals.market_cap)}`} />
-                  <Stat k="最近一季盈利变化" v={num(r.fundamentals.sue, 1)} s="正数：比去年同季赚得多；负数：赚得少；绝对值超过 2 算明显" />
+                  <Stat k="最近 12 个月收入（TTM）" v={big(r.fundamentals.revenue_ttm)} s={`同比 ${pct(r.fundamentals.rev_growth, 0)}，即比去年同期的变化`} />
+                  <Stat k="净利润" v={big(r.fundamentals.net_income_ttm)} s={`营业利润率 ${pctPlain(r.fundamentals.op_margin, 0)}：每 100 元收入里，主业赚 ${r.fundamentals.op_margin == null ? "—" : (r.fundamentals.op_margin * 100).toFixed(0)} 元`} />
+                  <Stat k="市盈率 PE（贵不贵）" v={r.fundamentals.pe ? r.fundamentals.pe.toFixed(0) : "—"} s={`股价是一年盈利的这么多倍，越大越贵（美股常见 15–30）· 市净率 ${r.fundamentals.pb ? r.fundamentals.pb.toFixed(1) : "—"} · 市值 ${big(r.fundamentals.market_cap)}`} />
+                  <Stat k="最近一季盈利变化（SUE）" v={num(r.fundamentals.sue, 1)} s="标准化盈利意外：正数：比去年同季赚得多；负数：赚得少；绝对值超过 2 算明显" />
                 </div>
               ) : <p className="empty">{r.fundamentals_note ?? "没有基本面数据。"}</p>}
             </div>
@@ -135,7 +135,7 @@ export default function Analyze() {
                     <Stat k="规则允许最多买" v={money(r.portfolio.max_buy)}
                       s={`${r.portfolio.max_buy > 0 ? lots(r.portfolio, r.portfolio.max_shares) + " · " : ""}可投资资金 ${money(r.portfolio.investable)}，现金 ${money(r.portfolio.cash)}`} />
                     <AfterBuy p={r.portfolio} />
-                    <Stat k="和你持仓的相似度" v={num(r.portfolio.avg_correlation)} s="1 表示涨跌几乎同步，买了也不分散风险；0.3 以下才算分散" />
+                    <Stat k="和你持仓的相似度（平均相关系数）" v={num(r.portfolio.avg_correlation)} s="按持仓市值加权；1 表示涨跌几乎同步，买了也不分散风险；0.3 以下才算分散" />
                   </div>
                   <table style={{ marginTop: 10 }}>
                     <tbody>
