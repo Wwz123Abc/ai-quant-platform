@@ -10,7 +10,7 @@ from quantlab.ai.jobs import Worker
 from quantlab.api.app import create_app
 from quantlab.config import get_settings
 from quantlab.core import data, paper
-from quantlab.errors import BudgetExceeded, Conflict, Unavailable
+from quantlab.errors import BudgetExceeded, Conflict, QuantLabError, Unavailable
 from quantlab.scheduler import Scheduler, is_due, queue_due_analyses
 
 AUTH = {"Authorization": "Bearer test-token"}
@@ -186,8 +186,10 @@ def test_ai_account_validation():
     ("2026-10-20 07:31", None, True),            # Tuesday after the time
     ("2026-10-20 07:29", None, False),           # too early
     ("2026-10-20 08:00", "2026-10-20", False),   # already ran today
-    ("2026-10-19 09:00", None, False),           # Monday: no US close since Saturday's run
-    ("2026-10-24 09:00", "2026-10-23", True),    # Saturday: Friday's close
+    ("2026-10-19 09:00", None, False),           # Monday
+    ("2026-10-21 09:00", "2026-10-20", False),   # Wednesday: once a week, Tuesday only
+    ("2026-10-24 09:00", "2026-10-20", False),   # Saturday
+    ("2026-10-27 09:00", "2026-10-20", True),    # the next Tuesday
 ])
 def test_is_due(local, last, due):
     now = dt.datetime.fromisoformat(local).replace(tzinfo=dt.timezone(dt.timedelta(hours=8)))
@@ -196,33 +198,33 @@ def test_is_due(local, last, due):
 
 def test_scheduler_waits_for_the_latest_close(monkeypatch):
     """Tencent's bar for Friday's close arrives some hours after it; the job waits for it, then gives up at noon."""
-    market = {"QQQ": bars(end="2026-10-22")}            # Thursday's close only
+    market = {"QQQ": bars(end="2026-10-23")}            # Friday's close only
     calls = []
 
     def load(sym, refresh=False):
         calls.append((sym, refresh))
         return market[data.normalize(sym)]
 
-    beijing = lambda hm: dt.datetime.fromisoformat("2026-10-24 %s" % hm).replace(tzinfo=dt.timezone(dt.timedelta(hours=8)))
-    sched = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-23")
+    beijing = lambda hm: dt.datetime.fromisoformat("2026-10-27 %s" % hm).replace(tzinfo=dt.timezone(dt.timedelta(hours=8)))
+    sched = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-26")
     sched.run_daily = lambda now=None: calls.append(("ran", now))
     get_settings.cache_clear()
-    ledger.set_meta(ledger.connect(), "daily_last", "2026-10-23")
+    ledger.set_meta(ledger.connect(), "daily_last", "2026-10-20")
 
     sched.clock = lambda: beijing("09:00")
     sched.tick()
-    assert ("QQQ", True) in calls and not [c for c in calls if c[0] == "ran"]   # downloaded afresh, still Thursday
+    assert ("QQQ", True) in calls and not [c for c in calls if c[0] == "ran"]   # downloaded afresh, still Friday
     calls.clear()
     sched.clock = lambda: beijing("09:20")
     sched.tick()
     assert calls == []                                    # checks at most every half hour
-    market["QQQ"] = bars(end="2026-10-23")                # Friday's bar has arrived
+    market["QQQ"] = bars(end="2026-10-26")                # Monday's bar has arrived
     sched.clock = lambda: beijing("09:31")
     sched.tick()
     assert calls[-1][0] == "ran"
 
-    market["QQQ"] = bars(end="2026-10-22")
-    late = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-23")
+    market["QQQ"] = bars(end="2026-10-23")
+    late = Scheduler(Worker(analyze=fake_analyze()), load=load, market=lambda: "2026-10-26")
     late.run_daily = lambda now=None: calls.append(("ran", now))
     late.clock = lambda: beijing("12:00")
     calls.clear()
@@ -438,3 +440,50 @@ def test_automatic_analysis_can_be_switched_off(monkeypatch):
         get_settings.cache_clear()
         pc.close()
         ac.close()
+
+
+# ---------------------------------------------------------------- the weekly run for the stocks you hold
+
+class FakeHeld:
+    """Stands in for holdings.ledger: a key is set and the ledger says what is held."""
+
+    def __init__(self, monkeypatch, symbols, fail=False):
+        from quantlab.holdings import ledger as hl
+        monkeypatch.setattr(hl, "configured", lambda: True)
+
+        def load(refresh=False):
+            if fail:
+                raise QuantLabError("账本连不上")
+            return {"trades": [{"date": "2026-10-01", "side": "buy", "symbol": s, "shares": 1, "price": 10} for s in symbols]}
+        monkeypatch.setattr(hl, "load", load)
+
+
+def test_every_held_us_stock_is_queued_each_week_and_a_repeat_of_the_same_close_is_not(monkeypatch):
+    monkeypatch.setattr(engine, "available", lambda: True)
+    monkeypatch.setattr(engine, "configured", lambda: True)
+    FakeHeld(monkeypatch, ["QQQM", "BAC", "0700"])
+    market = {"QQQM": bars(300, seed=1), "BAC": bars(40, seed=2)}
+    load = lambda sym, refresh=False: market[data.normalize(sym)]
+    from quantlab.scheduler import queue_holdings
+    ac = ledger.connect()
+    q, notes = queue_holdings(ac, load, NOW)
+    assert len(q) == 2                                              # QQQM and BAC; the Hong Kong code is skipped
+    assert any("0700" in n and "不是美股代码" in n for n in notes)
+    q2, notes2 = queue_holdings(ac, load, NOW)                      # same close again: nothing new is paid for
+    assert q2 == [] and any("已经" in n for n in notes2)
+
+
+def test_held_stock_analyses_have_their_own_switch_and_survive_a_broken_ledger(monkeypatch):
+    monkeypatch.setattr(engine, "available", lambda: True)
+    monkeypatch.setattr(engine, "configured", lambda: True)
+    from quantlab.scheduler import queue_holdings
+    ac = ledger.connect()
+    load = lambda sym, refresh=False: bars(300, seed=1)
+    FakeHeld(monkeypatch, ["QQQM"], fail=True)
+    q, notes = queue_holdings(ac, load, NOW)
+    assert q == [] and "读不到账本" in notes[0]
+    FakeHeld(monkeypatch, ["QQQM"])
+    monkeypatch.setenv("QUANTLAB_AI_WEEKLY_HOLDINGS", "false")
+    get_settings.cache_clear()
+    q, notes = queue_holdings(ac, load, NOW)
+    assert q == [] and "已关闭" in notes[0]

@@ -37,7 +37,7 @@ export default function Holdings() {
             {run.isPending ? "同步和检查中…" : "同步账本并检查"}
           </button>
           <span className="hint">
-            {status.data?.synced ? `上次同步 ${when(status.data.synced)}（北京时间，${status.data.account}）` : "还没有同步过"} · 每日任务也会自动检查
+            {status.data?.synced ? `上次同步 ${when(status.data.synced)}（北京时间，${status.data.account}）` : "还没有同步过"} · 每周二的任务和账本有变化时也会自动检查
           </span>
         </div>
         <ErrorBox error={run.error ?? decide.error} />

@@ -1,7 +1,7 @@
-"""The daily job, run inside `quantlab serve`: queue the AI analyses that are due, wait for them, then record a
-decision for every paper account.
+"""The weekly job, run inside `quantlab serve`: queue a fresh AI analysis of every stock you hold (and of the AI paper
+account's stocks that are due), wait for them, record a decision for every paper account and re-check your holdings.
 
-It runs once per Beijing day, Tuesday to Saturday, after the configured time (the US market has closed by then).
+It runs once a week, on Tuesday in Beijing, after the configured time (Monday's US session has closed by then).
 With Chinese prices it first waits until Tencent's daily bars have the latest finished session (they arrive some
 hours after the close), checking every half hour; from the give-up time it runs anyway and notes how old the bars
 are. Every symbol is downloaded afresh once per run, so no bar cached before the close is used.
@@ -10,6 +10,7 @@ days they missed. AI analyses are only ever made for the latest close, never bac
 import datetime as dt
 import json
 import logging
+import re
 import threading
 from zoneinfo import ZoneInfo
 
@@ -20,7 +21,7 @@ from .errors import QuantLabError
 
 log = logging.getLogger(__name__)
 BEIJING = ZoneInfo("Asia/Shanghai")
-RUN_DAYS = {1, 2, 3, 4, 5}  # Tuesday to Saturday in Beijing: the morning after each US trading day
+RUN_DAYS = {1}  # Tuesday in Beijing: the morning after Monday's US session (the owner asked for one run a week, 2026-11-09)
 PROBE = "QQQ"  # the symbol whose bars tell whether the latest close has arrived
 RETRY = dt.timedelta(minutes=30)
 WATCH_EVERY = dt.timedelta(minutes=3)  # how often the ledger is looked at for a new trade (its read key allows 120 reads an hour)
@@ -50,6 +51,34 @@ def queue_due_analyses(paper_con, ai_con, load, now=None):
                 queued.append(ledger.enqueue(ai_con, sym, latest.isoformat(), "schedule", now))
             except QuantLabError as e:  # duplicate, over budget, no data: note it and go on
                 notes.append("%s：%s" % (sym, e))
+    return queued, notes
+
+
+def queue_holdings(ai_con, load, now=None):
+    """Queues a fresh analysis of every US stock the ledger says you hold, at the latest close: one report per stock per
+    close, so a repeat of the same close is noted, not paid for twice. Own switch (QUANTLAB_AI_WEEKLY_HOLDINGS), apart from
+    the paper account's. Over-budget, unreadable or non-US symbols are noted and skipped."""
+    queued, notes = [], []
+    if not get_settings().ai_weekly_holdings:
+        return queued, ["持仓股票的每周 AI 研报已关闭（QUANTLAB_AI_WEEKLY_HOLDINGS=false）"]
+    if not (engine.available() and engine.configured()):
+        return queued, ["AI 没有安装或没有配置密钥，跳过持仓股票的 AI 研报"]
+    from .holdings import ledger as hledger
+    if not hledger.configured():
+        return queued, ["没有配置账本的只读密钥，不知道你持有什么，跳过持仓股票的 AI 研报"]
+    try:
+        held = hledger.positions(hledger.load(refresh=True))
+    except QuantLabError as e:
+        return queued, ["读不到账本，跳过持仓股票的 AI 研报：%s" % e]
+    for p in held:
+        sym = p["symbol"]
+        if not re.fullmatch(r"[A-Z][A-Z.\-]*", sym):
+            notes.append("%s 不是美股代码，AI 研报暂不支持，跳过" % sym)
+            continue
+        try:
+            queued.append(ledger.enqueue(ai_con, sym, load(sym).index[-1].date().isoformat(), "schedule", now))
+        except QuantLabError as e:  # already analysed at this close, over budget, no data: note it and go on
+            notes.append("%s：%s" % (sym, e))
     return queued, notes
 
 
@@ -188,7 +217,9 @@ class Scheduler:
 
             ai_con, paper_con = ledger.connect(), paper.connect()
             try:
-                queued, notes = queue_due_analyses(paper_con, ai_con, load, now)
+                queued, notes = queue_holdings(ai_con, load, now)
+                q2, n2 = queue_due_analyses(paper_con, ai_con, load, now)
+                queued, notes = queued + q2, notes + n2
                 if self._probe and self._probe[1] and self._probe[0] < self._probe[1]:
                     notes.append("到 %s 腾讯日线还没有 %s 的收盘价，这次按 %s 的收盘价运行" % (
                         get_settings().schedule_give_up, self._probe[1], self._probe[0]))

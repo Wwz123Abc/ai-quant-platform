@@ -84,7 +84,7 @@ function CreateAccount() {
       <h2>创建模拟账户</h2>
       <p className="hint">资金平均分给每只股票，每份资金只交易自己那只股票。第一批决定按最近的收盘价做出，下一个交易日开盘开始模拟成交。</p>
       {form.strategy === "ai_rating" ? (
-        <p className="hint">AI 评级账户：买入、增持 → 持有；卖出、减持 → 空仓；持有 → 维持原状；还没有评级时空仓。由每日任务按间隔自动分析，每次分析会产生模型费用，计入每月预算。</p>
+        <p className="hint">AI 评级账户：买入、增持 → 持有；卖出、减持 → 空仓；持有 → 维持原状；还没有评级时空仓。由每周任务按间隔自动分析，每次分析会产生模型费用，计入每月预算。</p>
       ) : null}
       <form className="params" onSubmit={submit}>
         <Field label="名称"><input value={form.name} onChange={set("name")} required maxLength={40} placeholder="例如 核心" /></Field>

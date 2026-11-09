@@ -10,9 +10,23 @@ export const RATING: Record<string, string> = {
 };
 export const yuan = (v: number) => `¥${v.toFixed(2)}`;
 
+/** Each stock's newest report replaces its older ones: keeps a run when it is the newest of its stock, or the newest finished
+ *  one while a newer run is still going or failed. Older runs stay on record (their cost counts toward the month's budget). */
+export function latestPerSymbol(runs: AiRun[]): AiRun[] {
+  const seen = new Set<string>();
+  const doneSeen = new Set<string>();
+  const keep = new Set<number>();
+  for (const r of [...runs].sort((a, b) => b.id - a.id)) {
+    if (!seen.has(r.symbol)) { seen.add(r.symbol); keep.add(r.id); }
+    if (r.status === "done" && !doneSeen.has(r.symbol)) { doneSeen.add(r.symbol); keep.add(r.id); }
+  }
+  return runs.filter((r) => keep.has(r.id));
+}
+
 export default function Ai() {
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["ai-status"], queryFn: () => api<AiStatus>("/api/ai/status"), refetchInterval: 15_000 });
+  const [history, setHistory] = useState(false);
   const busy = (status.data?.budget.queued ?? 0) + (status.data?.budget.running ?? 0) > 0;
   const runs = useQuery({
     queryKey: ["ai-runs"],
@@ -86,12 +100,12 @@ export default function Ai() {
           <ErrorBox error={create.error} />
         </div>
         <div className="card">
-          <h2>每日任务</h2>
+          <h2>每周任务</h2>
           {st ? (
             <p>
-              {st.schedule.enabled ? `每周二至周六北京时间 ${st.schedule.time} 后自动运行` : "自动运行已关闭"}
+              {st.schedule.enabled ? `每周二北京时间 ${st.schedule.time} 后自动运行一次` : "自动运行已关闭"}
               {st.schedule.last_run ? `，上次 ${st.schedule.last_run}` : "，还没有运行过"}。
-              先为 AI 模拟账户分析到期的股票，再给所有模拟账户记录当天的决定。
+              先给你持仓里的每只美股重新出一份 AI 研报（新的替换旧的，旧的在“显示历史”里），再给模拟账户记录决定，最后检查你的持仓。
             </p>
           ) : null}
           <button onClick={() => daily.mutate()} disabled={daily.isPending || st?.schedule.running}>
@@ -106,18 +120,20 @@ export default function Ai() {
         <ErrorBox error={runs.error} />
         {runs.data?.length === 0 ? <p className="empty">还没有分析记录。</p> : null}
         {runs.data?.length ? (
+          <>
+          <label className="hint"><input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} /> 显示历史（每只股票默认只显示最新一份，新的替换旧的）</label>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr><th>编号</th><th>代码</th><th>收盘日</th><th className="hide-sm">来源</th><th>状态</th><th>评级</th><th className="num hide-sm">模型调用</th><th className="num hide-sm">token（输入/输出）</th><th className="num">费用</th></tr>
               </thead>
               <tbody>
-                {runs.data.map((r) => (
+                {(history ? runs.data : latestPerSymbol(runs.data)).map((r) => (
                   <tr key={r.id}>
                     <td><Link to={`/ai/runs/${r.id}`}>#{r.id}</Link></td>
                     <td>{r.symbol}</td>
                     <td>{r.trade_date}</td>
-                    <td className="hint hide-sm">{{ manual: "手动", schedule: "每日任务", cli: "命令行" }[r.source] ?? r.source}</td>
+                    <td className="hint hide-sm">{{ manual: "手动", schedule: "每周任务", cli: "命令行" }[r.source] ?? r.source}</td>
                     <td className={r.status === "failed" ? "down" : undefined} title={r.error ?? undefined}>{STATUS[r.status]}</td>
                     <td>{r.rating ? RATING[r.rating] ?? r.rating : "—"}</td>
                     <td className="num hide-sm">{r.llm_calls}</td>
@@ -128,6 +144,7 @@ export default function Ai() {
               </tbody>
             </table>
           </div>
+          </>
         ) : null}
         <p className="hint">报告由 AI 生成，可能有事实错误，只作研究参考，不构成投资建议。</p>
       </div>

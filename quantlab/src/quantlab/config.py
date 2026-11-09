@@ -44,7 +44,8 @@ class Settings(BaseSettings):
     ai_analysts: list[str] = ["market", "social", "news", "fundamentals"]
     ai_language: str = "Chinese"
     ai_budget_cny: float = 100.0             # hard monthly limit on model spending
-    ai_auto_analysis: bool = True            # the daily job analyses the AI paper account's stocks (costs money); off: manual only
+    ai_auto_analysis: bool = True            # the weekly job analyses the AI paper account's stocks (costs money); off: manual only
+    ai_weekly_holdings: bool = True          # the weekly job analyses every stock you hold, each week (costs money, within the budget)
     ai_usd_cny: float = 7.3                  # for showing USD prices in CNY; set it near the current rate
     ai_first_estimate_cny: float = 2.0       # assumed cost of a run until real runs have been measured
     # USD per million tokens: [input from cache, input not from cache, output]. Peak-hour list prices, so the
@@ -77,7 +78,7 @@ class Settings(BaseSettings):
 
     # Daily job: AI analyses for AI accounts, then a decision for every paper account. Runs inside `serve`.
     schedule_enabled: bool = True
-    schedule_time: str = "09:00"             # Beijing time, Tuesday to Saturday; Tencent's daily bars arrive about 07:30-08:30
+    schedule_time: str = "09:00"             # Beijing time, Tuesdays only; Tencent's daily bars arrive about 07:30-08:30
     schedule_give_up: str = "12:00"          # still no bar for the latest close by then: run anyway, and say so
 
 
