@@ -29,17 +29,18 @@ export default function App() {
   }
 
   return (
-    <div className="shell">
+    <div className={"shell" + (BASE ? " solo" : "")}>
+      {BASE ? null : (
       <nav className="nav" aria-label="主导航">
-        <div className="brand">AI量化交易分析平台<small>量化分析 · QuantLab</small></div>
+        <div className="brand">测试</div>
         <NavLink to="/holdings">我的持仓</NavLink>
         <NavLink to="/rules">持仓规则</NavLink>
         <NavLink to="/analyze">个股分析</NavLink>
         <NavLink to="/ai">AI 研报</NavLink>
         {/* 均线回测 (/backtest), 参数扫描、模拟盘、机器学习选股、自动交易 and the API docs stay reachable by address, off the menu */}
-        {auth.data?.home_url ? <a href={auth.data.home_url}>← 持仓账本</a> : null}
         <div className="foot">v{auth.data?.version} · 仅用于研究，不构成投资建议</div>
       </nav>
+      )}
       <main>
         <Routes>
           <Route path="/" element={<Navigate to="/holdings" replace />} />
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/trading/:name" element={<TradingAccountPage />} />
           <Route path="*" element={<p className="empty">没有这个页面。<NavLink to="/holdings">回到我的持仓</NavLink></p>} />
         </Routes>
+        {BASE ? <p className="hint" style={{ marginTop: 24 }}>v{auth.data?.version} · 仅用于研究，不构成投资建议</p> : null}
       </main>
     </div>
   );

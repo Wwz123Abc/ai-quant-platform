@@ -46,7 +46,8 @@ USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
 SHARED_COLLS = {"history", "candles", "watch", "actions", "checks"}  # market data: written only by the server, uid 0
 PAGES = {"/": "index.html", "/index.html": "index.html", "/dashboard": "dashboard.html", "/reading": "reading.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
-ASSETS = {"d3.min.js": "text/javascript; charset=utf-8", "calc.js": "text/javascript; charset=utf-8"}
+ASSETS = {"d3.min.js": "text/javascript; charset=utf-8", "calc.js": "text/javascript; charset=utf-8",
+          "sitenav.js": "text/javascript; charset=utf-8"}
 ASSET_LINK_RE = re.compile(rb"/assets/([A-Za-z0-9_.-]+\.js)(?:\?v=[A-Za-z0-9]*)?")
 _asset_versions = {}
 
@@ -1138,7 +1139,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, system_status())
         if parts == ["sso"] and method == "GET":
             if not platform_owner(uid):
-                return self.send_json(403, {"error": "这个账号不能使用量化分析。"})
+                return self.send_json(403, {"error": "这个账号不能使用持仓分析这部分功能。"})
             return self.send_json(200, {"ok": True}, {"X-Ledger-User": urllib.parse.quote(get_user_by_id(uid)["name"])})
 
         # ---- signed in: the account itself

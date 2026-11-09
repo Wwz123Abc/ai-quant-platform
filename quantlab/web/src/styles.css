@@ -90,6 +90,10 @@ p {
   grid-template-columns: 200px minmax(0, 1fr);
   min-height: 100vh;
 }
+/* under the ledger site the shared top bar replaces the sidebar */
+.shell.solo {
+  grid-template-columns: minmax(0, 1fr);
+}
 .nav {
   border-right: 1px solid var(--border);
   padding: 20px 12px;

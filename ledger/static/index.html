@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <style>*, *::before, *::after { box-sizing: border-box; } body { margin: 0; }</style>
+<script src="/assets/sitenav.js" defer></script>
 </head>
 <body>
 <title>测试</title>
@@ -61,7 +62,6 @@ h2 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 20px
 .navlink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .navrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .navrow .navlink { margin-top: 0; }
-.nav-more { display: none; }
 button.navlink { font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
 .navlink[hidden] { display: none; }
 button.navlink:disabled { opacity: .6; cursor: default; }
@@ -375,13 +375,8 @@ footer p { margin: 0 0 6px; }
   form { padding: 14px; }
   .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   #f-side-row { grid-column: 1 / -1; }
-  .nav-more { display: inline-flex; }
-  .navrow .nav2 { display: none; }
-  .navrow.open .nav2 { display: inline-flex; }
-  .navrow.open .nav2[hidden] { display: none; }
   #f-side-row .seg { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   #f-side-row .seg label { padding: 7px 4px; text-align: center; }
-  .nav-x { display: none; }
   #entry, #importDlg { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); padding: 14px; }
   #impText { font-size: 16px; }
 }
@@ -395,12 +390,6 @@ footer p { margin: 0 0 6px; }
     <div class="navrow" id="navRow">
       <button class="navlink primary" type="button" id="entryBtn">＋ 记一笔</button>
       <button class="navlink" type="button" id="refreshBtn">↻ 刷新数据</button>
-      <button class="navlink nav-more" type="button" id="navMore" aria-expanded="false" aria-controls="navRow">更多 ▾</button>
-      <a class="navlink nav2" href="/dashboard">打开股票看板<span class="nav-x">（K 线、金价）</span>→</a>
-      <a class="navlink nav2" href="/reading">读书清单</a>
-      <a class="navlink nav2" href="/lab/" id="labLink" hidden>量化分析 →</a>
-      <a class="navlink nav2" href="/account">账号</a>
-      <button class="navlink nav2" type="button" id="logoutBtn">退出登录</button>
     </div>
     <p class="status" id="status">正在读取记录…</p>
   </header>
@@ -1970,12 +1959,6 @@ TAL|好未来|TAL Education
     renderChecks(c);
   }
 
-  $("#navMore").addEventListener("click", () => {
-    const open = $("#navRow").classList.toggle("open");
-    $("#navMore").setAttribute("aria-expanded", String(open));
-    $("#navMore").textContent = open ? "收起 ▴" : "更多 ▾";
-  });
-
   // ---------- closes cross-checked with a second source ----------
   // The server compares Tencent's last five daily closes with Eastmoney's on every refresh (US stocks).
   const checkBad = (sym) => { const k = state.checks[sym]; return !!(k && (k.unchecked || k.mismatches.length || k.missing.length || k.stale)); };
@@ -2752,10 +2735,7 @@ TAL|好未来|TAL Education
       btn.disabled = false;
     }
   });
-  $("#logoutBtn").addEventListener("click", async () => {
-    try { await window.ledgerApi("POST", "/api/logout"); } finally { location.reload(); }
-  });
-  window.ledgerApi("GET", "/api/auth").then((a) => { if (a.platform) { $("#labLink").hidden = false; loadStatus(); } }).catch(() => {});
+  window.ledgerApi("GET", "/api/auth").then((a) => { if (a.platform) loadStatus(); }).catch(() => {});
   init();
 })();
 </script>

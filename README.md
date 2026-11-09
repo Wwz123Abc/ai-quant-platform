@@ -2,12 +2,12 @@
 
 一个人用的美股投资平台：记账、分析、按规则管理持仓，三件事放在同一个网站、同一个登录下。目标和取舍见[目标说明](docs/goals.md)。
 
-线上地址：https://wwz.hk.cn （首页是持仓账本，量化分析在 `/lab/`，只有指定的一个账号能进）
+线上地址：https://wwz.hk.cn （首页是持仓账本，持仓分析在 `/lab/`，只有指定的一个账号能进）
 
 | 模块 | 做什么 | 技术 |
 | --- | --- | --- |
 | [持仓账本](ledger/) | 记录美股、港股、美国国债、定期存款和现金，自动算成本、盈亏、资产占比、收益走势和一年投资计划 | Python 标准库 + SQLite，零依赖 |
-| [量化分析](quantlab/) | 个股分析、我的持仓（按规则给出建议订单）、均线回测和参数扫描、模拟盘、AI 研报、机器学习选股、自动交易（模拟券商） | FastAPI + React/TypeScript，LightGBM，TradingAgents |
+| [持仓分析](quantlab/) | 个股分析、我的持仓（按规则给出建议订单）、均线回测和参数扫描、模拟盘、AI 研报、机器学习选股、自动交易（模拟券商） | FastAPI + React/TypeScript，LightGBM，TradingAgents |
 
 ## 分析端和执行端
 
@@ -22,20 +22,20 @@
 浏览器 ──HTTPS──> nginx（wwz.hk.cn）
                     ├─ /        ──> 持仓账本  127.0.0.1:5090   SQLite：账号、交易、国债定存、现金
                     └─ /lab/    ──> 先问账本 GET /api/sso：是平台所有者吗？
-                                    是 ──> 量化分析 127.0.0.1:8010   SQLite：行情缓存、模拟盘、AI 台账、交易账户
+                                    是 ──> 持仓分析 127.0.0.1:8010   SQLite：行情缓存、模拟盘、AI 台账、交易账户
                                     否 ──> 跳回账本登录
 
-量化分析 ──只读密钥──> 账本 GET /api/holdings（只能读交易、国债定存和现金）
-量化分析 ──> 腾讯/新浪行情、SEC 财报、DeepSeek（AI 研报，每月预算上限）
+持仓分析 ──只读密钥──> 账本 GET /api/holdings（只能读交易、国债定存和现金）
+持仓分析 ──> 腾讯/新浪行情、SEC 财报、DeepSeek（AI 研报，每月预算上限）
 ```
 
-两个模块各自独立运行、独立部署：账本可以单独给别人用；量化分析在本地电脑上也能单独运行（用访问令牌登录）。
+两个模块各自独立运行、独立部署：账本可以单独给别人用；持仓分析在本地电脑上也能单独运行（用访问令牌登录）。
 
 ## 目录
 
 ```
 ledger/      持仓账本：app.py（服务器和命令行）、static/（页面）、tests/（端到端测试）、deploy/
-quantlab/    量化分析：src/quantlab/（Python 包）、web/（React 工作台）、tests/、docs/、deploy/
+quantlab/    持仓分析：src/quantlab/（Python 包）、web/（React 工作台）、tests/、docs/、deploy/
 docs/        平台文档：目标说明、路线图、市场调研
 ```
 
@@ -51,11 +51,11 @@ cd quantlab && pip install -e ".[ml]" && python -m quantlab serve
 
 **怎么用：[使用手册](docs/用户手册.md)**
 
-各模块的完整说明：[持仓账本](ledger/README.md) · [量化分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [目标说明](docs/goals.md) · [路线图](docs/roadmap.md) · [市场调研](docs/research/2026-10-market-research.md)
+各模块的完整说明：[持仓账本](ledger/README.md) · [持仓分析](quantlab/README.md) · [部署到服务器](quantlab/docs/deploy.md) · [目标说明](docs/goals.md) · [路线图](docs/roadmap.md) · [市场调研](docs/research/2026-10-market-research.md)
 
 ## 测试
 
-CI 在每次提交时运行：账本的两组端到端测试（只读密钥、平台登录检查），量化分析的单元和接口测试（Python 3.11 和 3.13）、前端类型检查、lint 和测试，以及两个 Docker 镜像的构建。
+CI 在每次提交时运行：账本的两组端到端测试（只读密钥、平台登录检查），持仓分析的单元和接口测试（Python 3.11 和 3.13）、前端类型检查、lint 和测试，以及两个 Docker 镜像的构建。
 
 > 仅用于学习和研究，不构成投资建议。回测和模拟结果不代表未来表现。
 

@@ -128,7 +128,7 @@ docker compose exec ledger python app.py users
 | 命令行取行情 | `python3 app.py refresh 用户名` |
 | 导入数据 | `python3 app.py import 用户名 文件.json`，格式见 `demo.json`，和“账号”页导出的文件相同 |
 | 更新到新版本 | `cd /opt/ai-quant-platform && sudo git pull && sudo systemctl restart stock-ledger` |
-| 指定量化分析的使用者 | `python3 app.py platform-owner 用户名`（只有这个账号能打开 `/lab/`）；`platform-owner off` 关闭 |
+| 指定持仓分析的使用者 | `python3 app.py platform-owner 用户名`（只有这个账号能打开 `/lab/`）；`platform-owner off` 关闭 |
 | 把只读密钥写给程序 | `python3 app.py read-key 用户名 文件`：新建该账号的只读密钥，直接写进文件的 `LEDGER_TOKEN=` 一行，不显示；旧密钥失效 |
 
 全部数据就是 `data/ledger.db` 这一个文件，换服务器时把它复制过去就行。

@@ -8,6 +8,14 @@ import "./styles.css";
 
 adoptTokenFromUrl();
 
+// Under the ledger site the whole site shares one navigation bar (the ledger's sitenav.js); on its own, this app keeps its sidebar.
+if (BASE) {
+  const nav = document.createElement("script");
+  nav.src = "/assets/sitenav.js";
+  nav.defer = true;
+  document.head.appendChild(nav);
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
