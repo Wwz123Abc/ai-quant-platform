@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type HoldingsPolicy, type HoldingsReview } from "../api/client";
 import { ErrorBox, PageHead, Stat } from "../components/ui";
@@ -19,7 +19,7 @@ export default function Rules() {
         这里的计划只是计划，系统不会替你下单；去<Link to="/holdings">我的持仓</Link>逐条确认。
       </PageHead>
       {r ? <Status r={r} /> : review.isPending ? <p className="empty">正在读取…</p> : <p className="empty">还没有检查过持仓：先到“我的持仓”点“同步账本并检查”，这里才有对照和计划。</p>}
-      <PolicyCard />
+      <PolicyCard investable={r?.valuation.investable} />
     </>
   );
 }
@@ -170,13 +170,22 @@ function toForm(p: HoldingsPolicy): Record<string, string> {
   };
 }
 
-function PolicyCard() {
+function PolicyCard({ investable }: { investable?: number }) {
   const pol = useQuery({ queryKey: ["hpolicy"], queryFn: () => api<HoldingsPolicy>("/api/holdings/policy") });
   if (!pol.data) return <div className="card"><h2>你的规则</h2><ErrorBox error={pol.error} /><p className="empty">正在读取…</p></div>;
-  return <PolicyForm key={JSON.stringify(pol.data)} initial={pol.data} />;
+  return <PolicyForm key={JSON.stringify(pol.data)} initial={pol.data} investable={investable} />;
 }
 
-function PolicyForm({ initial }: { initial: HoldingsPolicy }) {
+function parseTargets(text: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const part of text.split(/[,，\s]+/).filter(Boolean)) {
+    const [sym, w] = part.split(/[:：]/);
+    if (sym && w && Number.isFinite(Number(w))) out[sym.toUpperCase()] = Number(w) / 100;
+  }
+  return out;
+}
+
+export function PolicyForm({ initial, investable }: { initial: HoldingsPolicy; investable?: number }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Record<string, string>>(() => toForm(initial));
   const save = useMutation({
@@ -186,11 +195,7 @@ function PolicyForm({ initial }: { initial: HoldingsPolicy }) {
   const set = (k: string) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
   function submit(e: FormEvent) {
     e.preventDefault();
-    const targets: Record<string, number> = {};
-    for (const part of (form.targets ?? "").split(/[,，\s]+/).filter(Boolean)) {
-      const [s, w] = part.split(/[:：]/);
-      if (s && w) targets[s.toUpperCase()] = Number(w) / 100;
-    }
+    const targets = parseTargets(form.targets ?? "");
     const pct = (k: string) => Number(form[k]) / 100;
     save.mutate({
       targets, band: pct("band"), max_position: pct("max_position"), cash_reserve: pct("cash_reserve"),
@@ -199,29 +204,84 @@ function PolicyForm({ initial }: { initial: HoldingsPolicy }) {
       alert_drawdown_from_cost: pct("alert_drawdown_from_cost"), alert_drawdown_from_high: pct("alert_drawdown_from_high"),
     });
   }
-  const f = (k: string, label: string) => (
-    <div className="field"><label>{label}<input type="number" step="any" min={0} value={form[k] ?? ""} onChange={set(k)} /></label></div>
+  const num = (k: string) => Number(form[k]);
+  const inv = investable ?? 0;
+  const usd = (x: number) => (inv > 0 ? money(x) : "—");
+  const parsed = parseTargets(form.targets ?? "");
+  const tsum = Object.values(parsed).reduce((x, y) => x + y, 0);
+  const cap = num("max_position") / 100, reserve = num("cash_reserve") / 100, band = num("band") / 100;
+  const uncappedSet = new Set((form.uncapped ?? "").split(/[,，\s]+/).filter(Boolean).map((x) => x.toUpperCase()));
+  const overCap = Object.entries(parsed).filter(([sym, w]) => !uncappedSet.has(sym) && w > cap + 1e-9);
+  const field = (k: string, unit: string) => (
+    <label className="inl"><input type="number" step="any" min={0} value={form[k] ?? ""} onChange={set(k)} /> <span>{unit}</span></label>
+  );
+  const rule = (name: string, term: string, control: ReactNode, what: string, now: ReactNode, tip: string) => (
+    <div className="rule">
+      <div className="rule-in"><div className="rule-name">{name}<small>{term}</small></div>{control}</div>
+      <div className="rule-text">
+        <p>{what}</p>
+        <p className="hint"><b>按你现在的情况：</b>{now}</p>
+        <p className="hint"><b>怎么定：</b>{tip}</p>
+      </div>
+    </div>
   );
   return (
     <div className="card">
-      <h2>你的规则</h2>
-      <p className="hint">占比都按“可投资资金”（股票 + 现金）计算。只有这些规则会生成建议订单。改完后点“同步账本并检查”生效。</p>
-      <form className="params" onSubmit={submit}>
-        <div className="field wide"><label>目标仓位（代码:百分比，逗号分隔，可不填）<input value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" /></label></div>
-        {f("band", "再平衡区间（%）")}
-        {f("max_position", "单只上限（%）")}
-        <div className="field wide"><label>不设上限的代码（宽基 ETF，逗号分隔）<input value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" /></label></div>
-        {f("cash_reserve", "现金储备（%）")}
-        {f("min_trade_usd", "最小下单金额（$）")}
-        <div className="field"><label>按整股
-          <select value={form.whole_shares ?? "1"} onChange={set("whole_shares")}><option value="1">是</option><option value="0">否（碎股）</option></select>
-        </label></div>
-        {f("alert_drawdown_from_cost", "低于成本提醒（%）")}
-        {f("alert_drawdown_from_high", "离一年高点提醒（%）")}
+      <h2>修改规则</h2>
+      <p className="hint">占比都按“可投资资金”（股票 + 现金；国债和定存持有到期，不参与）计算。只有这些规则会生成建议订单，其余只是提醒。保存后点“我的持仓”的“同步账本并检查”生效。</p>
+      <form onSubmit={submit}>
+        <h3 className="rule-group">一、买什么、买多少</h3>
+        {rule("目标仓位", "target weight",
+          <input className="wide" value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" />,
+          "给想长期持有的股票定一个占可投资资金的目标比例，格式“代码:百分比”，用逗号隔开。可以不填：不填的股票只受下面的“单只上限”约束，不会被要求买到某个比例。",
+          Object.keys(parsed).length ? <>目标合计 <b>{(tsum * 100).toFixed(0)}%</b>，现金储备 {(reserve * 100).toFixed(0)}%，剩下 {Math.max(0, (1 - tsum - reserve) * 100).toFixed(0)}% 没有指定，可以放在其他股票或现金上。{Object.entries(parsed).map(([sym, w]) => ` ${sym} 目标 ${(w * 100).toFixed(0)}% ≈ ${usd(w * inv)}。`)}{tsum + reserve > 1 + 1e-9 ? <span className="down"> ✗ 目标合计加现金储备超过 100%，保存会被拒绝。</span> : null}{overCap.length ? <span className="down"> ✗ {overCap.map(([sym]) => sym).join("、")} 的目标高于单只上限，保存会被拒绝（宽基 ETF 请先加到下面的“不设上限”）。</span> : null}</> : "还没有设目标：现在只按上限和现金储备检查。",
+          "目标合计不要超过“100% − 现金储备”。核心宽基 ETF 可以定高一点，个股定低一点；定了目标，偏离超过“再平衡区间”才会提议买卖。")}
+        {rule("单只上限", "position cap", field("max_position", "%"),
+          "任何一只个股占可投资资金的比例不能超过这个数；超出的部分会提议卖出。目的是不把钱押在一家公司上。",
+          <>上限 {(cap * 100).toFixed(0)}%：现在资金 {usd(inv)}，单只最多约 <b>{usd(cap * inv)}</b>。</>,
+          "常见做法是 10%–30%：越看重分散越低。范围 2%–100%。")}
+        <div className="rule">
+          <div className="rule-in"><div className="rule-name">不设上限的代码<small>uncapped</small></div>
+            <input className="wide" value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" /></div>
+          <div className="rule-text">
+            <p>宽基指数 ETF 本身就分散在几百家公司里，不适用“单只上限”。写在这里的代码不受上限限制（逗号隔开）。</p>
+            <p className="hint"><b>按你现在的情况：</b>{uncappedSet.size} 个代码不设上限。<b>注意：</b>行业 ETF、杠杆 ETF 或个股不要放进来，它们并不分散。</p>
+          </div>
+        </div>
+        {rule("再平衡区间", "rebalancing band", field("band", "个百分点"),
+          "只有设了目标的股票才用到：占比偏离目标超过这个距离，才提议买或卖回目标；没超过就不动，免得天天为小偏差下单、白付手续费。",
+          <>目标 40% 的股票，占比低于 <b>{((0.4 - band) * 100).toFixed(0)}%</b> 或高于 <b>{((0.4 + band) * 100).toFixed(0)}%</b> 才会调整。</>,
+          "常见 3–5 个百分点：越小越勤、费用越多；越大越懒、偏离越久。范围 1–50。")}
+        <h3 className="rule-group">二、现金和下单</h3>
+        {rule("现金储备", "cash reserve", field("cash_reserve", "%"),
+          "现金占可投资资金至少要留这么多。买入不会把现金花到这条线以下，现金不够时买入会按比例缩减；现金已经低于它时会提醒。",
+          <>储备 {(reserve * 100).toFixed(0)}%：现在资金 {usd(inv)}，至少留 <b>{usd(reserve * inv)}</b> 现金，其余 {usd((1 - reserve) * inv)} 才能用来买。</>,
+          "留着应急或等机会。5%–20% 常见；越大越稳，但闲置的钱越多。")}
+        {rule("最小下单金额", "minimum trade", field("min_trade_usd", "美元"),
+          "算出来的调整不到这个金额就不提议，免得为了几美元的偏差下单。",
+          <>不到 <b>${(num("min_trade_usd") || 0).toFixed(0)}</b>{inv > 0 ? `（约占资金 ${((num("min_trade_usd") / inv) * 100).toFixed(1)}%）` : ""} 的调整会被忽略，并在“说明”里写出原因。</>,
+          "定成手续费的几倍以上比较划算：金额太小，手续费占比就高。")}
+        <div className="rule">
+          <div className="rule-in"><div className="rule-name">按整股<small>whole shares</small></div>
+            <select value={form.whole_shares ?? "1"} onChange={set("whole_shares")}><option value="1">是</option><option value="0">否（碎股）</option></select></div>
+          <div className="rule-text">
+            <p>多数券商不能买碎股。选“是”，建议订单按整数股取整：买入向下取整，保证现金够；卖出取最接近规则的整数股，不会为了几美元多卖一整股。</p>
+            <p className="hint"><b>怎么定：</b>按整股下单的券商保持“是”。股价很高（几百美元一股）时，单次调整可能不到 1 股，这种会写明“不到半股，暂不建议”。</p>
+          </div>
+        </div>
+        <h3 className="rule-group">三、提醒线（只提醒，不生成订单）</h3>
+        {rule("低于成本提醒", "drawdown from cost", field("alert_drawdown_from_cost", "%"),
+          "持仓现价比平均成本低这么多时，提醒你复查这只股票的逻辑还在不在。平均成本按账本的移动平均法算。",
+          <>平均成本 $100 的股票，现价跌到 <b>${(100 * (1 - num("alert_drawdown_from_cost") / 100)).toFixed(0)}</b> 以下就提醒。</>,
+          "只是提醒，不会自动卖。比较常见的是 15%–25%。")}
+        {rule("离一年高点提醒", "drawdown from 52-week high", field("alert_drawdown_from_high", "%"),
+          "股价比近一年（约 252 个交易日）的最高点低这么多时提醒，说明这一年里回撤已经很深。",
+          <>一年最高 $100 的股票，现价跌到 <b>${(100 * (1 - num("alert_drawdown_from_high") / 100)).toFixed(0)}</b> 以下就提醒。</>,
+          "和上一条不同：它看的是高点，不管你什么价买的。20%–30% 常见。")}
         <button type="submit" disabled={save.isPending}>保存规则</button>
       </form>
       <ErrorBox error={save.error} />
-      {save.isSuccess ? <p className="hint">已保存。</p> : null}
+      {save.isSuccess ? <p className="hint">已保存。到“我的持仓”点“同步账本并检查”后，上面的对照和调仓计划会按新规则重算。</p> : null}
     </div>
   );
 }

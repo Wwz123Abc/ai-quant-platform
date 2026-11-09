@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { HoldingsReview } from "../api/client";
-import { Status } from "./Rules";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PolicyForm, Status } from "./Rules";
 
 const pos = (symbol: string, shares: number, price: number, avg: number, weight: number) =>
   ({ symbol, currency: "USD", shares, avg_cost: avg, price, value: shares * price, gain: price / avg - 1, weight });
@@ -35,5 +36,15 @@ describe("Rules page", () => {
     r.valuation.investable = 2500; r.valuation.stocks = 1000; r.valuation.cash = 1500; r.valuation.cash_weight = 0.6;
     const html = renderToStaticMarkup(<Status r={r} />);
     expect(html).toContain("现在不需要调整");
+  });
+});
+
+describe("Rules form", () => {
+  it("explains every rule with figures from the current money", () => {
+    const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><PolicyForm initial={review().policy} investable={2500} /></QueryClientProvider>);
+    for (const t of ["目标仓位", "单只上限", "再平衡区间", "现金储备", "最小下单金额", "按整股", "低于成本提醒", "离一年高点提醒"]) expect(html).toContain(t);
+    expect(html).toContain("<b>$750</b>");   // 30% of $2,500
+    expect(html).toContain("<b>$250</b>");   // 10% reserve
+    expect(html).toContain("<b>$80</b>");    // a $100 cost, 20% below
   });
 });

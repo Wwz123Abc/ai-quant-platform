@@ -549,3 +549,60 @@ ul.todo li.warn-item {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- the holdings rules page ---------- */
+.rule-group {
+  margin: 18px 0 4px;
+  font-size: 14px;
+}
+.rule {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 8px 18px;
+  padding: 12px 0;
+  border-top: 1px solid var(--axis);
+}
+.rule-in {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.rule-name {
+  font-weight: 600;
+}
+.rule-name small {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.rule input,
+.rule select {
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--axis);
+  border-radius: 6px;
+  padding: 6px 8px;
+  width: 110px;
+}
+.rule input.wide {
+  width: 100%;
+  max-width: 240px;
+}
+.rule label.inl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.rule-text p {
+  margin: 0 0 6px;
+}
+@media (max-width: 720px) {
+  .rule {
+    grid-template-columns: 1fr;
+  }
+}
