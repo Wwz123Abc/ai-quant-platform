@@ -380,7 +380,7 @@ def cmd_trade_new(a):
         engine.create_account(con, a.name, a.mode, a.capital)
     finally:
         con.close()
-    print("已创建交易账户 %s（%s 模式）。每月最后一个交易日收盘后，每日任务会自动调仓；想立刻建仓可以运行：quantlab trade run --force" % (
+    print("已创建交易账户 %s（%s 模式）。每月最后一个交易日收盘后，每周任务会自动调仓；想立刻建仓可以运行：quantlab trade run --force" % (
         a.name, {"plan": "只出计划", "paper": "模拟券商"}[a.mode]))
 
 
@@ -659,7 +659,7 @@ def fee_arg(v):
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="quantlab", description="AI量化交易分析平台 · 量化分析：回测、参数扫描、每日信号、模拟盘")
+    p = argparse.ArgumentParser(prog="quantlab", description="AI量化交易分析平台 · 持仓分析：回测、参数扫描、每日信号、模拟盘")
     p.add_argument("--version", action="version", version="%(prog)s " + __version__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -796,7 +796,7 @@ def build_parser():
         hd.add_argument("--note")
         hd.set_defaults(fn=cmd_holdings_decide, cmd_name=name)
 
-    sch = sub.add_parser("schedule", help="每日任务")
+    sch = sub.add_parser("schedule", help="每周任务")
     schsub = sch.add_subparsers(dest="schedule_cmd", required=True)
     schsub.add_parser("run", help="立即运行一次：到期的 AI 分析 + 记录所有模拟账户").set_defaults(fn=cmd_schedule_run)
 

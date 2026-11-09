@@ -3,7 +3,7 @@
 ## 分层
 
 ```
-web/ (React + TypeScript)          浏览器里的工作台：总览、回测、参数扫描、模拟盘
+web/ (React + TypeScript)          浏览器里的页面：我的持仓、持仓规则、个股分析、AI 研报（回测、参数扫描、模拟盘等不在菜单里，按地址访问）
         │  HTTPS/HTTP + Bearer 令牌，类型由 OpenAPI 生成
         ▼
 src/quantlab/api/ (FastAPI)        接口层：校验输入、调用领域层、转换结果；不含业务逻辑
@@ -34,7 +34,7 @@ src/quantlab/trading/              自动交易
   broker.py     券商接口 + 内置模拟券商；订单、持仓、净值、审计日志（trading.db）
   engine.py     订单生成、逐笔风控、数据检查、回撤熔断、模式和实盘门槛
   daily.py      每日交易步骤：结算 → 估值 → 月末调仓
-src/quantlab/scheduler.py          每日任务：到期的 AI 分析 → 记录所有模拟账户 → 交易步骤
+src/quantlab/scheduler.py          每周任务（周二）：持仓股票的 AI 研报 → 到期的模拟账户分析 → 记录所有模拟账户 → 交易步骤 → 持仓检查
         │
         ▼
 src/quantlab/storage.py            SQLite 连接 + 版本化迁移（PRAGMA user_version）

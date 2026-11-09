@@ -46,7 +46,7 @@ python -m quantlab serve
 powershell -ExecutionPolicy Bypass -File scripts/install_autostart.ps1
 ```
 
-它会在“启动”文件夹里放一个快捷方式：登录 Windows 后，用 `pythonw` 在后台运行服务（没有命令行窗口），日志写到 `data/logs/serve.log`（按 5 MB 轮换，令牌不会写进日志）。每日任务也随服务一起运行。不需要管理员权限，删除用 `scripts/uninstall_autostart.ps1`。
+它会在“启动”文件夹里放一个快捷方式：登录 Windows 后，用 `pythonw` 在后台运行服务（没有命令行窗口），日志写到 `data/logs/serve.log`（按 5 MB 轮换，令牌不会写进日志）。每周任务也随服务一起运行。不需要管理员权限，删除用 `scripts/uninstall_autostart.ps1`。
 
 服务在后台运行时，用这条命令打开工作台（自动带上令牌）：
 
@@ -61,7 +61,7 @@ python -m quantlab open
 | 均线回测 | 价格与均线（标出买卖点）、账户价值、回撤、指标对比、交易明细 |
 | 参数扫描 | 样本内和样本外两张热力图（同一色阶）、排名表，以及自动生成的结论 |
 | 模拟盘 | 创建账户（均线或 AI 评级）、记录每日决定、持仓、待执行订单、账户价值曲线、成交记录 |
-| AI 研报 | 新建分析、分析记录（评级、token、费用）、完整报告、立即运行每日任务 |
+| AI 研报 | 新建分析、分析记录（评级、token、费用）、完整报告、立即运行每周任务 |
 
 ## 命令行
 
@@ -127,7 +127,7 @@ python -m quantlab analyze NVDA --amount 500
 
 - **规则只有这几条，也只有它们会生成建议订单：**目标仓位（偏离超过再平衡区间才调整）、单只上限、现金储备（买入不会让现金低于储备）、最小下单金额、是否按整股。占比都按“股票 + 现金”计算，国债和定存持有到期，不参与调整。
 - **提醒**（不生成订单）：低于成本或离一年高点太远、均线空头排列、最近的 AI 评级、净利润为负、盈利明显低于去年同期、收入同比下降。
-- **确认**只是记录你同意这笔调整，系统不会替你下单；成交后在账本记一笔，下次同步就会更新。每日任务也会自动检查。
+- **确认**只是记录你同意这笔调整，系统不会替你下单；成交后在账本记一笔，下次同步就会更新。每周任务也会自动检查。
 - **个股分析**的结论只来自你的规则；其余信息供参考，不是买卖建议。
 
 ## 机器学习选股
@@ -181,7 +181,7 @@ python -m quantlab trade run --force
 python -m quantlab trade status
 ```
 
-- **流程：** 月末收盘后计算目标组合 → 和当前持仓比较生成订单（先卖后买，碎股）→ 逐笔风控 → 第二天开盘成交。设了 `QUANTLAB_TRADING_DAILY=true` 时，每日任务会自动结算、估值和调仓；默认不跑（2026-10-23 起暂停）。
+- **流程：** 月末收盘后计算目标组合 → 和当前持仓比较生成订单（先卖后买，碎股）→ 逐笔风控 → 第二天开盘成交。设了 `QUANTLAB_TRADING_DAILY=true` 时，每周任务会自动结算、估值和调仓；默认不跑（2026-10-23 起暂停）。
 - **模式：** `plan` 只记录订单；`paper` 发给内置模拟券商（按下一个开盘价加减滑点成交，现金不会变成负数）；`live` 需要同时满足三个条件：`.env` 里开启、已有券商连接器、模拟账户运行满 8 周。目前没有任何券商连接器，所以不会产生真实交易。
 - **风控（在 `.env` 里设置）：** 资金上限 $500、单只最多 20%、单笔最多 $200、单日最多 $1,000、每天最多 30 笔、只能买纳指 100 成分股、行情过期或价格异常时暂停、回撤超过 25% 时熔断。手动暂停：`quantlab trade halt 名称`。
 - **审计：** 每个信号、订单、成交、拒绝和暂停都写入 `data/trading.db`，网页“自动交易”页面可以查看。
@@ -225,10 +225,10 @@ python -m quantlab paper new AI --symbols QQQM,VOO --strategy ai --every 7
 | GET / POST | `/api/paper/accounts` | 列出 / 创建模拟账户 |
 | GET / DELETE | `/api/paper/accounts/{name}` | 账户详情 / 删除 |
 | POST | `/api/paper/accounts/{name}/record` | 记录最新的决定 |
-| GET | `/api/ai/status` | AI 组件、密钥是否配置、本月预算、每日任务状态 |
+| GET | `/api/ai/status` | AI 组件、密钥是否配置、本月预算、每周任务状态 |
 | GET / POST | `/api/ai/runs` | 分析记录 / 提交分析（202，后台运行） |
 | GET | `/api/ai/runs/{id}` | 分析详情和完整报告 |
-| POST | `/api/schedule/run` | 立即运行每日任务 |
+| POST | `/api/schedule/run` | 立即运行每周任务 |
 | POST | `/api/ml/backtests` | 机器学习选股回测 |
 | GET / POST | `/api/ml/signal` | 最近的目标组合 / 重新计算 |
 | GET / POST | `/api/trading/accounts` | 交易账户 |
@@ -305,7 +305,7 @@ src/quantlab/
   ml/          机器学习选股：股票池、因子、滚动训练、仓位、组合回测、最新信号
   trading/     自动交易：券商接口和模拟券商、风控和订单、每日交易步骤
   holdings/    你的真实持仓：账本同步、规则、每日检查和建议订单、个股分析
-  scheduler.py 每日任务
+  scheduler.py 每周任务
   api/         FastAPI 接口：路由、请求和响应模型、令牌校验
   cli.py       命令行
   config.py    配置        errors.py  领域错误       storage.py  SQLite 迁移

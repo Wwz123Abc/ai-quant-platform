@@ -220,10 +220,10 @@ def ai_get_run(run_id: int):
     return ai_run(_with_ai(lambda con: ledger.get(con, run_id)))
 
 
-@api.post("/schedule/run", status_code=202, tags=["system"], summary="立即运行每日任务（AI 分析 + 记录模拟账户）")
+@api.post("/schedule/run", status_code=202, tags=["system"], summary="立即运行每周任务（AI 分析 + 记录模拟账户）")
 def schedule_run(request: Request):
     sched = request.app.state.scheduler
     if sched.status()["running"]:
-        raise Conflict("每日任务正在运行")
+        raise Conflict("每周任务正在运行")
     threading.Thread(target=sched.run_daily, name="daily-manual", daemon=True).start()
     return {"status": "started"}

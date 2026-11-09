@@ -220,7 +220,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 立即运行每日任务（AI 分析 + 记录模拟账户） */
+        /** 立即运行每周任务（AI 分析 + 记录模拟账户） */
         post: operations["schedule_run_api_schedule_run_post"];
         delete?: never;
         options?: never;
