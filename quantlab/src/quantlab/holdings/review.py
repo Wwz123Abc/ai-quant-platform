@@ -64,10 +64,28 @@ def price_basis(sym, px, info):
     return "%s %s收盘价 $%.2f（%s%s）" % (sym, "%s " % date if date else "", px, src, "，%s" % check if check else "")
 
 
-def proposals(val, pol, prices, info=None):
+def take_profit_step(pol, gain, done=()):
+    """The take-profit step a holding with this gain (price over average cost) is at, as (index, threshold, share to sell),
+    or None: the highest step reached that is not in done. Needs pol["take_profit"]."""
+    if not pol.get("take_profit") or gain is None:
+        return None
+    for i in (2, 1):
+        if gain >= pol["tp_gain_%d" % i] - 1e-9:
+            if done and max(done) >= i:  # this step, or a higher one, was already taken
+                return None
+            return i, pol["tp_gain_%d" % i], pol["tp_sell_%d" % i]
+    return None
+
+
+def tp_tag(i, pol):
+    return "止盈第 %d 档（+%.0f%%）" % (i, pol["tp_gain_%d" % i] * 100)
+
+
+def proposals(val, pol, prices, info=None, tp_done=None):
     """Orders that bring the holdings within your rules. Sells first; buys never take cash below the reserve.
     Each order carries its basis: the rule, the figures it used, the data date and source. info (optional) names
-    the price dates, the source, the sync time and the cross-check results."""
+    the price dates, the source, the sync time and the cross-check results. tp_done maps a symbol to the take-profit steps
+    already proposed and approved since its last purchase."""
     inv = val["investable"]
     if inv <= 0:
         return [], []
@@ -88,6 +106,12 @@ def proposals(val, pol, prices, info=None):
         cap = policy.cap_for(pol, sym) * inv
         if desired > cap + 1e-6:
             desired, why = cap, "超过单只上限 %.0f%%（当前 %.1f%%）" % (pol["max_position"] * 100, value / inv * 100)
+        if not why and sym in held and sym not in pol["uncapped"]:
+            step = take_profit_step(pol, held[sym]["gain"], (tp_done or {}).get(sym, ()))
+            if step:
+                i, at, sell = step
+                desired = value * (1 - sell)
+                why = "%s：现价比平均成本高 %.0f%%，卖出约 %.0f%% 的股数锁定一部分利润" % (tp_tag(i, pol), held[sym]["gain"] * 100, sell * 100)
         if why:
             want[sym] = (desired - value, why, value, desired)
     sells = {s: d for s, d in want.items() if d[0] < 0}
@@ -121,7 +145,9 @@ def proposals(val, pol, prices, info=None):
             continue
         synced = "（%s 同步）" % info["synced"] if info and info.get("synced") else ""
         cut = "，现金不足，按 %.0f%% 缩减" % (scale * 100) if delta > 0 and scale < 1 else ""
-        basis = ("规则：你设定的持仓规则（目标占比和偏离带、单只上限、现金储备）。数据：%s；持仓来自账本%s；"
+        rule = ("规则：止盈（涨到平均成本的 %.0f%% 以上分两档卖出，每档每次买入只提议一次）。" % (pol["tp_gain_1"] * 100)
+                if why.startswith("止盈") else "规则：你设定的持仓规则（目标占比和偏离带、单只上限、现金储备）。")
+        basis = (rule + "数据：%s；持仓来自账本%s；"
                  "可投资资金 $%.2f（股票 $%.2f + 现金 $%.2f），%s 现值 $%.2f。计算：应持有 $%.2f，差 $%.2f%s，"
                  "按 $%.2f 折合 %s 股%s。"
                  % (price_basis(sym, px, info), synced, inv, val["stocks"], val["cash"], sym, cur, desired,
@@ -212,6 +238,25 @@ def _price_dates(symbols, load):
     return out
 
 
+def take_profit_done(snapshot, pol):
+    """Per symbol, the take-profit steps already approved since the stock's last purchase in the ledger."""
+    last_buy = {}
+    for t in snapshot.get("trades", []):
+        if t.get("side") == "buy":
+            s = str(t.get("symbol", "")).upper()
+            last_buy[s] = max(last_buy.get(s, ""), t.get("date", ""))
+    out = {}
+    con = connect()
+    try:
+        for sym, reason, decided in con.execute("SELECT symbol, reason, decided_at FROM proposals WHERE status = 'approved' AND reason LIKE '止盈第%'"):
+            for i in (1, 2):
+                if reason.startswith(tp_tag(i, pol)) and (decided or "")[:10] >= last_buy.get(sym, ""):
+                    out.setdefault(sym, set()).add(i)
+    finally:
+        con.close()
+    return out
+
+
 def run(refresh=True, load=None, with_fundamentals=True, check=True):
     """Syncs (when a key is configured), reviews, and records the review and its proposals. check cross-checks the
     held stocks' recent closes with a second source.
@@ -231,7 +276,7 @@ def run(refresh=True, load=None, with_fundamentals=True, check=True):
     info = {"dates": _price_dates(syms, load), "synced": snap.get("synced"),
             "source": "腾讯日线" if get_settings().price_source == "cn" else "Yahoo 日线",
             "checked": {c["symbol"]: "已和第二来源核对一致" for c in checks if c["ok"]}}
-    props, notes = proposals(val, pol, prices, info)
+    props, notes = proposals(val, pol, prices, info, take_profit_done(snap, pol))
     rem = reminders(val, pol, load, with_fundamentals, info)
     rem += [{"symbol": c["symbol"], "level": "info" if c["ok"] is None else "warn", "kind": "核对", "text": c["text"]} for c in checks if not c["ok"]]
     review = {"at": now_iso(), "synced": snap.get("synced"), "account": snap.get("account"), "policy": pol,

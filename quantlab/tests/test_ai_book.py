@@ -18,7 +18,7 @@ SNAP = {
     "fixed": [],
 }
 PRICES = {"AAA": 150.0, "BBB": 60.0}
-POL = policy.validate({"targets": {"AAA": 0.25}, "max_position": 0.30, "uncapped": ["BBB"], "cash_reserve": 0.10})
+POL = policy.validate({"targets": {"AAA": 0.25}, "uncapped": ["BBB"], "cash_reserve": 0.10})
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def test_facts_describe_the_position_and_what_the_rules_still_allow(val):
     assert f["held"] and f["shares"] == 15 and f["value"] == pytest.approx(15 * 150)
     inv = 15 * 150 + 4 * 60 + 1000                                   # stocks plus cash
     assert f["investable"] == pytest.approx(inv) and f["weight"] == pytest.approx(15 * 150 / inv)
-    assert f["room_cap"] == pytest.approx(max(0.0, 0.30 * inv - 15 * 150))   # AAA is already above its 30% cap: no room
+    assert f["room_cap"] == pytest.approx(max(0.0, 0.25 * inv - 15 * 150))   # AAA is already above its 25% cap: no room
     assert f["max_buy"] == pytest.approx(min(f["room_cap"], f["room_cash"]))
     other = acct.facts("BBB", val, POL)
     assert other["uncapped"] and other["cap"] == 1.0                  # a broad ETF has no single-holding cap
@@ -50,7 +50,7 @@ def test_holdings_without_a_price_are_called_out_not_silently_dropped():
 
 def test_the_block_for_the_agents_says_what_is_held_and_the_rules(val):
     text = acct.render(acct.facts("AAA", val, POL))
-    for part in ("holds 15 shares", "average cost", "of investable funds", "at most 30%", "cash must stay at or above 10%",
+    for part in ("holds 15 shares", "average cost", "of investable funds", "at most 25%", "cash must stay at or above 10%",
                  "AAA 25%", "whole shares only", "by hand at a retail broker", "no options"):
         assert part in text, part
     etf = acct.render(acct.facts("BBB", val, POL))
@@ -61,7 +61,7 @@ def test_the_block_for_the_agents_says_what_is_held_and_the_rules(val):
 
 def test_the_report_says_what_the_ai_knew(val):
     held = personal.holding_line(acct.facts("AAA", val, POL))
-    assert "持有 15 股" in held and "平均成本" in held and "单只上限 30%" in held and "最多还能买入约" in held
+    assert "持有 15 股" in held and "平均成本" in held and "单只上限 25%" in held and "最多还能买入约" in held
     none = personal.holding_line(acct.facts("CCC", val, POL))
     assert "没有持有" in none and "只能理解成“不买”" in none
     unknown = personal.holding_line(None)

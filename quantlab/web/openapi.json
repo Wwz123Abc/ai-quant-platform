@@ -3,7 +3,7 @@
   "info": {
     "title": "QuantLab API",
     "description": "回测、参数扫描、每日信号和模拟盘。除 /api/health 外，所有接口都需要 `Authorization: Bearer <令牌>`。",
-    "version": "0.13.2"
+    "version": "0.14.1"
   },
   "paths": {
     "/api/health": {
@@ -4086,8 +4086,8 @@
           "max_position": {
             "type": "number",
             "title": "Max Position",
-            "description": "单只股票上限",
-            "default": 0.3
+            "description": "单只股票上限：固定 25%，不能修改，传什么都按 25% 算",
+            "default": 0.25
           },
           "uncapped": {
             "items": {
@@ -4122,6 +4122,36 @@
             "type": "number",
             "title": "Alert Drawdown From High",
             "default": 0.25
+          },
+          "take_profit": {
+            "type": "boolean",
+            "title": "Take Profit",
+            "description": "止盈：开关",
+            "default": true
+          },
+          "tp_gain_1": {
+            "type": "number",
+            "title": "Tp Gain 1",
+            "description": "第一档：现价比平均成本高这么多",
+            "default": 0.5
+          },
+          "tp_sell_1": {
+            "type": "number",
+            "title": "Tp Sell 1",
+            "description": "第一档卖出当前股数的比例",
+            "default": 0.33
+          },
+          "tp_gain_2": {
+            "type": "number",
+            "title": "Tp Gain 2",
+            "description": "第二档：现价比平均成本高这么多",
+            "default": 1.0
+          },
+          "tp_sell_2": {
+            "type": "number",
+            "title": "Tp Sell 2",
+            "description": "第二档卖出当时股数的比例",
+            "default": 0.33
           }
         },
         "type": "object",

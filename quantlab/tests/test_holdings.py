@@ -52,11 +52,11 @@ def test_valuation():
 
 
 def test_policy_validation():
-    assert policy.validate({"targets": {"aaa": 0.3}})["targets"] == {"AAA": 0.3}
+    assert policy.validate({"targets": {"aaa": 0.25}})["targets"] == {"AAA": 0.25}
     with pytest.raises(InvalidInput):
-        policy.validate({"targets": {"AAA": 0.5}})                      # above the 30% cap
+        policy.validate({"targets": {"AAA": 0.5}})                      # above the fixed 25% cap
     with pytest.raises(InvalidInput):
-        policy.validate({"targets": {"AAA": 0.3, "BBB": 0.3, "CCC": 0.3}, "cash_reserve": 0.2})  # 90% > 80%
+        policy.validate({"targets": {"AAA": 0.25, "BBB": 0.25, "CCC": 0.25, "DDD": 0.25}, "cash_reserve": 0.2})  # 100% > 80%
     with pytest.raises(InvalidInput):
         policy.validate({"band": 0.0})
 
@@ -64,28 +64,28 @@ def test_policy_validation():
 def test_cap_trims_and_target_buys_within_the_cash_reserve():
     prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
     v = review.valuation(SNAP, prices)                       # investable 3350; AAA is 67%
-    pol = policy.validate({"targets": {"CCC": 0.2}, "max_position": 0.4, "cash_reserve": 0.1, "min_trade_usd": 10})
+    pol = policy.validate({"targets": {"CCC": 0.2}, "cash_reserve": 0.1, "min_trade_usd": 10})
     props, notes = review.proposals(v, pol, prices)
     by = {p["symbol"]: p for p in props}
-    assert by["AAA"]["side"] == "sell" and by["AAA"]["shares"] == 6          # 2250 - 1340 = 910 -> 6.07, nearest is 6 shares
+    assert by["AAA"]["side"] == "sell" and by["AAA"]["shares"] == 9          # 2250 - 837.5 = 1412.5 -> 9.4, nearest is 9 shares
     assert "单只上限" in by["AAA"]["reason"]
     assert by["CCC"]["side"] == "buy" and by["CCC"]["shares"] == 16           # 20% of 3350 = 670 -> 16 whole shares
     assert [p["side"] for p in props] == ["sell", "buy"]
 
 
 def test_selling_rounds_to_the_nearest_whole_share():
-    pol = policy.validate({"max_position": 0.3, "uncapped": [], "min_trade_usd": 10})
+    pol = policy.validate({"uncapped": [], "min_trade_usd": 10})
     snap = {**SNAP, "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 3, "price": 700, "currency": "USD"}],
-            "cash": [{"currency": "USD", "amount": 4870}]}
+            "cash": [{"currency": "USD", "amount": 6280}]}
     prices = {"AAA": 702.0}
-    v = review.valuation(snap, prices)                       # investable 6976; AAA 2106 = 30.2%, $13 over the cap
+    v = review.valuation(snap, prices)                       # investable 8386; AAA 2106 = 25.1%, $9.5 over the 25% cap
     props, notes = review.proposals(v, pol, prices)
     assert props == [] and any("不到半股" in n for n in notes)
-    prices = {"AAA": 900.0}
-    v = review.valuation(snap, prices)                       # investable 7570; AAA 2700 = 35.7%, $429 over: 0.48 share
+    prices = {"AAA": 850.0}
+    v = review.valuation(snap, prices)                       # investable 8830; AAA 2550 = 28.9%, $342 over: 0.40 share
     assert review.proposals(v, pol, prices)[0] == []
     prices = {"AAA": 1000.0}
-    v = review.valuation(snap, prices)                       # investable 7870; AAA 3000 = 38.1%, $639 over: 0.64 share
+    v = review.valuation(snap, prices)                       # investable 9280; AAA 3000 = 32.3%, $680 over: 0.68 share
     props, _ = review.proposals(v, pol, prices)
     assert [(p["symbol"], p["side"], p["shares"]) for p in props] == [("AAA", "sell", 1)]
 
@@ -93,7 +93,7 @@ def test_selling_rounds_to_the_nearest_whole_share():
 def test_broad_etfs_are_not_capped():
     prices = {"AAA": 150.0, "BBB": 25.0}
     v = review.valuation(SNAP, prices)                       # AAA is 67%
-    pol = policy.validate({"max_position": 0.3, "uncapped": ["aaa"]})
+    pol = policy.validate({"uncapped": ["aaa"]})
     assert pol["uncapped"] == ["AAA"] and review.proposals(v, pol, prices)[0] == []
     assert policy.validate({"targets": {"AAA": 0.6}, "uncapped": ["AAA"], "cash_reserve": 0.1})["targets"] == {"AAA": 0.6}
     assert "QQQM" in policy.load()["uncapped"] and "VOO" in policy.load()["uncapped"]   # the defaults
@@ -103,7 +103,7 @@ def test_buys_scaled_to_cash_after_reserve():
     prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
     snap = {**SNAP, "cash": [{"currency": "USD", "amount": 500}]}
     v = review.valuation(snap, prices)                       # investable 2850; reserve 285; available 215
-    pol = policy.validate({"targets": {"CCC": 0.25}, "max_position": 1.0, "cash_reserve": 0.1, "min_trade_usd": 10})
+    pol = policy.validate({"targets": {"CCC": 0.25}, "uncapped": ["AAA"], "cash_reserve": 0.1, "min_trade_usd": 10})
     props, notes = review.proposals(v, pol, prices)
     assert props == [{"symbol": "CCC", "side": "buy", "shares": 5, "price": 40.0, "value": 200.0, "reason": props[0]["reason"],
                       "basis": props[0]["basis"]}]
@@ -114,7 +114,7 @@ def test_every_order_and_reminder_says_what_it_rests_on(monkeypatch):
     prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
     snap = {**SNAP, "cash": [{"currency": "USD", "amount": 500}]}
     v = review.valuation(snap, prices)
-    pol = policy.validate({"targets": {"CCC": 0.25}, "max_position": 1.0, "cash_reserve": 0.1, "min_trade_usd": 10})
+    pol = policy.validate({"targets": {"CCC": 0.25}, "uncapped": ["AAA"], "cash_reserve": 0.1, "min_trade_usd": 10})
     info = {"dates": {"CCC": "2026-11-03"}, "source": "腾讯日线", "synced": "2026-11-04T03:00:00+00:00",
             "checked": {"CCC": "已和第二来源核对一致"}}
     basis = review.proposals(v, pol, prices, info)[0][0]["basis"]
@@ -133,9 +133,9 @@ def test_no_order_inside_the_band_or_below_minimum():
     prices = {"AAA": 150.0, "BBB": 25.0}
     v = review.valuation(SNAP, prices)
     w = v["positions"][0]["weight"]
-    pol = policy.validate({"targets": {"AAA": min(1.0, round(w, 2))}, "max_position": 1.0, "cash_reserve": 0.0, "band": 0.05})
+    pol = policy.validate({"targets": {"AAA": min(1.0, round(w, 2))}, "uncapped": ["AAA", "BBB"], "cash_reserve": 0.0, "band": 0.05})
     assert review.proposals(v, pol, prices)[0] == []
-    pol = policy.validate({"targets": {"BBB": 0.05}, "max_position": 1.0, "band": 0.01, "min_trade_usd": 500})
+    pol = policy.validate({"targets": {"BBB": 0.05}, "uncapped": ["AAA", "BBB"], "band": 0.01, "min_trade_usd": 500})
     props, notes = review.proposals(v, pol, prices)
     assert props == [] and any("最小下单金额" in n for n in notes)
 
@@ -272,3 +272,65 @@ def test_price_checks_become_reminders(monkeypatch):
     assert [(m["symbol"], m["level"]) for m in r["reminders"] if m["kind"] == "核对"] == [("BBB", "warn")]
     a = analysis.analyze("CCC", load=load, with_fundamentals=False)
     assert {"kind": "核对", "text": "CCC 核对结果"} in a["notes"]
+
+
+# ---- take profit: two steps, once per purchase, never for the broad ETFs
+TP_SNAP = {"account": "me", "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 10, "price": 100, "currency": "USD"}],
+           "cash": [{"currency": "USD", "amount": 9000}], "fixed": []}
+
+
+def tp_props(price, done=None, **rules):
+    pol = policy.validate({"min_trade_usd": 10, **rules})
+    v = review.valuation(TP_SNAP, {"AAA": price})
+    return review.proposals(v, pol, {"AAA": price}, None, done)[0]
+
+
+def test_the_position_cap_is_fixed_at_25_percent():
+    assert policy.load()["max_position"] == 0.25
+    assert policy.validate({"max_position": 0.9})["max_position"] == 0.25      # not a setting: whatever is sent, 25%
+    pol = {**policy.DEFAULT, "max_position": 0.9}
+    policy.path().parent.mkdir(parents=True, exist_ok=True)
+    policy.path().write_text(json.dumps(pol), encoding="utf-8")                 # an old file with a looser cap is overruled
+    assert policy.load()["max_position"] == 0.25
+
+
+def test_take_profit_first_step_sells_a_third_at_plus_50_percent():
+    assert tp_props(140.0) == []                                                # +40%: not yet
+    (o,) = tp_props(160.0)                                                      # +60%
+    assert (o["side"], o["shares"]) == ("sell", 3) and o["reason"].startswith("止盈第 1 档（+50%）")
+    assert "止盈" in o["basis"] and "规则：止盈" in o["basis"]
+
+
+def test_take_profit_second_step_and_each_step_only_once():
+    (o,) = tp_props(220.0)                                                      # +120%: the second step
+    assert o["reason"].startswith("止盈第 2 档（+100%）")
+    assert tp_props(160.0, {"AAA": {1}}) == []                                  # step 1 already taken
+    assert tp_props(220.0, {"AAA": {1}})[0]["reason"].startswith("止盈第 2 档")  # step 2 still open
+    assert tp_props(220.0, {"AAA": {2}}) == []                                  # taking step 2 covers step 1 as well
+    assert tp_props(160.0, {"AAA": {2}}) == []                                  # and a fall back does not re-open them
+
+
+def test_take_profit_leaves_broad_etfs_alone_and_can_be_switched_off():
+    assert tp_props(220.0, uncapped=["AAA"]) == []
+    assert tp_props(220.0, take_profit=False) == []
+
+
+def test_take_profit_settings_are_checked():
+    with pytest.raises(InvalidInput):
+        policy.validate({"tp_gain_1": 1.0, "tp_gain_2": 0.5})                   # the second step must be higher
+    with pytest.raises(InvalidInput):
+        policy.validate({"tp_sell_1": 0.0})
+
+
+def test_steps_taken_are_remembered_until_the_stock_is_bought_again():
+    pol = policy.load()
+    con = review.connect()
+    with con:
+        con.execute("INSERT INTO reviews (at, synced, data) VALUES ('t', NULL, '{}')")
+        for status, day in (("approved", "2026-10-05T01:00:00+00:00"), ("rejected", "2026-10-06T01:00:00+00:00")):
+            con.execute("INSERT INTO proposals (review_id, symbol, side, shares, price, value, reason, basis, status, decided_at) "
+                        "VALUES (1, 'AAA', 'sell', 3, 160, 480, ?, '', ?, ?)", ("%s：现价比平均成本高 60%%" % review.tp_tag(1, pol), status, day))
+    con.close()
+    assert review.take_profit_done(TP_SNAP, pol) == {"AAA": {1}}                # only the approved one counts
+    later = {**TP_SNAP, "trades": TP_SNAP["trades"] + [{"date": "2026-10-20", "side": "buy", "symbol": "AAA", "shares": 5, "price": 150}]}
+    assert review.take_profit_done(later, pol) == {}                            # bought again after: the steps start over

@@ -606,3 +606,33 @@ ul.todo li.warn-item {
     grid-template-columns: 1fr;
   }
 }
+
+.anom h3 {
+  margin: 14px 0 4px;
+  font-size: 13px;
+}
+.anom ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.anom li {
+  margin: 6px 0;
+}
+.anom.error h3 {
+  color: var(--down, #c0392b);
+}
+.anom .tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid var(--axis);
+  border-radius: 10px;
+  color: var(--ink-2);
+}
+.rule .two {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rule .fixed {
+  font-size: 22px;
+}

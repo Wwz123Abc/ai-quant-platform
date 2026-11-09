@@ -2,11 +2,72 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type HoldingsPolicy, type HoldingsReview } from "../api/client";
-import { ErrorBox, PageHead, Stat } from "../components/ui";
+import { ErrorBox, PageHead } from "../components/ui";
 import { money, pctPlain } from "../lib/format";
 
-const pp = (v: number) => `${v >= 0 ? "+" : "−"}${(Math.abs(v) * 100).toFixed(1)} 个百分点`;
-const ok = (good: boolean | null) => (good == null ? "—" : good ? "✓ 符合" : "✗ 不符合");
+/** The single-stock cap is fixed by the owner: it is shown here, never edited (the server also forces it). */
+export const MAX_POSITION = 0.25;
+
+export type Anomaly = { level: "error" | "warn" | "info"; group: string; title: string; detail: string; basis?: string };
+
+const LEVEL_TEXT = { error: "违反规则", warn: "需要留意", info: "信号提醒" } as const;
+
+/** Everything in the latest check that conflicts with your rules or with itself: breaches, rules that clash with each other,
+ *  data that disagrees or is missing, take-profit steps reached, and the signals that argue with a holding. */
+export function anomalies(r: HoldingsReview): Anomaly[] {
+  const v = r.valuation, pol = r.policy;
+  const out: Anomaly[] = [];
+  const uncapped = new Set(pol.uncapped ?? []);
+  const targets = pol.targets ?? {};
+  const order = (sym: string) => r.proposals.find((o) => o.symbol === sym && o.status === "pending");
+  const orderText = (sym: string) => {
+    const o = order(sym);
+    return o ? `建议${o.side === "buy" ? "买入" : "卖出"} ${o.shares} 股（约 ${money(o.value)}），到“我的持仓”确认。` : "按整股或最小下单金额，这次没有生成建议订单。";
+  };
+  for (const p of v.positions) {
+    if (!uncapped.has(p.symbol) && p.weight != null && p.weight > MAX_POSITION + 1e-9) {
+      out.push({ level: "error", group: "仓位", title: `${p.symbol} 占 ${pctPlain(p.weight)}，超过单只上限 ${pctPlain(MAX_POSITION, 0)}`, detail: orderText(p.symbol) });
+    }
+  }
+  if (v.cash_weight != null && v.cash_weight < pol.cash_reserve - 1e-9) {
+    out.push({ level: "error", group: "现金", title: `现金只占 ${pctPlain(v.cash_weight)}，低于储备 ${pctPlain(pol.cash_reserve, 0)}`, detail: `至少要有 ${money(pol.cash_reserve * v.investable)}，现在 ${money(v.cash)}。买入会被暂停，直到现金回到储备以上。` });
+  }
+  for (const [sym, t] of Object.entries(targets)) {
+    const w = v.positions.find((p) => p.symbol === sym)?.weight ?? 0;
+    if (Math.abs(w - t) > pol.band + 1e-9) {
+      out.push({ level: "error", group: "仓位", title: `${sym} 占 ${pctPlain(w)}，目标 ${pctPlain(t, 0)}，偏离超过 ${pctPlain(pol.band, 0)} 的区间`, detail: orderText(sym) });
+    }
+    if (!uncapped.has(sym) && t > MAX_POSITION + 1e-9) {
+      out.push({ level: "error", group: "规则冲突", title: `${sym} 的目标 ${pctPlain(t, 0)} 高于单只上限 ${pctPlain(MAX_POSITION, 0)}`, detail: "两条规则互相矛盾：这只股票永远买不到目标。把目标降到 25% 以内，或确认它是宽基 ETF 并加进“不设上限的代码”。" });
+    }
+  }
+  const tsum = Object.values(targets).reduce((a, b) => a + b, 0);
+  if (tsum + pol.cash_reserve > 1 + 1e-9) {
+    out.push({ level: "error", group: "规则冲突", title: `目标合计 ${pctPlain(tsum, 0)} 加现金储备 ${pctPlain(pol.cash_reserve, 0)} 超过 100%`, detail: "目标不可能同时满足：减少目标或降低现金储备。" });
+  }
+  for (const o of r.proposals.filter((x) => x.status === "pending" && x.reason.startsWith("止盈"))) {
+    out.push({ level: "warn", group: "止盈", title: `${o.symbol} 到了止盈档：${o.reason.split("：")[0]}`, detail: `${o.reason.split("：").slice(1).join("：")}。建议卖出 ${o.shares} 股（约 ${money(o.value)}），到“我的持仓”确认。`, basis: o.basis });
+  }
+  if (pol.take_profit) {
+    for (const p of v.positions) {
+      if (!uncapped.has(p.symbol) && p.gain != null && p.gain >= pol.tp_gain_1 && !order(p.symbol)) {
+        out.push({ level: "info", group: "止盈", title: `${p.symbol} 比成本高 ${pctPlain(p.gain, 0)}，已过止盈线，这次没有止盈订单`, detail: "这一档你已经确认过，或者按整股、最小下单金额算出来不到 1 股。再买入这只股票后，止盈会重新计。" });
+      }
+    }
+  }
+  for (const m of r.reminders) {
+    if (m.kind === "核对") out.push({ level: "warn", group: "数据冲突", title: `${m.symbol} 两个行情来源对不上`, detail: m.text, basis: m.basis });
+    else if (m.kind === "数据") out.push({ level: "warn", group: "数据缺失", title: `${m.symbol} 取不到行情`, detail: m.text, basis: m.basis });
+    else if (m.kind === "到期") out.push({ level: "warn", group: "账本", title: `${m.symbol} ${m.text.includes("已到期") ? "已到期" : "快到期"}`, detail: m.text, basis: m.basis });
+    else if (m.kind === "亏损" || m.kind === "回撤") out.push({ level: "warn", group: "提醒线", title: `${m.symbol} ${m.text}`, detail: m.kind === "亏损" ? "触发了“低于成本提醒”。只提醒，不生成订单。" : "触发了“离一年高点提醒”。只提醒，不生成订单。", basis: m.basis });
+    else if (m.kind === "AI" && m.level === "warn") out.push({ level: "info", group: "信号", title: `${m.symbol} ${m.text}`, detail: "AI 评级偏谨慎，但你在持有：只是提醒，是否调整由你决定。", basis: m.basis });
+    else if (m.kind === "基本面" && m.level === "warn") out.push({ level: "info", group: "信号", title: `${m.symbol} ${m.text}`, detail: "财报信号偏弱，只是提醒。", basis: m.basis });
+  }
+  for (const n of r.notes) {
+    out.push({ level: "warn", group: "规则和数据冲突", title: n, detail: "规则要求调整，但价格、现金或下单限制让它没法照做。" });
+  }
+  return out;
+}
 
 export default function Rules() {
   const review = useQuery({ queryKey: ["hreview"], queryFn: () => api<HoldingsReview>("/api/holdings/review"), retry: false });
@@ -14,149 +75,38 @@ export default function Rules() {
   return (
     <>
       <PageHead title="持仓规则">
-        你的持仓规则放在这一页：每条规则是什么意思、你现在的持仓符不符合，以及按规则算出的详细调仓计划。只有这些规则会生成建议订单；
-        趋势、基本面、AI 评级只做提醒。占比都按“可投资资金”（股票 + 现金）计算，国债和定存持有到期，不参与。
-        这里的计划只是计划，系统不会替你下单；去<Link to="/holdings">我的持仓</Link>逐条确认。
+        上面是最近一次检查发现的异常和冲突，下面是规则设置。只有这些规则会生成建议订单；订单到<Link to="/holdings">我的持仓</Link>确认，系统不会替你下单。
       </PageHead>
-      {r ? <Status r={r} /> : review.isPending ? <p className="empty">正在读取…</p> : <p className="empty">还没有检查过持仓：先到“我的持仓”点“同步账本并检查”，这里才有对照和计划。</p>}
+      {r ? <Anomalies r={r} /> : review.isPending ? <p className="empty">正在读取…</p> : <div className="card"><h2>异常与冲突</h2><p className="empty">还没有检查过持仓：先到“我的持仓”点“同步账本并检查”。</p></div>}
       <PolicyCard investable={r?.valuation.investable} />
     </>
   );
 }
 
-export function Status({ r }: { r: HoldingsReview }) {
-  const v = r.valuation, pol = r.policy;
-  const inv = v.investable;
-  const uncapped = new Set(pol.uncapped ?? []);
-  const targets = pol.targets ?? {};
-  const capped = v.positions.filter((p) => !uncapped.has(p.symbol) && p.weight != null);
-  const biggest = capped.slice().sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))[0];
-  const drifted = Object.entries(targets).filter(([s, t]) => Math.abs((v.positions.find((p) => p.symbol === s)?.weight ?? 0) - t) > pol.band + 1e-9);
-  const lossy = v.positions.filter((p) => p.gain != null && p.gain <= -pol.alert_drawdown_from_cost);
-  const farFromHigh = r.reminders.filter((m) => m.kind === "回撤").map((m) => m.symbol);
-  const hasTargets = Object.keys(targets).length > 0;
-  const rows: { name: string; term: string; set: string; now: string; state: string; text: string }[] = [
-    {
-      name: "现金储备", term: "cash reserve", set: `不低于 ${pctPlain(pol.cash_reserve, 0)}`,
-      now: pctPlain(v.cash_weight), state: ok(v.cash_weight == null ? null : v.cash_weight >= pol.cash_reserve - 1e-9),
-      text: "手里至少留这么多现金，买入不会把现金花到这条线以下；现金不够时买入会按比例缩减。",
-    },
-    {
-      name: "单只上限", term: "position cap", set: `不超过 ${pctPlain(pol.max_position, 0)}`,
-      now: biggest ? `最大 ${biggest.symbol} ${pctPlain(biggest.weight)}` : "—",
-      state: ok(biggest ? (biggest.weight ?? 0) <= pol.max_position + 1e-9 : null),
-      text: "任何一只个股占可投资资金不超过这个比例，超过的部分会提议卖出，避免把钱押在一只股票上。",
-    },
-    {
-      name: "不设上限的代码", term: "uncapped", set: (pol.uncapped ?? []).join("、") || "无", now: "—", state: "—",
-      text: "宽基指数 ETF 本身已分散在几百家公司，不受单只上限约束（你 2026-10-23 的选择）。",
-    },
-    {
-      name: "目标仓位与再平衡区间", term: "target weight / rebalancing band",
-      set: hasTargets ? `${Object.entries(targets).map(([s, t]) => `${s} ${pctPlain(t, 0)}`).join("、")}；区间 ±${pctPlain(pol.band, 0)}` : `没设目标；区间 ±${pctPlain(pol.band, 0)}`,
-      now: hasTargets ? (drifted.length ? `${drifted.map(([s]) => s).join("、")} 偏离超过区间` : "都在区间内") : "—",
-      state: hasTargets ? ok(drifted.length === 0) : "—",
-      text: "给某只股票定目标占比，偏离目标超过区间才调整（买入或卖出到目标），避免天天小调整、白付手续费。没设目标的只受上限约束。",
-    },
-    { name: "最小下单金额", term: "min trade", set: money(pol.min_trade_usd), now: "—", state: "—", text: "算出来的调整不到这个金额就不提议，免得为了几美元下单。" },
-    { name: "按整股", term: "whole shares", set: pol.whole_shares ? "是" : "否（碎股）", now: "—", state: "—", text: "多数券商不能买碎股，建议订单按整股取整：买入向下取整保证现金够，卖出取最接近规则的整数股。" },
-    {
-      name: "低于成本提醒", term: "drawdown from cost", set: `比平均成本低 ${pctPlain(pol.alert_drawdown_from_cost, 0)}`,
-      now: lossy.length ? lossy.map((p) => `${p.symbol} ${pctPlain(p.gain, 0)}`).join("、") : "没有触发", state: ok(lossy.length === 0),
-      text: "持仓亏到平均成本以下这么多时提醒你复查，只是提醒，不生成订单。",
-    },
-    {
-      name: "离一年高点提醒", term: "drawdown from 52-week high", set: `比一年最高价低 ${pctPlain(pol.alert_drawdown_from_high, 0)}`,
-      now: farFromHigh.length ? farFromHigh.join("、") : "没有触发", state: ok(farFromHigh.length === 0),
-      text: "股价从近一年最高点回落到这个幅度时提醒（最大回撤的一种看法），只是提醒，不生成订单。",
-    },
-  ];
-
-  const orders = r.proposals.filter((o) => o.status !== "rejected" && o.status !== "superseded");
-  const syms = [...new Set([...v.positions.map((p) => p.symbol), ...Object.keys(targets)])].sort();
-  const plan = syms.map((s) => {
-    const p = v.positions.find((x) => x.symbol === s);
-    const value = p?.value ?? 0;
-    const o = orders.find((x) => x.symbol === s);
-    const after = value + (o ? (o.side === "buy" ? o.value : -o.value) : 0);
-    const t = targets[s];
-    const cap = uncapped.has(s) ? null : pol.max_position;
-    const weight = inv > 0 ? value / inv : 0;
-    let state = "无需调整";
-    if (cap != null && weight > cap + 1e-9) state = `超上限 ${pp(weight - cap)}`;
-    else if (t != null && Math.abs(weight - t) > pol.band + 1e-9) state = `${weight > t ? "高于" : "低于"}目标 ${pp(weight - t)}，超出区间`;
-    else if (t != null) state = `偏离目标 ${pp(weight - t)}，在区间内`;
-    return { s, value, weight, t, cap, state, o, afterW: inv > 0 ? after / inv : 0 };
-  });
-  const sells = orders.filter((o) => o.side === "sell"), buys = orders.filter((o) => o.side === "buy");
-  const sellTotal = sells.reduce((a, o) => a + o.value, 0), buyTotal = buys.reduce((a, o) => a + o.value, 0);
-  const cashAfter = v.cash + sellTotal - buyTotal;
-  const floor = pol.cash_reserve * inv;
-  const step = [...sells, ...buys];
-  const compared = rows.filter((x) => x.state !== "—");
-
+export function Anomalies({ r }: { r: HoldingsReview }) {
+  const items = anomalies(r);
+  const levels = (["error", "warn", "info"] as const).filter((l) => items.some((i) => i.level === l));
   return (
-    <>
-      <div className="card">
-        <div className="stats">
-          <Stat k="可投资资金" v={money(inv)} s={`股票 ${money(v.stocks)} + 现金 ${money(v.cash)}`} />
-          <Stat k="符合规则" v={`${compared.filter((x) => x.state.startsWith("✓")).length} / ${compared.length} 条`} s="只数能对照的规则" />
-          <Stat k="需要调整" v={step.length ? `${step.length} 笔` : "不需要"} s={`依据检查 #${r.id}${r.price_date ? `，${r.price_date} 收盘价` : ""}`} />
+    <div className="card">
+      <h2>异常与冲突（检查 #{r.id}{r.price_date ? `，${r.price_date} 收盘价` : ""}）</h2>
+      {items.length ? (
+        <p className="hint">{levels.map((l) => `${LEVEL_TEXT[l]} ${items.filter((i) => i.level === l).length} 项`).join(" · ")}</p>
+      ) : <p className="empty">没有异常：持仓符合规则，规则之间没有矛盾，行情来源一致。</p>}
+      {levels.map((l) => (
+        <div key={l} className={"anom " + l}>
+          <h3>{LEVEL_TEXT[l]}</h3>
+          <ul>
+            {items.filter((i) => i.level === l).map((i, k) => (
+              <li key={k}>
+                <span className="tag">{i.group}</span> <b>{i.title}</b>
+                <div className="hint">{i.detail}</div>
+                {i.basis ? <details><summary className="hint">依据</summary><span className="hint">{i.basis}</span></details> : null}
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
-      <div className="card">
-        <h2>规则说明和现状对照</h2>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>规则</th><th>你的设定</th><th>现在</th><th>对照</th></tr></thead>
-            <tbody>
-              {rows.map((x) => (
-                <tr key={x.name}>
-                  <td style={{ whiteSpace: "normal" }}><b>{x.name}</b><div className="hint">{x.term}</div></td>
-                  <td style={{ whiteSpace: "normal" }}>{x.set}</td>
-                  <td style={{ whiteSpace: "normal" }}>{x.now}</td>
-                  <td className={x.state.startsWith("✗") ? "down" : undefined}>{x.state}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {rows.map((x) => <p key={x.name} className="hint">· <b>{x.name}</b>：{x.text}</p>)}
-      </div>
-      <div className="card">
-        <h2>详细调仓计划</h2>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>代码</th><th className="num">现值</th><th className="num">现占比</th><th className="num">目标</th><th className="num">上限</th><th>判断</th><th>建议</th><th className="num">调整后占比</th></tr></thead>
-            <tbody>
-              {plan.map((x) => (
-                <tr key={x.s}>
-                  <td>{x.s}</td><td className="num">{money(x.value)}</td><td className="num">{pctPlain(x.weight)}</td>
-                  <td className="num">{x.t != null ? pctPlain(x.t, 0) : "—"}</td><td className="num">{x.cap != null ? pctPlain(x.cap, 0) : "不设"}</td>
-                  <td style={{ whiteSpace: "normal" }}>{x.state}</td>
-                  <td className={x.o ? (x.o.side === "buy" ? "up" : "down") : undefined}>{x.o ? `${x.o.side === "buy" ? "买入" : "卖出"} ${x.o.shares} 股（约 ${money(x.o.value)}）` : "不动"}</td>
-                  <td className="num">{pctPlain(x.afterW)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {step.length ? (
-          <>
-            <h3 style={{ marginTop: 14 }}>执行顺序（先卖后买）</h3>
-            <ol style={{ margin: 0, paddingLeft: 20 }}>
-              {step.map((o) => <li key={o.id}>{o.side === "buy" ? "买入" : "卖出"} {o.symbol} {o.shares} 股，约 {money(o.value)}（按 {o.price.toFixed(2)}）：{o.reason}</li>)}
-            </ol>
-          </>
-        ) : <p className="empty">现在不需要调整：持仓符合你的规则。</p>}
-        <p style={{ marginTop: 12 }}>
-          现金：现在 {money(v.cash)}，卖出回笼 {money(sellTotal)}，买入花 {money(buyTotal)}，调整后 <b>{money(cashAfter)}</b>（占 {pctPlain(inv > 0 ? cashAfter / inv : null)}），
-          储备下限 {money(floor)}：<span className={cashAfter >= floor - 1 ? undefined : "down"}>{cashAfter >= floor - 1 ? "✓ 不低于储备" : "✗ 低于储备"}</span>。
-        </p>
-        {r.notes.map((n, i) => <p key={i} className="hint">· {n}</p>)}
-        <p className="hint">计划来自最近一次检查，改规则后先点“同步账本并检查”再回来看。建议订单要到“我的持仓”确认或拒绝；确认后自己去券商下单，成交后在账本记一笔。</p>
-      </div>
-    </>
+      ))}
+    </div>
   );
 }
 
@@ -164,19 +114,21 @@ function toForm(p: HoldingsPolicy): Record<string, string> {
   const pct = (v: number | undefined) => String(Math.round((v ?? 0) * 1000) / 10);
   return {
     targets: Object.entries(p.targets ?? {}).map(([s, w]) => `${s}:${pct(w)}`).join(", "),
-    band: pct(p.band), max_position: pct(p.max_position), cash_reserve: pct(p.cash_reserve),
+    band: pct(p.band), cash_reserve: pct(p.cash_reserve),
     uncapped: (p.uncapped ?? []).join(", "), min_trade_usd: String(p.min_trade_usd ?? 50), whole_shares: p.whole_shares === false ? "0" : "1",
     alert_drawdown_from_cost: pct(p.alert_drawdown_from_cost), alert_drawdown_from_high: pct(p.alert_drawdown_from_high),
+    take_profit: p.take_profit === false ? "0" : "1",
+    tp_gain_1: pct(p.tp_gain_1), tp_sell_1: pct(p.tp_sell_1), tp_gain_2: pct(p.tp_gain_2), tp_sell_2: pct(p.tp_sell_2),
   };
 }
 
 function PolicyCard({ investable }: { investable?: number }) {
   const pol = useQuery({ queryKey: ["hpolicy"], queryFn: () => api<HoldingsPolicy>("/api/holdings/policy") });
-  if (!pol.data) return <div className="card"><h2>你的规则</h2><ErrorBox error={pol.error} /><p className="empty">正在读取…</p></div>;
+  if (!pol.data) return <div className="card"><h2>规则设置</h2><ErrorBox error={pol.error} /><p className="empty">正在读取…</p></div>;
   return <PolicyForm key={JSON.stringify(pol.data)} initial={pol.data} investable={investable} />;
 }
 
-function parseTargets(text: string): Record<string, number> {
+export function parseTargets(text: string): Record<string, number> {
   const out: Record<string, number> = {};
   for (const part of text.split(/[,，\s]+/).filter(Boolean)) {
     const [sym, w] = part.split(/[:：]/);
@@ -193,95 +145,67 @@ export function PolicyForm({ initial, investable }: { initial: HoldingsPolicy; i
     onSuccess: (p) => qc.setQueryData(["hpolicy"], p),
   });
   const set = (k: string) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+  const n = (k: string) => Number(form[k]);
+  const pct = (k: string) => n(k) / 100;
   function submit(e: FormEvent) {
     e.preventDefault();
-    const targets = parseTargets(form.targets ?? "");
-    const pct = (k: string) => Number(form[k]) / 100;
     save.mutate({
-      targets, band: pct("band"), max_position: pct("max_position"), cash_reserve: pct("cash_reserve"),
+      targets: parseTargets(form.targets ?? ""), band: pct("band"), max_position: MAX_POSITION, cash_reserve: pct("cash_reserve"),
       uncapped: (form.uncapped ?? "").split(/[,，\s]+/).filter(Boolean).map((s) => s.toUpperCase()),
-      min_trade_usd: Number(form.min_trade_usd), whole_shares: form.whole_shares === "1",
+      min_trade_usd: n("min_trade_usd"), whole_shares: form.whole_shares === "1",
       alert_drawdown_from_cost: pct("alert_drawdown_from_cost"), alert_drawdown_from_high: pct("alert_drawdown_from_high"),
+      take_profit: form.take_profit === "1", tp_gain_1: pct("tp_gain_1"), tp_sell_1: pct("tp_sell_1"), tp_gain_2: pct("tp_gain_2"), tp_sell_2: pct("tp_sell_2"),
     });
   }
-  const num = (k: string) => Number(form[k]);
   const inv = investable ?? 0;
-  const usd = (x: number) => (inv > 0 ? money(x) : "—");
   const parsed = parseTargets(form.targets ?? "");
-  const tsum = Object.values(parsed).reduce((x, y) => x + y, 0);
-  const cap = num("max_position") / 100, reserve = num("cash_reserve") / 100, band = num("band") / 100;
-  const uncappedSet = new Set((form.uncapped ?? "").split(/[,，\s]+/).filter(Boolean).map((x) => x.toUpperCase()));
-  const overCap = Object.entries(parsed).filter(([sym, w]) => !uncappedSet.has(sym) && w > cap + 1e-9);
-  const field = (k: string, unit: string) => (
+  const input = (k: string, unit: string) => (
     <label className="inl"><input type="number" step="any" min={0} value={form[k] ?? ""} onChange={set(k)} /> <span>{unit}</span></label>
   );
-  const rule = (name: string, term: string, control: ReactNode, what: string, now: ReactNode, tip: string) => (
+  const row = (name: string, term: string, control: ReactNode, text: ReactNode) => (
     <div className="rule">
       <div className="rule-in"><div className="rule-name">{name}<small>{term}</small></div>{control}</div>
-      <div className="rule-text">
-        <p>{what}</p>
-        <p className="hint"><b>按你现在的情况：</b>{now}</p>
-        <p className="hint"><b>怎么定：</b>{tip}</p>
-      </div>
+      <div className="rule-text">{text}</div>
     </div>
   );
+  // the take-profit example: 10 shares bought at $100
+  const s1 = Math.round(10 * pct("tp_sell_1")), s2 = Math.round((10 - s1) * pct("tp_sell_2"));
+  const p1 = 100 * (1 + pct("tp_gain_1")), p2 = 100 * (1 + pct("tp_gain_2"));
   return (
     <div className="card">
-      <h2>修改规则</h2>
-      <p className="hint">占比都按“可投资资金”（股票 + 现金；国债和定存持有到期，不参与）计算。只有这些规则会生成建议订单，其余只是提醒。保存后点“我的持仓”的“同步账本并检查”生效。</p>
+      <h2>规则设置</h2>
+      <p className="hint">占比都按“可投资资金”（股票 + 现金；国债和定存持有到期，不参与）算。保存后点“我的持仓”的“同步账本并检查”，上面的异常就按新规则重算。</p>
+      <h3 className="rule-group">固定规则（不能改）</h3>
+      <div className="rule">
+        <div className="rule-in"><div className="rule-name">单只上限<small>position cap</small></div><b className="fixed">{pctPlain(MAX_POSITION, 0)}</b></div>
+        <div className="rule-text">任何一只个股占可投资资金不超过 25%，超出的部分会提议卖出。宽基指数 ETF 例外（见下面的“不设上限的代码”）。{inv > 0 ? <> 按现在的资金 {money(inv)}，单只最多约 <b>{money(MAX_POSITION * inv)}</b>。</> : null}</div>
+      </div>
       <form onSubmit={submit}>
-        <h3 className="rule-group">一、买什么、买多少</h3>
-        {rule("目标仓位", "target weight",
-          <input className="wide" value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" />,
-          "给想长期持有的股票定一个占可投资资金的目标比例，格式“代码:百分比”，用逗号隔开。可以不填：不填的股票只受下面的“单只上限”约束，不会被要求买到某个比例。",
-          Object.keys(parsed).length ? <>目标合计 <b>{(tsum * 100).toFixed(0)}%</b>，现金储备 {(reserve * 100).toFixed(0)}%，剩下 {Math.max(0, (1 - tsum - reserve) * 100).toFixed(0)}% 没有指定，可以放在其他股票或现金上。{Object.entries(parsed).map(([sym, w]) => ` ${sym} 目标 ${(w * 100).toFixed(0)}% ≈ ${usd(w * inv)}。`)}{tsum + reserve > 1 + 1e-9 ? <span className="down"> ✗ 目标合计加现金储备超过 100%，保存会被拒绝。</span> : null}{overCap.length ? <span className="down"> ✗ {overCap.map(([sym]) => sym).join("、")} 的目标高于单只上限，保存会被拒绝（宽基 ETF 请先加到下面的“不设上限”）。</span> : null}</> : "还没有设目标：现在只按上限和现金储备检查。",
-          "目标合计不要超过“100% − 现金储备”。核心宽基 ETF 可以定高一点，个股定低一点；定了目标，偏离超过“再平衡区间”才会提议买卖。")}
-        {rule("单只上限", "position cap", field("max_position", "%"),
-          "任何一只个股占可投资资金的比例不能超过这个数；超出的部分会提议卖出。目的是不把钱押在一家公司上。",
-          <>上限 {(cap * 100).toFixed(0)}%：现在资金 {usd(inv)}，单只最多约 <b>{usd(cap * inv)}</b>。</>,
-          "常见做法是 10%–30%：越看重分散越低。范围 2%–100%。")}
-        <div className="rule">
-          <div className="rule-in"><div className="rule-name">不设上限的代码<small>uncapped</small></div>
-            <input className="wide" value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" /></div>
-          <div className="rule-text">
-            <p>宽基指数 ETF 本身就分散在几百家公司里，不适用“单只上限”。写在这里的代码不受上限限制（逗号隔开）。</p>
-            <p className="hint"><b>按你现在的情况：</b>{uncappedSet.size} 个代码不设上限。<b>注意：</b>行业 ETF、杠杆 ETF 或个股不要放进来，它们并不分散。</p>
-          </div>
-        </div>
-        {rule("再平衡区间", "rebalancing band", field("band", "个百分点"),
-          "只有设了目标的股票才用到：占比偏离目标超过这个距离，才提议买或卖回目标；没超过就不动，免得天天为小偏差下单、白付手续费。",
-          <>目标 40% 的股票，占比低于 <b>{((0.4 - band) * 100).toFixed(0)}%</b> 或高于 <b>{((0.4 + band) * 100).toFixed(0)}%</b> 才会调整。</>,
-          "常见 3–5 个百分点：越小越勤、费用越多；越大越懒、偏离越久。范围 1–50。")}
-        <h3 className="rule-group">二、现金和下单</h3>
-        {rule("现金储备", "cash reserve", field("cash_reserve", "%"),
-          "现金占可投资资金至少要留这么多。买入不会把现金花到这条线以下，现金不够时买入会按比例缩减；现金已经低于它时会提醒。",
-          <>储备 {(reserve * 100).toFixed(0)}%：现在资金 {usd(inv)}，至少留 <b>{usd(reserve * inv)}</b> 现金，其余 {usd((1 - reserve) * inv)} 才能用来买。</>,
-          "留着应急或等机会。5%–20% 常见；越大越稳，但闲置的钱越多。")}
-        {rule("最小下单金额", "minimum trade", field("min_trade_usd", "美元"),
-          "算出来的调整不到这个金额就不提议，免得为了几美元的偏差下单。",
-          <>不到 <b>${(num("min_trade_usd") || 0).toFixed(0)}</b>{inv > 0 ? `（约占资金 ${((num("min_trade_usd") / inv) * 100).toFixed(1)}%）` : ""} 的调整会被忽略，并在“说明”里写出原因。</>,
-          "定成手续费的几倍以上比较划算：金额太小，手续费占比就高。")}
-        <div className="rule">
-          <div className="rule-in"><div className="rule-name">按整股<small>whole shares</small></div>
-            <select value={form.whole_shares ?? "1"} onChange={set("whole_shares")}><option value="1">是</option><option value="0">否（碎股）</option></select></div>
-          <div className="rule-text">
-            <p>多数券商不能买碎股。选“是”，建议订单按整数股取整：买入向下取整，保证现金够；卖出取最接近规则的整数股，不会为了几美元多卖一整股。</p>
-            <p className="hint"><b>怎么定：</b>按整股下单的券商保持“是”。股价很高（几百美元一股）时，单次调整可能不到 1 股，这种会写明“不到半股，暂不建议”。</p>
-          </div>
-        </div>
-        <h3 className="rule-group">三、提醒线（只提醒，不生成订单）</h3>
-        {rule("低于成本提醒", "drawdown from cost", field("alert_drawdown_from_cost", "%"),
-          "持仓现价比平均成本低这么多时，提醒你复查这只股票的逻辑还在不在。平均成本按账本的移动平均法算。",
-          <>平均成本 $100 的股票，现价跌到 <b>${(100 * (1 - num("alert_drawdown_from_cost") / 100)).toFixed(0)}</b> 以下就提醒。</>,
-          "只是提醒，不会自动卖。比较常见的是 15%–25%。")}
-        {rule("离一年高点提醒", "drawdown from 52-week high", field("alert_drawdown_from_high", "%"),
-          "股价比近一年（约 252 个交易日）的最高点低这么多时提醒，说明这一年里回撤已经很深。",
-          <>一年最高 $100 的股票，现价跌到 <b>${(100 * (1 - num("alert_drawdown_from_high") / 100)).toFixed(0)}</b> 以下就提醒。</>,
-          "和上一条不同：它看的是高点，不管你什么价买的。20%–30% 常见。")}
+        <h3 className="rule-group">止盈</h3>
+        {row("止盈开关", "take profit", <select value={form.take_profit} onChange={set("take_profit")}><option value="1">开</option><option value="0">关</option></select>,
+          <>分两档：现价涨到<b>平均成本</b>的某个幅度，就卖掉一部分股数，把利润落袋，剩下的继续拿着。只对个股，宽基 ETF 不止盈；每一档每次买入只提议一次，再买入这只股票后重新计。</>)}
+        {row("第一档", "step 1", <div className="two">{input("tp_gain_1", "% 涨幅")}{input("tp_sell_1", "% 股数")}</div>,
+          <>涨到成本的 +{n("tp_gain_1") || 0}% 时，卖掉当时股数的 {n("tp_sell_1") || 0}%。</>)}
+        {row("第二档", "step 2", <div className="two">{input("tp_gain_2", "% 涨幅")}{input("tp_sell_2", "% 股数")}</div>,
+          <>涨到成本的 +{n("tp_gain_2") || 0}% 时，再卖掉当时股数的 {n("tp_sell_2") || 0}%（必须比第一档高）。例：10 股、成本 $100，涨到 ${p1.toFixed(0)} 卖 {s1} 股，涨到 ${p2.toFixed(0)} 再卖 {s2} 股，剩 {10 - s1 - s2} 股继续持有。</>)}
+        <p className="hint">为什么这样设计：不预测顶部，只在大幅盈利后分批落袋，和 25% 上限互补（上限管“太集中”，止盈管“赚了不落袋”）。我们测过的均线卖出规则没有一条胜过一直持有，所以没有用“跌破某条线就清仓”这类规则。分批止盈会在大涨的股票上少赚一些，换的是把一部分利润锁住；不想要就把开关关掉。</p>
+        <h3 className="rule-group">仓位和现金</h3>
+        {row("目标仓位", "target weight", <input className="wide" value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" />,
+          <>可不填。格式“代码:百分比”，逗号隔开；不填的股票只受上限约束。{Object.keys(parsed).length ? <> 现在合计 {(Object.values(parsed).reduce((a, b) => a + b, 0) * 100).toFixed(0)}%{Object.entries(parsed).map(([s, w]) => `，${s} ≈ ${inv > 0 ? money(w * inv) : "—"}`)}。</> : null}</>)}
+        {row("再平衡区间", "rebalancing band", input("band", "个百分点"), <>只对设了目标的股票：偏离目标超过这个距离才买卖回目标，免得为小偏差反复下单。</>)}
+        {row("不设上限的代码", "uncapped", <input className="wide" value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" />,
+          <>宽基指数 ETF，不受 25% 上限限制，也不止盈（逗号隔开）。个股、行业或杠杆 ETF 不要放进来。</>)}
+        {row("现金储备", "cash reserve", input("cash_reserve", "%"), <>现金至少占这么多，买入不会把现金花到这条线以下。{inv > 0 ? <> 现在至少留 <b>{money(pct("cash_reserve") * inv)}</b>。</> : null}</>)}
+        {row("最小下单金额", "minimum trade", input("min_trade_usd", "美元"), <>算出来的调整不到这个金额就不提议。</>)}
+        {row("按整股", "whole shares", <select value={form.whole_shares} onChange={set("whole_shares")}><option value="1">是</option><option value="0">否（碎股）</option></select>,
+          <>买入向下取整，卖出取最接近规则的整数股。</>)}
+        <h3 className="rule-group">提醒线（只提醒，不生成订单）</h3>
+        {row("低于成本", "drawdown from cost", input("alert_drawdown_from_cost", "%"), <>现价比平均成本低这么多就提醒。成本 $100 的股票，跌到 <b>${(100 * (1 - pct("alert_drawdown_from_cost"))).toFixed(0)}</b> 以下。</>)}
+        {row("离一年高点", "drawdown from 52-week high", input("alert_drawdown_from_high", "%"), <>现价比近一年最高点低这么多就提醒。高点 $100 的股票，跌到 <b>${(100 * (1 - pct("alert_drawdown_from_high"))).toFixed(0)}</b> 以下。</>)}
         <button type="submit" disabled={save.isPending}>保存规则</button>
       </form>
       <ErrorBox error={save.error} />
-      {save.isSuccess ? <p className="hint">已保存。到“我的持仓”点“同步账本并检查”后，上面的对照和调仓计划会按新规则重算。</p> : null}
+      {save.isSuccess ? <p className="hint">已保存。到“我的持仓”点“同步账本并检查”后生效。</p> : null}
     </div>
   );
 }

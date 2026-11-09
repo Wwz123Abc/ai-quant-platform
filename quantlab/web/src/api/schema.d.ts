@@ -1280,8 +1280,8 @@ export interface components {
             band: number;
             /**
              * Max Position
-             * @description 单只股票上限
-             * @default 0.3
+             * @description 单只股票上限：固定 25%，不能修改，传什么都按 25% 算
+             * @default 0.25
              */
             max_position: number;
             /**
@@ -1315,6 +1315,36 @@ export interface components {
              * @default 0.25
              */
             alert_drawdown_from_high: number;
+            /**
+             * Take Profit
+             * @description 止盈：开关
+             * @default true
+             */
+            take_profit: boolean;
+            /**
+             * Tp Gain 1
+             * @description 第一档：现价比平均成本高这么多
+             * @default 0.5
+             */
+            tp_gain_1: number;
+            /**
+             * Tp Sell 1
+             * @description 第一档卖出当前股数的比例
+             * @default 0.33
+             */
+            tp_sell_1: number;
+            /**
+             * Tp Gain 2
+             * @description 第二档：现价比平均成本高这么多
+             * @default 1
+             */
+            tp_gain_2: number;
+            /**
+             * Tp Sell 2
+             * @description 第二档卖出当时股数的比例
+             * @default 0.33
+             */
+            tp_sell_2: number;
         };
         /** PortfolioFit */
         PortfolioFit: {

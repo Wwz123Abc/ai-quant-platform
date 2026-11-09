@@ -15,13 +15,18 @@ router = APIRouter(prefix="/api", dependencies=[Depends(require_token)], tags=["
 class Policy(BaseModel):
     targets: dict[str, float] = Field(default_factory=dict, description="股票 -> 目标仓位（占股票加现金的比例）")
     band: float = Field(0.05, description="偏离目标超过这么多（绝对值）才再平衡")
-    max_position: float = Field(0.30, description="单只股票上限")
+    max_position: float = Field(0.25, description="单只股票上限：固定 25%，不能修改，传什么都按 25% 算")
     uncapped: list[str] = Field(default_factory=list, description="不设单只上限的代码（宽基 ETF）")
     cash_reserve: float = Field(0.10, description="现金储备下限")
     min_trade_usd: float = 50.0
     whole_shares: bool = True
     alert_drawdown_from_cost: float = 0.20
     alert_drawdown_from_high: float = 0.25
+    take_profit: bool = Field(True, description="止盈：开关")
+    tp_gain_1: float = Field(0.50, description="第一档：现价比平均成本高这么多")
+    tp_sell_1: float = Field(0.33, description="第一档卖出当前股数的比例")
+    tp_gain_2: float = Field(1.00, description="第二档：现价比平均成本高这么多")
+    tp_sell_2: float = Field(0.33, description="第二档卖出当时股数的比例")
 
 
 class HoldingPosition(BaseModel):
