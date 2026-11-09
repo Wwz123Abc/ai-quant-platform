@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
-import { api, type HoldingsPolicy, type HoldingsReview, type HoldingsStatus, post, type Proposal } from "../api/client";
+import { Link } from "react-router-dom";
+import { api, type HoldingsReview, type HoldingsStatus, post, type Proposal } from "../api/client";
 import { ErrorBox, PageHead, Signed, Stat } from "../components/ui";
 import { money, pctPlain, when } from "../lib/format";
 
@@ -132,7 +132,9 @@ export default function Holdings() {
           ) : null}
         </>
       ) : review.isPending ? <p className="empty">正在读取…</p> : <p className="empty">还没有检查过持仓。</p>}
-      <PolicyCard />
+      <p className="hint">
+        规则的说明、你现在和规则的对照、详细调仓计划，以及修改规则，都在单独的页面：<Link to="/rules">持仓规则</Link>。
+      </p>
     </>
   );
 }
@@ -148,71 +150,5 @@ function PriceCheckLine({ checks }: { checks: HoldingsReview["price_check"] }) {
         ? `${good.map((c) => c.symbol).join("、")} 最近 5 个交易日的收盘价和${against}一致，差异不超过 0.2%。`
         : `${good.length} 只一致，${checks.length - good.length} 只有问题（见上面标“核对”的提醒）。`}
     </p>
-  );
-}
-
-function toForm(p: HoldingsPolicy): Record<string, string> {
-  const pct = (v: number | undefined) => String(Math.round((v ?? 0) * 1000) / 10);
-  return {
-    targets: Object.entries(p.targets ?? {}).map(([s, w]) => `${s}:${pct(w)}`).join(", "),
-    band: pct(p.band), max_position: pct(p.max_position), cash_reserve: pct(p.cash_reserve),
-    uncapped: (p.uncapped ?? []).join(", "), min_trade_usd: String(p.min_trade_usd ?? 50), whole_shares: p.whole_shares === false ? "0" : "1",
-    alert_drawdown_from_cost: pct(p.alert_drawdown_from_cost), alert_drawdown_from_high: pct(p.alert_drawdown_from_high),
-  };
-}
-
-function PolicyCard() {
-  const pol = useQuery({ queryKey: ["hpolicy"], queryFn: () => api<HoldingsPolicy>("/api/holdings/policy") });
-  if (!pol.data) return <div className="card"><h2>你的规则</h2><ErrorBox error={pol.error} /><p className="empty">正在读取…</p></div>;
-  return <PolicyForm key={JSON.stringify(pol.data)} initial={pol.data} />;
-}
-
-function PolicyForm({ initial }: { initial: HoldingsPolicy }) {
-  const qc = useQueryClient();
-  const [form, setForm] = useState<Record<string, string>>(() => toForm(initial));
-  const save = useMutation({
-    mutationFn: (p: HoldingsPolicy) => api<HoldingsPolicy>("/api/holdings/policy", { method: "PUT", body: JSON.stringify(p) }),
-    onSuccess: (p) => qc.setQueryData(["hpolicy"], p),
-  });
-  const set = (k: string) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    const targets: Record<string, number> = {};
-    for (const part of (form.targets ?? "").split(/[,，\s]+/).filter(Boolean)) {
-      const [s, w] = part.split(/[:：]/);
-      if (s && w) targets[s.toUpperCase()] = Number(w) / 100;
-    }
-    const pct = (k: string) => Number(form[k]) / 100;
-    save.mutate({
-      targets, band: pct("band"), max_position: pct("max_position"), cash_reserve: pct("cash_reserve"),
-      uncapped: (form.uncapped ?? "").split(/[,，\s]+/).filter(Boolean).map((s) => s.toUpperCase()),
-      min_trade_usd: Number(form.min_trade_usd), whole_shares: form.whole_shares === "1",
-      alert_drawdown_from_cost: pct("alert_drawdown_from_cost"), alert_drawdown_from_high: pct("alert_drawdown_from_high"),
-    });
-  }
-  const f = (k: string, label: string) => (
-    <div className="field"><label>{label}<input type="number" step="any" min={0} value={form[k] ?? ""} onChange={set(k)} /></label></div>
-  );
-  return (
-    <div className="card">
-      <h2>你的规则</h2>
-      <p className="hint">占比都按“可投资资金”（股票 + 现金）计算。只有这些规则会生成建议订单。改完后点“同步账本并检查”生效。</p>
-      <form className="params" onSubmit={submit}>
-        <div className="field wide"><label>目标仓位（代码:百分比，逗号分隔，可不填）<input value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" /></label></div>
-        {f("band", "再平衡区间（%）")}
-        {f("max_position", "单只上限（%）")}
-        <div className="field wide"><label>不设上限的代码（宽基 ETF，逗号分隔）<input value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" /></label></div>
-        {f("cash_reserve", "现金储备（%）")}
-        {f("min_trade_usd", "最小下单金额（$）")}
-        <div className="field"><label>按整股
-          <select value={form.whole_shares ?? "1"} onChange={set("whole_shares")}><option value="1">是</option><option value="0">否（碎股）</option></select>
-        </label></div>
-        {f("alert_drawdown_from_cost", "低于成本提醒（%）")}
-        {f("alert_drawdown_from_high", "离一年高点提醒（%）")}
-        <button type="submit" disabled={save.isPending}>保存规则</button>
-      </form>
-      <ErrorBox error={save.error} />
-      {save.isSuccess ? <p className="hint">已保存。</p> : null}
-    </div>
   );
 }

@@ -5,6 +5,7 @@ import { api, ApiError, BASE, type Health, setToken } from "./api/client";
 import Account from "./pages/Account";
 import Analyze from "./pages/Analyze";
 import Holdings from "./pages/Holdings";
+import Rules from "./pages/Rules";
 import Ai from "./pages/Ai";
 import Chat from "./pages/Chat";
 import AiRun from "./pages/AiRun";
@@ -35,6 +36,7 @@ export default function App() {
         <div className="brand">AI量化交易分析平台<small>量化分析 · QuantLab</small></div>
         <NavLink to="/" end>总览</NavLink>
         <NavLink to="/holdings">我的持仓</NavLink>
+        <NavLink to="/rules">持仓规则</NavLink>
         <NavLink to="/analyze">个股分析</NavLink>
         <NavLink to="/ai">AI 研报</NavLink>
         <NavLink to="/chat">问一问</NavLink>
@@ -46,6 +48,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/holdings" element={<Holdings />} />
+          <Route path="/rules" element={<Rules />} />
           <Route path="/analyze" element={<Analyze />} />
           <Route path="/backtest" element={<Backtest />} />
           <Route path="/scan" element={<Scan />} />
