@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { type AiRun, type AiStatus, api, post } from "../api/client";
-import { ErrorBox, Field, PageHead, Stat } from "../components/ui";
+import { ErrorBox, Field, PageHead } from "../components/ui";
 
 export const STATUS: Record<AiRun["status"], string> = { queued: "排队中", running: "运行中", done: "完成", failed: "失败" };
 export const RATING: Record<string, string> = {
@@ -52,9 +52,7 @@ export default function Ai() {
   }
 
   const st = status.data;
-  const b = st?.budget;
   const ready = st?.available && st.configured;
-  const used = b ? Math.min(1, b.committed_cny / b.budget_cny) : 0;
 
   return (
     <>
@@ -69,23 +67,6 @@ export default function Ai() {
       {st && st.available && !st.configured ? (
         <div className="notice">
           还没有配置大模型密钥。在 quant-lab 文件夹的 <code>.env</code> 文件里加一行 <code>DEEPSEEK_API_KEY=你的密钥</code>，然后重启服务。
-        </div>
-      ) : null}
-
-      {b ? (
-        <div className="card">
-          <h2>{b.month} 月预算</h2>
-          <div className="stats">
-            <Stat k="已用" v={yuan(b.spent_cny)} s={`预算 ${yuan(b.budget_cny)}`} />
-            <Stat k="排队中预计" v={yuan(b.committed_cny - b.spent_cny)} s={`${b.queued} 个排队，${b.running} 个运行中`} />
-            <Stat k="剩余可用" v={yuan(Math.max(0, b.remaining_cny))} />
-            <Stat k="每次分析预计" v={yuan(b.estimate_cny)} s={`模型 ${st.quick_model} / ${st.deep_model}`} />
-          </div>
-          <div className={"meter" + (used >= 1 ? " over" : "")} role="meter" aria-valuemin={0} aria-valuemax={b.budget_cny}
-            aria-valuenow={b.committed_cny} aria-label="本月预算使用情况">
-            <span style={{ width: `${used * 100}%` }} />
-          </div>
-          <p className="hint">按高峰时段价格计算（非高峰时段实际只要一半），汇率 {b.usd_cny}。超过预算的分析不会被提交，也不会被运行。</p>
         </div>
       ) : null}
 

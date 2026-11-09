@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api, ApiError, BASE, type Health, setToken } from "./api/client";
 import Account from "./pages/Account";
 import Analyze from "./pages/Analyze";
@@ -12,7 +12,6 @@ import AiRun from "./pages/AiRun";
 import Ml from "./pages/Ml";
 import Trading, { TradingAccountPage } from "./pages/Trading";
 import Backtest from "./pages/Backtest";
-import Dashboard from "./pages/Dashboard";
 import Paper from "./pages/Paper";
 import Scan from "./pages/Scan";
 
@@ -34,7 +33,6 @@ export default function App() {
     <div className="shell">
       <nav className="nav" aria-label="主导航">
         <div className="brand">AI量化交易分析平台<small>量化分析 · QuantLab</small></div>
-        <NavLink to="/" end>总览</NavLink>
         <NavLink to="/holdings">我的持仓</NavLink>
         <NavLink to="/rules">持仓规则</NavLink>
         <NavLink to="/analyze">个股分析</NavLink>
@@ -46,7 +44,7 @@ export default function App() {
       </nav>
       <main>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Navigate to="/holdings" replace />} />
           <Route path="/holdings" element={<Holdings />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/analyze" element={<Analyze />} />
@@ -60,7 +58,7 @@ export default function App() {
           <Route path="/ml" element={<Ml />} />
           <Route path="/trading" element={<Trading />} />
           <Route path="/trading/:name" element={<TradingAccountPage />} />
-          <Route path="*" element={<p className="empty">没有这个页面。<NavLink to="/">回到总览</NavLink></p>} />
+          <Route path="*" element={<p className="empty">没有这个页面。<NavLink to="/holdings">回到我的持仓</NavLink></p>} />
         </Routes>
       </main>
     </div>
