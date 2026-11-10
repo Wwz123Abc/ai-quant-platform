@@ -7,7 +7,6 @@
     { label: "持仓规则", href: "/lab/rules", lab: true },
     { label: "个股分析", href: "/lab/analyze", lab: true },
     { label: "AI 研报", href: "/lab/ai", lab: true },
-    { label: "股票看板", href: "/dashboard" },
     { label: "读书清单", href: "/reading" },
     { label: "账号", href: "/account" },
   ];

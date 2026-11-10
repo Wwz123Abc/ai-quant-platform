@@ -1,4 +1,4 @@
-// Bookkeeping rules shared by the home page and the stock dashboard, tested on their own (tests/calc.test.mjs).
+// Bookkeeping rules used by the home page, tested on their own (tests/calc.test.mjs).
 //
 // A record is one of:
 //   buy / sell   shares, price, fees            moving average cost; a sale realizes price - average cost

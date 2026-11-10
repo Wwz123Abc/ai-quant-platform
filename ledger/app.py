@@ -44,10 +44,9 @@ DB_PATH = os.path.join(DATA, "ledger.db")
 STATIC = os.path.join(ROOT, "static")
 USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
 SHARED_COLLS = {"history", "candles", "watch", "actions", "checks"}  # market data: written only by the server, uid 0
-PAGES = {"/": "index.html", "/index.html": "index.html", "/dashboard": "dashboard.html", "/reading": "reading.html", "/account": "account.html"}
+PAGES = {"/": "index.html", "/index.html": "index.html", "/reading": "reading.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
-ASSETS = {"d3.min.js": "text/javascript; charset=utf-8", "calc.js": "text/javascript; charset=utf-8",
-          "sitenav.js": "text/javascript; charset=utf-8"}
+ASSETS = {"calc.js": "text/javascript; charset=utf-8", "sitenav.js": "text/javascript; charset=utf-8"}
 ASSET_LINK_RE = re.compile(rb"/assets/([A-Za-z0-9_.-]+\.js)(?:\?v=[A-Za-z0-9]*)?")
 _asset_versions = {}
 
