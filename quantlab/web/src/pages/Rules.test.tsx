@@ -103,3 +103,15 @@ describe("建议订单（合并进持仓规则页）", () => {
     expect(titles.some((t) => t.includes("SGOV 只占"))).toBe(false);
   });
 });
+
+describe("价格核对没做成", () => {
+  it("is a data note, not a conflict between two sources", () => {
+    const r = review({ reminders: [
+      { symbol: "VOO", level: "info", kind: "核对", text: "没能核对，腾讯日线暂时取不到：行情接口返回错误 501", basis: "" },
+      { symbol: "ORCL", level: "warn", kind: "核对", text: "ORCL 10/30 的收盘价腾讯 120.0、新浪 121.5，差 1.2%", basis: "" },
+    ] });
+    const a = anomalies(r);
+    expect(a.find((x) => x.title.startsWith("VOO"))).toMatchObject({ level: "info", title: "VOO 价格核对没做成" });
+    expect(a.find((x) => x.title.startsWith("ORCL"))).toMatchObject({ level: "warn", group: "数据冲突" });
+  });
+});

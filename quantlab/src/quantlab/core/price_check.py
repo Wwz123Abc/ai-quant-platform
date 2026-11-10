@@ -7,6 +7,7 @@ than six calendar days is stale. Sina is the second source, Eastmoney stands in 
 import datetime as dt
 import json
 import re
+import time
 import urllib.parse
 from zoneinfo import ZoneInfo
 
@@ -14,6 +15,7 @@ from ..errors import QuantLabError
 from . import cn_data
 
 CHECK_DAYS, CHECK_TOLERANCE, STALE_DAYS = 5, 0.002, 6
+RETRY_PAUSE = 2.0  # seconds before Tencent's bars are asked for a second time (it answers 5xx now and then)
 LAG_DAYS = 4  # how far the second source may trail on its newest days before they count as missing
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 EM_MARKET = {"OQ": "105", "N": "106", "AM": "107", "PS": "107"}  # Eastmoney's market for a Tencent exchange suffix
@@ -116,9 +118,13 @@ def check(sym, today=None):
     against; text says what was found, in words."""
     today = today or today_us()
     try:
-        bars = tencent_recent(sym)
+        try:
+            bars = tencent_recent(sym)
+        except QuantLabError:  # a hiccup: once more before giving up
+            time.sleep(RETRY_PAUSE)
+            bars = tencent_recent(sym)
     except QuantLabError as e:
-        return {"symbol": sym, "against": "", "ok": False, "text": "取不到腾讯日线：%s" % e}
+        return {"symbol": sym, "against": "", "ok": None, "text": "没能核对，腾讯日线暂时取不到：%s" % e}
     name, other, problems = second_source(sym, CHECK_DAYS + 5)
     if not other:
         return {"symbol": sym, "against": "", "ok": None, "text": "没能核对：%s" % "；".join(problems)}

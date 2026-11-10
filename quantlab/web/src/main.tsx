@@ -11,7 +11,7 @@ adoptTokenFromUrl();
 // Under the ledger site the whole site shares one navigation bar (the ledger's sitenav.js); on its own, this app keeps its sidebar.
 if (BASE) {
   const nav = document.createElement("script");
-  nav.src = "/assets/sitenav.js";
+  nav.src = "/assets/sitenav.js?v=" + Math.floor(Date.now() / 3600000);   // a new URL each hour, so a stale copy is never kept
   nav.defer = true;
   document.head.appendChild(nav);
 }

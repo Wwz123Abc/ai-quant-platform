@@ -371,3 +371,26 @@ def test_a_thin_sgov_reserve_is_flagged_by_the_cash_rule():
     v = review.valuation(with_cash(SNAP, 100), {"AAA": 150.0, "BBB": 25.0, **SG})        # 100 of ~2450
     rem = review.reminders(v, policy.validate({"cash_reserve": 0.1}), load, with_fundamentals=False)
     assert any(r["symbol"] == "SGOV" and r["kind"] == "规则" and "SGOV 只占" in r["text"] for r in rem)
+
+
+# ---- a hiccup of Tencent's bars is retried once, and a failure is "not checked", not a conflict
+def test_a_tencent_hiccup_is_retried_and_a_double_failure_is_not_a_conflict(monkeypatch):
+    from quantlab.core import price_check as pc
+    from quantlab.errors import QuantLabError
+    monkeypatch.setattr(pc, "RETRY_PAUSE", 0)
+    calls = []
+
+    def flaky(sym):
+        calls.append(sym)
+        if len(calls) == 1:
+            raise QuantLabError("行情接口返回错误 501")
+        return [["2026-11-06", 1, 1, 1, 1, 1]]
+    monkeypatch.setattr(pc, "tencent_recent", flaky)
+    monkeypatch.setattr(pc, "second_source", lambda sym, days: ("新浪财经", [["2026-11-06", 1, 1, 1, 1, 1]], []))
+    assert pc.check("VOO", today="2026-11-07")["ok"] is True and len(calls) == 2           # the second try went through
+
+    def down(sym):
+        raise QuantLabError("行情接口返回错误 501")
+    monkeypatch.setattr(pc, "tencent_recent", down)
+    r = pc.check("VOO", today="2026-11-07")
+    assert r["ok"] is None and r["text"].startswith("没能核对")                              # not False: nothing was found to disagree

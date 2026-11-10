@@ -1082,7 +1082,8 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and path in PUBLIC_PAGES:
             return self.send_file(PUBLIC_PAGES[path])
         if method == "GET" and path.startswith("/assets/") and path[8:] in ASSETS:
-            return self.send_file(path[8:], ASSETS[path[8:]], "public, max-age=31536000, immutable")
+            # sitenav.js is also loaded by the holdings pages, which cannot ask for a fingerprinted URL: always revalidate it
+            return self.send_file(path[8:], ASSETS[path[8:]], "no-cache" if path[8:] == "sitenav.js" else "public, max-age=31536000, immutable")
         if not path.startswith("/api/"):
             return self.send_json(404, {"error": "not found"})
         if method != "GET" and self.headers.get("X-Requested-With") != "ledger":

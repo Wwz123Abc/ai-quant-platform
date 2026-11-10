@@ -55,7 +55,8 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
     }
   }
   for (const m of r.reminders) {
-    if (m.kind === "核对") out.push({ level: "warn", group: "数据冲突", title: `${m.symbol} 两个行情来源对不上`, detail: m.text, basis: m.basis });
+    if (m.kind === "核对" && m.text.startsWith("没能核对")) out.push({ level: "info", group: "数据", title: `${m.symbol} 价格核对没做成`, detail: m.text + "。不是价格有问题，只是这次没核对上，下次检查会再试。", basis: m.basis });
+    else if (m.kind === "核对") out.push({ level: "warn", group: "数据冲突", title: `${m.symbol} 两个行情来源对不上`, detail: m.text, basis: m.basis });
     else if (m.kind === "数据") out.push({ level: "warn", group: "数据缺失", title: `${m.symbol} 取不到行情`, detail: m.text, basis: m.basis });
     else if (m.kind === "到期") out.push({ level: "warn", group: "账本", title: `${m.symbol} ${m.text.includes("已到期") ? "已到期" : "快到期"}`, detail: m.text, basis: m.basis });
     else if (m.kind === "亏损" || m.kind === "回撤") out.push({ level: "warn", group: "提醒线", title: `${m.symbol} ${m.text}`, detail: m.kind === "亏损" ? "触发了“低于成本提醒”。只提醒，不生成订单。" : "触发了“离一年高点提醒”。只提醒，不生成订单。", basis: m.basis });
@@ -163,12 +164,13 @@ export function Orders({ r, onDecide }: { r: HoldingsReview; onDecide: (id: numb
 function PriceCheckLine({ checks }: { checks: HoldingsReview["price_check"] }) {
   if (!checks?.length) return null;
   const good = checks.filter((c) => c.ok);
+  const bad = checks.filter((c) => c.ok === false);
   const against = good[0]?.against || "第二个来源";
   return (
     <p className="hint" style={{ marginTop: 12 }}>
       价格核对：{good.length === checks.length
         ? `${good.map((c) => c.symbol).join("、")} 最近 5 个交易日的收盘价和${against}一致，差异不超过 0.2%。`
-        : `${good.length} 只一致，${checks.length - good.length} 只有问题（见上面标“数据冲突”的项）。`}
+        : `${good.length} 只一致${bad.length ? `，${bad.length} 只对不上（见标“数据冲突”的项）` : ""}${checks.length - good.length - bad.length ? `，${checks.length - good.length - bad.length} 只这次没能核对（行情接口暂时取不到，下次检查再试）` : ""}。`}
     </p>
   );
 }
