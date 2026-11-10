@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { Link } from "react-router-dom";
-import { api, type HoldingsPolicy, type HoldingsReview } from "../api/client";
+import { api, type HoldingsPolicy, type HoldingsReview, type HoldingsStatus, post, type Proposal } from "../api/client";
 import { ErrorBox, PageHead } from "../components/ui";
-import { money, pctPlain } from "../lib/format";
+import { money, pctPlain, when } from "../lib/format";
 
 /** The single-stock cap is fixed by the owner: it is shown here, never edited (the server also forces it). */
 export const MAX_POSITION = 0.25;
@@ -22,7 +21,7 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
   const order = (sym: string) => r.proposals.find((o) => o.symbol === sym && o.status === "pending");
   const orderText = (sym: string) => {
     const o = order(sym);
-    return o ? `建议${o.side === "buy" ? "买入" : "卖出"} ${o.shares} 股（约 ${money(o.value)}），到“我的持仓”确认。` : "按整股或最小下单金额，这次没有生成建议订单。";
+    return o ? `建议${o.side === "buy" ? "买入" : "卖出"} ${o.shares} 股（约 ${money(o.value)}），在上面的“建议订单”里确认。` : "按整股或最小下单金额，这次没有生成建议订单。";
   };
   for (const p of v.positions) {
     if (!uncapped.has(p.symbol) && p.weight != null && p.weight > MAX_POSITION + 1e-9) {
@@ -46,7 +45,7 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
     out.push({ level: "error", group: "规则冲突", title: `目标合计 ${pctPlain(tsum, 0)} 加 SGOV 储备 ${pctPlain(pol.cash_reserve, 0)} 超过 100%`, detail: "目标不可能同时满足：减少目标或降低 SGOV 储备。" });
   }
   for (const o of r.proposals.filter((x) => x.status === "pending" && x.reason.startsWith("止盈"))) {
-    out.push({ level: "warn", group: "止盈", title: `${o.symbol} 到了止盈档：${o.reason.split("：")[0]}`, detail: `${o.reason.split("：").slice(1).join("：")}。建议卖出 ${o.shares} 股（约 ${money(o.value)}），到“我的持仓”确认。`, basis: o.basis });
+    out.push({ level: "warn", group: "止盈", title: `${o.symbol} 到了止盈档：${o.reason.split("：")[0]}`, detail: `${o.reason.split("：").slice(1).join("：")}。建议卖出 ${o.shares} 股（约 ${money(o.value)}），在上面的“建议订单”里确认。`, basis: o.basis });
   }
   if (pol.take_profit) {
     for (const p of v.positions) {
@@ -62,6 +61,8 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
     else if (m.kind === "亏损" || m.kind === "回撤") out.push({ level: "warn", group: "提醒线", title: `${m.symbol} ${m.text}`, detail: m.kind === "亏损" ? "触发了“低于成本提醒”。只提醒，不生成订单。" : "触发了“离一年高点提醒”。只提醒，不生成订单。", basis: m.basis });
     else if (m.kind === "AI" && m.level === "warn") out.push({ level: "info", group: "信号", title: `${m.symbol} ${m.text}`, detail: "AI 评级偏谨慎，但你在持有：只是提醒，是否调整由你决定。", basis: m.basis });
     else if (m.kind === "基本面" && m.level === "warn") out.push({ level: "info", group: "信号", title: `${m.symbol} ${m.text}`, detail: "财报信号偏弱，只是提醒。", basis: m.basis });
+    else if (m.kind === "规则" && m.symbol === "SGOV") continue;   // the SGOV reserve is already reported above with its figures
+    else out.push({ level: "info", group: "信号", title: `${m.symbol} ${m.text}`, detail: "只是信号，不生成订单。", basis: m.basis });
   }
   for (const n of r.notes) {
     out.push({ level: "warn", group: "规则和数据冲突", title: n, detail: "规则要求调整，但价格、SGOV 或下单限制让它没法照做。" });
@@ -69,17 +70,106 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
   return out;
 }
 
+const STATUS: Record<string, string> = { pending: "待确认", approved: "已确认（请去券商下单）", rejected: "已拒绝", superseded: "已过期" };
+
 export default function Rules() {
+  const qc = useQueryClient();
+  const status = useQuery({ queryKey: ["hstatus"], queryFn: () => api<HoldingsStatus>("/api/holdings/status") });
   const review = useQuery({ queryKey: ["hreview"], queryFn: () => api<HoldingsReview>("/api/holdings/review"), retry: false });
+  const run = useMutation({
+    mutationFn: () => post<HoldingsReview>("/api/holdings/review", {}),
+    onSuccess: (r) => { qc.setQueryData(["hreview"], r); qc.invalidateQueries({ queryKey: ["hstatus"] }); },
+  });
+  const decide = useMutation({
+    mutationFn: (p: { id: number; ok: boolean }) => post<Proposal>(`/api/holdings/proposals/${p.id}/${p.ok ? "approve" : "reject"}`, { note: "" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["hreview"] }),
+  });
   const r = review.data;
   return (
     <>
       <PageHead title="持仓规则">
-        上面是最近一次检查发现的异常和冲突，下面是规则设置。只有这些规则会生成建议订单；订单到<Link to="/holdings">我的持仓</Link>确认，系统不会替你下单。
+        你的持仓规则放在这一页：从账本同步真实持仓，按规则检查，给出建议订单，列出异常和冲突，最后是规则设置。只有这些规则会生成建议订单；
+        趋势、基本面、AI 评级只做提醒。你逐条确认后自己去券商下单，成交后在账本记一笔，系统不会替你下单。持仓本身（股数、成本、盈亏）看<a href="/">持仓账本</a>。
       </PageHead>
-      {r ? <Anomalies r={r} /> : review.isPending ? <p className="empty">正在读取…</p> : <div className="card"><h2>异常与冲突</h2><p className="empty">还没有检查过持仓：先到“我的持仓”点“同步账本并检查”。</p></div>}
+      {status.data && !status.data.configured ? (
+        <div className="notice">
+          还没有配置账本的只读访问密钥：在账本网站的“账号”页面创建密钥，然后在 quant-lab 文件夹的 <code>.env</code> 里加一行 <code>LEDGER_TOKEN=密钥</code>，重启服务。
+        </div>
+      ) : null}
+      <div className="card">
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <button className="primary" onClick={() => run.mutate()} disabled={run.isPending || !status.data?.configured}>
+            {run.isPending ? "同步和检查中…" : "同步账本并检查"}
+          </button>
+          <span className="hint">
+            {status.data?.synced ? `上次同步 ${when(status.data.synced)}（北京时间，${status.data.account}）` : "还没有同步过"} · 每周二的任务和账本有变化时也会自动检查
+          </span>
+        </div>
+        {r ? (
+          <p className="hint" style={{ marginTop: 8 }}>
+            可投资资金 {money(r.valuation.investable)}（股票 {money(r.valuation.stocks)} + SGOV {money(r.valuation.cash)}）· SGOV 占 {pctPlain(r.valuation.cash_weight)}，储备下限 {pctPlain(r.policy.cash_reserve, 0)}
+          </p>
+        ) : null}
+        <ErrorBox error={run.error ?? decide.error} />
+      </div>
+      {r ? (
+        <>
+          <Orders r={r} onDecide={(id, ok) => decide.mutate({ id, ok })} />
+          <Anomalies r={r} />
+        </>
+      ) : review.isPending ? <p className="empty">正在读取…</p> : <div className="card"><h2>建议订单和异常</h2><p className="empty">还没有检查过持仓：点上面的“同步账本并检查”。</p></div>}
       <PolicyCard investable={r?.valuation.investable} />
     </>
+  );
+}
+
+export function Orders({ r, onDecide }: { r: HoldingsReview; onDecide: (id: number, ok: boolean) => void }) {
+  return (
+    <div className="card">
+      <h2>建议订单（检查 #{r.id}{r.price_date ? `，按 ${r.price_date} 收盘价` : ""}）</h2>
+      {r.proposals.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>方向</th><th>代码</th><th className="num">股数</th><th className="num">约价</th><th className="num">约金额</th><th>原因</th><th>状态</th><th /></tr></thead>
+            <tbody>
+              {r.proposals.map((o) => (
+                <tr key={o.id}>
+                  <td className={o.side === "buy" ? "up" : "down"}>{o.side === "buy" ? "买入" : "卖出"}</td>
+                  <td>{o.symbol}</td><td className="num">{o.shares}</td><td className="num">{o.price.toFixed(2)}</td>
+                  <td className="num">{money(o.value)}</td>
+                  <td style={{ whiteSpace: "normal" }}>{o.reason}{o.basis ? <details><summary className="hint">依据</summary><span className="hint">{o.basis}</span></details> : null}</td>
+                  <td>{STATUS[o.status] ?? o.status}</td>
+                  <td>
+                    {o.status === "pending" ? (
+                      <span style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => onDecide(o.id, true)}>确认</button>
+                        <button onClick={() => onDecide(o.id, false)}>拒绝</button>
+                      </span>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <p className="empty">没有建议订单：持仓符合你的规则。</p>}
+      {r.notes.map((n, i) => <p key={i} className="hint">· {n}</p>)}
+      <p className="hint">“确认”只是记录你同意这笔调整；系统不会替你下单。</p>
+    </div>
+  );
+}
+
+/** One line on the cross-check of the held stocks' closes; the problems themselves are in the anomalies. */
+function PriceCheckLine({ checks }: { checks: HoldingsReview["price_check"] }) {
+  if (!checks?.length) return null;
+  const good = checks.filter((c) => c.ok);
+  const against = good[0]?.against || "第二个来源";
+  return (
+    <p className="hint" style={{ marginTop: 12 }}>
+      价格核对：{good.length === checks.length
+        ? `${good.map((c) => c.symbol).join("、")} 最近 5 个交易日的收盘价和${against}一致，差异不超过 0.2%。`
+        : `${good.length} 只一致，${checks.length - good.length} 只有问题（见上面标“数据冲突”的项）。`}
+    </p>
   );
 }
 
@@ -92,6 +182,7 @@ export function Anomalies({ r }: { r: HoldingsReview }) {
       {items.length ? (
         <p className="hint">{levels.map((l) => `${LEVEL_TEXT[l]} ${items.filter((i) => i.level === l).length} 项`).join(" · ")}</p>
       ) : <p className="empty">没有异常：持仓符合规则，规则之间没有矛盾，行情来源一致。</p>}
+      <PriceCheckLine checks={r.price_check ?? []} />
       {levels.map((l) => (
         <div key={l} className={"anom " + l}>
           <h3>{LEVEL_TEXT[l]}</h3>
@@ -174,7 +265,7 @@ export function PolicyForm({ initial, investable }: { initial: HoldingsPolicy; i
   return (
     <div className="card">
       <h2>规则设置</h2>
-      <p className="hint">占比都按“可投资资金”（所有股票，含 SGOV；国债和定存持有到期，不参与）算。账本不记现金，SGOV 就是你的现金。保存后点“我的持仓”的“同步账本并检查”，上面的异常就按新规则重算。</p>
+      <p className="hint">占比都按“可投资资金”（所有股票，含 SGOV；国债和定存持有到期，不参与）算。账本不记现金，SGOV 就是你的现金。保存后点上面的“同步账本并检查”，异常和建议订单就按新规则重算。</p>
       <h3 className="rule-group">固定规则（不能改）</h3>
       <div className="rule">
         <div className="rule-in"><div className="rule-name">单只上限<small>position cap</small></div><b className="fixed">{pctPlain(MAX_POSITION, 0)}</b></div>
@@ -205,7 +296,7 @@ export function PolicyForm({ initial, investable }: { initial: HoldingsPolicy; i
         <button type="submit" disabled={save.isPending}>保存规则</button>
       </form>
       <ErrorBox error={save.error} />
-      {save.isSuccess ? <p className="hint">已保存。到“我的持仓”点“同步账本并检查”后生效。</p> : null}
+      {save.isSuccess ? <p className="hint">已保存。点上面的“同步账本并检查”后生效。</p> : null}
     </div>
   );
 }

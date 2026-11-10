@@ -3,7 +3,7 @@
 ## 分层
 
 ```
-web/ (React + TypeScript)          浏览器里的页面：我的持仓、持仓规则、个股分析、AI 研报（回测、参数扫描、模拟盘等不在菜单里，按地址访问）
+web/ (React + TypeScript)          浏览器里的页面：持仓规则（含建议订单）、个股分析、AI 研报（回测、参数扫描、模拟盘等不在菜单里，按地址访问）
         │  HTTPS/HTTP + Bearer 令牌，类型由 OpenAPI 生成
         ▼
 src/quantlab/api/ (FastAPI)        接口层：校验输入、调用领域层、转换结果；不含业务逻辑

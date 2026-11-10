@@ -4,7 +4,6 @@
   "use strict";
   var ITEMS = [
     { label: "持仓账本", href: "/", exact: true },
-    { label: "我的持仓", href: "/lab/holdings", lab: true },
     { label: "持仓规则", href: "/lab/rules", lab: true },
     { label: "个股分析", href: "/lab/analyze", lab: true },
     { label: "AI 研报", href: "/lab/ai", lab: true },

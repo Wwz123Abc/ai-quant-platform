@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { HoldingsReview } from "../api/client";
-import { anomalies, Anomalies, PolicyForm } from "./Rules";
+import { anomalies, Anomalies, Orders, PolicyForm } from "./Rules";
 
 const pos = (symbol: string, shares: number, price: number, avg: number, weight: number) =>
   ({ symbol, currency: "USD", shares, avg_cost: avg, price, value: shares * price, gain: price / avg - 1, weight });
@@ -80,5 +80,26 @@ describe("规则设置", () => {
     expect(html).toContain("<b>$625</b>");                                  // 25% of $2,500
     expect(html).toContain("涨到 $150 卖 3 股，涨到 $200 再卖 2 股，剩 5 股继续持有");
     expect(html).not.toContain("单只上限（%）");                            // no input for the cap
+  });
+});
+
+describe("建议订单（合并进持仓规则页）", () => {
+  it("lists the pending orders with confirm and reject buttons, and says so when there are none", () => {
+    const html = renderToStaticMarkup(<Orders r={review()} onDecide={() => {}} />);
+    expect(html).toContain("建议订单（检查 #7");
+    expect(html).toContain("卖出");
+    expect(html).toContain("确认</button>");
+    expect(html).toContain("拒绝</button>");
+    expect(renderToStaticMarkup(<Orders r={review({ proposals: [] })} onDecide={() => {}} />)).toContain("没有建议订单");
+  });
+
+  it("keeps the other reminders (trend, AI, fundamentals) as signals so no separate reminders list is needed, without repeating the SGOV reserve", () => {
+    const r = review({ reminders: [
+      { symbol: "ORCL", level: "info", kind: "趋势", text: "50 日线在 200 日线下方", basis: "" },
+      { symbol: "SGOV", level: "warn", kind: "规则", text: "SGOV 只占 0.0%，低于储备 10%", basis: "" },
+    ] });
+    const titles = anomalies(r).map((a) => a.title);
+    expect(titles).toContain("ORCL 50 日线在 200 日线下方");
+    expect(titles.some((t) => t.includes("SGOV 只占"))).toBe(false);
   });
 });

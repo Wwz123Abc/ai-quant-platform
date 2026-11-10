@@ -4,7 +4,6 @@ import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api, ApiError, BASE, type Health, setToken } from "./api/client";
 import Account from "./pages/Account";
 import Analyze from "./pages/Analyze";
-import Holdings from "./pages/Holdings";
 import Rules from "./pages/Rules";
 import Ai from "./pages/Ai";
 import AiRun from "./pages/AiRun";
@@ -33,7 +32,6 @@ export default function App() {
       {BASE ? null : (
       <nav className="nav" aria-label="主导航">
         <div className="brand">测试</div>
-        <NavLink to="/holdings">我的持仓</NavLink>
         <NavLink to="/rules">持仓规则</NavLink>
         <NavLink to="/analyze">个股分析</NavLink>
         <NavLink to="/ai">AI 研报</NavLink>
@@ -43,8 +41,8 @@ export default function App() {
       )}
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/holdings" replace />} />
-          <Route path="/holdings" element={<Holdings />} />
+          <Route path="/" element={<Navigate to="/rules" replace />} />
+          <Route path="/holdings" element={<Navigate to="/rules" replace />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/analyze" element={<Analyze />} />
           <Route path="/backtest" element={<Backtest />} />
@@ -56,7 +54,7 @@ export default function App() {
           <Route path="/ml" element={<Ml />} />
           <Route path="/trading" element={<Trading />} />
           <Route path="/trading/:name" element={<TradingAccountPage />} />
-          <Route path="*" element={<p className="empty">没有这个页面。<NavLink to="/holdings">回到我的持仓</NavLink></p>} />
+          <Route path="*" element={<p className="empty">没有这个页面。<NavLink to="/rules">回到持仓规则</NavLink></p>} />
         </Routes>
         {BASE ? <p className="hint" style={{ marginTop: 24 }}>v{auth.data?.version} · 仅用于研究，不构成投资建议</p> : null}
       </main>

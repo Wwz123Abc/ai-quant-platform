@@ -52,7 +52,7 @@ export default function Analyze() {
           <div className={r.allowed ? "notice" : r.portfolio ? "error" : "notice"} role="status">
             <b>{r.verdict}</b>
             {r.checks.map((c) => <div key={c.rule}>{c.ok ? "✓" : "✗"} {c.rule}：{c.text}</div>)}
-            {!r.portfolio ? <div>到“<Link to="/holdings">我的持仓</Link>”同步账本后，这里会按你的规则判断。</div> : null}
+            {!r.portfolio ? <div>到“<Link to="/rules">持仓规则</Link>”同步账本后，这里会按你的规则判断。</div> : null}
           </div>
           {r.levels ? (
             <div className="card">
