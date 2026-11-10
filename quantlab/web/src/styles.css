@@ -139,6 +139,7 @@ main {
   padding: 24px 28px 48px;
   max-width: 1200px;
   width: 100%;
+  margin-inline: auto; /* centred on a wide screen, like the ledger pages */
 }
 .page-head {
   margin-bottom: 20px;
