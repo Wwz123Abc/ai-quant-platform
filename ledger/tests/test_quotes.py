@@ -1,7 +1,9 @@
 """Automatic live prices (app.refresh_quotes). Run: python -m unittest discover -s ledger/tests"""
 import importlib.util
+import json
 import os
 import tempfile
+import urllib.error
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -175,3 +177,29 @@ class NewStock(unittest.TestCase):
         app.put_doc(self.uid, "trades", "t5", {"symbol": "KO", "side": "buy", "shares": 1, "price": 60, "date": "2026-11-06"})
         app.put_doc(self.uid, "config", "main", {"prices": {"VOO": 693.54, "KO": 61.0}}, merge=True)
         self.assertEqual(app.missing_market_data(self.uid), ["KO"])
+
+
+class Dividends(unittest.TestCase):
+    """Cash dividends from Sina's adjustment rows (app.us_dividends): the interest SGOV pays each month."""
+
+    @staticmethod
+    def sina(rows):
+        return "var X_qfq= " + json.dumps({"total": len(rows), "data": [{"d": d, "f": str(f), "c": str(c)} for d, f, c in rows]})
+
+    def dividends(self, rows):
+        with mock.patch.object(app, "fetch", lambda url, **kw: self.sina(rows)):
+            return app.us_dividends("SGOV")
+
+    def test_each_step_between_rows_is_the_dividend_that_went_ex_on_the_newer_date(self):
+        got = self.dividends([("2026-11-02", 1, 0), ("2026-10-01", 1, -0.328581), ("2026-09-01", 1, -0.629128)])
+        self.assertEqual(got, [["2026-10-01", "", 0.300547], ["2026-11-02", "", 0.328581]])   # the oldest row has nothing older to step from
+
+    def test_a_split_between_rows_and_a_row_that_steps_the_wrong_way_are_skipped_not_guessed(self):
+        got = self.dividends([("2026-06-01", 2, -1.0), ("2026-03-01", 2, -2.0), ("2025-12-01", 1, -3.0), ("2025-09-01", 1, -1.0)])
+        self.assertEqual(got, [["2026-06-01", "", 0.5]])       # (-1 - -2) / factor 2; 03-01 vs 12-01 crosses a split; 12-01 steps the wrong way
+
+    def test_no_adjustment_file_means_no_dividends(self):
+        def gone(url, **kw):
+            raise urllib.error.HTTPError(url, 404, "nf", {}, None)
+        with mock.patch.object(app, "fetch", gone):
+            self.assertEqual(app.us_dividends("NEWCO"), [])

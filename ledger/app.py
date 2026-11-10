@@ -536,6 +536,28 @@ def us_splits(sym):
     return out
 
 
+def us_dividends(sym):
+    """Cash dividends per share from the same Sina adjustment rows, as [exDate, "", perShare] oldest first. Each row holds the
+    running total of the dividends paid from its date on (c, zero or negative, with the split factor f); the step between a
+    row and the next older one is the dividend that went ex on the newer row's date. A step across a split is skipped (its
+    units differ), and so is a row that does not step the right way (a stale file): a missing dividend is better than a wrong one."""
+    try:
+        text = fetch("https://finance.sina.com.cn/us_stock/company/reinstatement/%s_qfq.js" % sym.replace(".", "_"),
+                     referer="https://finance.sina.com.cn/")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return []
+        raise
+    m = re.search(r"=\s*(\{.*\})", text, re.S)
+    rows = sorted(((d["d"], float(d["f"]), float(d.get("c") or 0)) for d in (json.loads(m.group(1)).get("data") or [])), reverse=True) if m else []
+    out = []
+    for (day, f1, c1), (_, f0, c0) in zip(rows, rows[1:]):
+        per = (c1 - c0) / f1 if f1 > 0 else 0
+        if abs(f1 - f0) < 1e-9 and per > 1e-6:
+            out.append([day, "", round(per, 6)])
+    return sorted(out)
+
+
 # Eastmoney's market id for a Tencent exchange suffix; unknown suffixes try all three
 EM_MARKET = {"OQ": "105", "N": "106", "AM": "107", "PS": "107"}
 CHECK_DAYS, CHECK_TOLERANCE, STALE_DAYS = 5, 0.002, 6
@@ -829,8 +851,13 @@ def refresh_market(uid):
             report["errors"][s + " 历史"] = str(e)
         if is_hk(s):
             continue
-        try:  # splits the records may be missing; the page compares
-            put_doc(0, "actions", s, {"symbol": s, "splits": us_splits(s), "source": "新浪财经（拆股、合股）", "updatedAt": now_iso()})
+        try:  # splits the records may be missing, and the cash dividends (SGOV's interest is credited from these); the page compares
+            try:
+                divs = us_dividends(s)
+            except Exception as e:  # dividends are a bonus: the splits are still stored
+                divs = []
+                report["errors"][s + " 分红"] = str(e)
+            put_doc(0, "actions", s, {"symbol": s, "splits": us_splits(s), "dividends": divs, "source": "新浪财经（拆股、合股、分红）", "updatedAt": now_iso()})
         except Exception as e:
             report["errors"][s + " 分红拆股"] = str(e)
     return report

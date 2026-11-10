@@ -111,6 +111,18 @@
     return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }
 
+  // The dividends of the symbols in `symbols` that market data shows and the records do not have, as dividend records (gross,
+  // no tax) flagged `auto`: the owner keeps cash in SGOV, whose monthly interest is paid out as dividends. A dividend the owner
+  // has recorded by hand is not counted twice (the same matching as missingActions). Dated on the ex-date, the day the shares must be held.
+  function autoDividends(records, actions, symbols, today) {
+    const only = {};
+    for (const s of symbols || []) if (actions && actions[s]) only[s] = actions[s];
+    return missingActions(records, only, today).filter((h) => h.kind === "dividend" && h.gross > 0).map((h) => ({
+      id: "auto|" + h.key, side: "dividend", symbol: h.symbol, date: h.date, amount: Math.round(h.gross * 100) / 100, tax: 0, auto: true,
+      note: "自动计入：每股 $" + Number(h.perShare).toFixed(4) + " × " + h.shares + " 股",
+    }));
+  }
+
   // Splits of one symbol as [date, ratio] oldest first, from market data and from the records; a record within
   // 5 days of a market split is the same split.
   function splitList(symbol, actions, records) {
@@ -224,7 +236,7 @@
   root.LedgerCalc = {
     intradayPortfolio,
     portfolioQuote,
-    SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, splitList, factorAfter, splitAdjust,
+    SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, autoDividends, splitList, factorAfter, splitAdjust,
     parseD, fmtD, dayDiff, addMonths, coupons, bondAt, depositAt, markOn, fixedStart, fixedOn,
   };
 })(typeof window !== "undefined" ? window : globalThis);

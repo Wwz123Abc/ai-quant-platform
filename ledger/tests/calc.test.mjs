@@ -233,3 +233,15 @@ test("the held stocks as one intraday line: forward-filled per minute, the previ
   near(hk.v[0], 120);
   assert.equal(C.intradayPortfolio([], toUSD).t.length, 0);
 });
+
+test("SGOV's monthly interest is credited from market data, net of nothing, and never twice", () => {
+  const recs = [{ date: "2026-09-10", side: "buy", symbol: "SGOV", shares: 20, price: 100.5, fees: 0 }, { date: "2026-10-20", side: "buy", symbol: "SGOV", shares: 10, price: 100.6, fees: 0 }];
+  const actions = { SGOV: { dividends: [["2026-09-01", "", 0.3], ["2026-10-01", "", 0.3005], ["2026-11-02", "", 0.3286], ["2026-12-01", "", 0.3]], splits: [] } };
+  const got = C.autoDividends(recs, actions, ["SGOV"], "2026-11-09");
+  assert.equal(JSON.stringify(got.map((d) => [d.date, d.amount])), JSON.stringify([["2026-11-02", 9.86], ["2026-10-01", 6.01]]));   // before the first buy: none; after today: none
+  assert.ok(got.every((d) => d.auto && d.side === "dividend" && d.tax === 0));
+  const byHand = recs.concat([{ date: "2026-10-02", side: "dividend", symbol: "SGOV", amount: 6.01, tax: 0 }]);
+  assert.equal(C.autoDividends(byHand, actions, ["SGOV"], "2026-11-09").map((d) => d.date).join(), "2026-11-02");   // October was recorded by hand
+  assert.equal(C.autoDividends(recs, actions, ["VOO"], "2026-11-09").length, 0);                                     // only the symbols asked for
+  near(C.holdings(recs.concat(got)).SGOV.dividends, 9.86 + 6.01);                                                  // and they count as income
+});

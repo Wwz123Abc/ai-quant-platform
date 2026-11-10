@@ -405,7 +405,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="mix-h">
     <div class="head-row">
-      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。账本里不记现金，要留现金就买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
+      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。账本里不记现金，要留现金就买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
       <p class="hint" id="mixSum"></p>
     </div>
     <dl class="pnl-stats" id="assetStats" hidden></dl>
@@ -424,7 +424,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="stk-h">
     <div class="head-row">
-      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债和定期存款。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏（都已扣费用）。</p><p>已经全部卖出的股票没有现值，不在圆盘和表格里，但它们的已实现盈亏算进上面的盈亏。鼠标移到圆盘上可以看到每只股票的现值和盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。</p></div></details></div>
+      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票占全部股票现值的多少，以及股票部分自己的盈亏，不含国债和定期存款。港股按当前汇率折成美元。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏再加分红利息（都已扣费用）。SGOV 每月分红的利息按新浪的分红数据自动计入，不用手动记。</p><p>已经全部卖出的股票没有现值，不在圆盘和表格里，但它们的已实现盈亏算进上面的盈亏。鼠标移到圆盘上可以看到每只股票的现值和盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。</p></div></details></div>
       <p class="hint" id="stkSum"></p>
     </div>
     <dl class="pnl-stats" id="stkStats" hidden></dl>
@@ -978,7 +978,19 @@ TAL|好未来|TAL Education
 
   // ---------- calculations ----------
   // Trades, dividends and splits in the order they take effect (a split before the trades of its day).
-  const sortedTrades = () => LedgerCalc.sortRecords(state.trades);
+  // The interest of the stocks that stand in for cash is credited by itself (see LedgerCalc.autoDividends); it is shown in the log but
+  // is not a record you can edit or delete.
+  const AUTO_INTEREST = ["SGOV"];
+  const autoMemo = { trades: null, actions: null, day: "", out: [] };
+  function allRecords() {
+    const day = todayUS();
+    if (autoMemo.trades !== state.trades || autoMemo.actions !== state.actions || autoMemo.day !== day) {
+      autoMemo.trades = state.trades; autoMemo.actions = state.actions; autoMemo.day = day;
+      autoMemo.out = LedgerCalc.autoDividends(state.trades, state.actions, AUTO_INTEREST, day);
+    }
+    return autoMemo.out.length ? state.trades.concat(autoMemo.out) : state.trades;
+  }
+  const sortedTrades = () => LedgerCalc.sortRecords(allRecords());
   const tradeCcy = (t) => (t.currency === "HKD" || t.currency === "USD" ? t.currency : ccyOf(t.symbol));
 
   function compute(list) {
@@ -1156,7 +1168,7 @@ TAL|好未来|TAL Education
     $("#mixTotal").textContent = total > 0 ? money(total) : "—";
     // Original assets: the money put in and not yet taken back. Current value minus it is the total profit
     // (unrealized + realized + Treasury and deposit income), the same figure as the profit trend.
-    const as = $("#assetStats"), profit = c.unreal + c.realized + fixedNow().income, original = total - profit;
+    const as = $("#assetStats"), profit = c.unreal + c.realized + c.dividends + fixedNow().income, original = total - profit;
     as.hidden = !(total > 0);
     as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金") +
       stat("盈亏", signed(profit), tone(profit), original > 0 ? pct((profit / original) * 100) : "") : "";
@@ -1190,14 +1202,14 @@ TAL|好未来|TAL Education
     items.sort((a, b) => b.v - a.v);
     // One hue for all stocks, stepping lighter from the biggest, so neighbours never share a shade.
     items.forEach((it, i) => { it.op = items.length > 1 ? 1 - (0.74 * i) / (items.length - 1) : 1; });
-    const total = items.reduce((t, it) => t + it.v, 0), profit = c.unreal + c.realized, original = total - profit;
+    const total = items.reduce((t, it) => t + it.v, 0), profit = c.unreal + c.realized + c.dividends, original = total - profit;
     $("#stkTip").hidden = true;
     $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；点“刷新数据”取价格。" : [items.length ? "共 " + items.length + " 只" : "", c.fees ? "累计费用 " + money(c.fees) : ""].filter(Boolean).join(" · ");
     $("#stkTotal").textContent = total > 0 ? money(total) : "—";
     const st = $("#stkStats");
     st.hidden = !(total > 0 || sold.length);
-    st.innerHTML = st.hidden ? "" : stat("股票现值", money(total), "", "持有的股票按现价") + stat("原始投入", money(original), "", "买入花的钱减去卖出拿回的钱") +
-      stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized));
+    st.innerHTML = st.hidden ? "" : stat("股票现值", money(total), "", "持有的股票按现价") + stat("原始投入", money(original), "", "买入花的钱减去卖出拿回的钱和分红利息") +
+      stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized) + (Math.abs(c.dividends) >= 0.005 ? " · 分红利息 " + signed(c.dividends) : ""));
     STK.lay = drawDonut($("#stkChart"), items, total, "股票占比", (it) => it.name);
     STK.items = items;   // the holdings table beside the donut links its rows to these
   }
@@ -1263,7 +1275,10 @@ TAL|好未来|TAL Education
         const avg = s.cost / s.shares;
         const px = Number(state.prices[s.symbol]) || 0;
         const uCell = px > 0
-          ? '<span class="' + tone(s.unreal) + '">' + signed(s.unreal, s.ccy) + "<br><small>" + (s.cost > 0 ? pct(s.unreal / s.cost * 100) : "") + "</small></span>" + usdCap(s.unreal, s.ccy, true)
+          ? '<span class="' + tone(s.unreal) + '">' + signed(s.unreal, s.ccy) + "<br><small>" + (s.cost > 0 ? pct(s.unreal / s.cost * 100) : "") + "</small></span>" + usdCap(s.unreal, s.ccy, true) +
+            // what this stock has already earned and paid out is kept apart from the floating figure (which is against the average cost of the shares still held)
+            (Math.abs(s.realized) >= 0.005 || Math.abs(s.dividends) >= 0.005
+              ? '<br><small class="muted">' + [Math.abs(s.realized) >= 0.005 && "已实现 " + signed(s.realized, s.ccy), Math.abs(s.dividends) >= 0.005 && "分红利息 " + signed(s.dividends, s.ccy)].filter(Boolean).join(" · ") + "</small>" : "")
           : '<span class="muted">—</span>';
         const qt = state.quotes[s.symbol];
         const cap = !(px > 0) ? "等待收盘价" : qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘") +
@@ -1699,7 +1714,8 @@ TAL|好未来|TAL Education
       const ccy = tradeCcy(t), q = Number(t.shares) || 0, pr = Number(t.price) || 0, f = Number(t.fees) || 0, id = esc(t.id);
       const chip = '<span class="chip ' + esc(t.side) + '">' + sideName(t) + "</span>";
       let acts = "";
-      if (!ro) {
+      if (t.auto) acts = '<span class="muted">自动</span>';
+      else if (!ro) {
         acts = state.pendingDelete === t.id
           ? '<button class="mini danger" type="button" data-act="confirm" data-id="' + id + '">确认删除</button><button class="mini" type="button" data-act="cancel">取消</button>'
           : '<button class="mini" type="button" data-act="del" data-id="' + id + '">删除</button>';
