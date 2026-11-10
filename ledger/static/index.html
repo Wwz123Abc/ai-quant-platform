@@ -133,8 +133,12 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .logbar .seg label { padding: 5px 14px; font-size: 13px; }
 .logsym { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .logsym select { padding: 5px 8px; font-size: 13px; }
-#log tr.mon td { background: var(--bg); color: var(--muted); font-size: 12px; padding: 6px 12px; white-space: normal; }
+#log tr.mon td { background: var(--bg); color: var(--muted); font-size: 12px; padding: 0; white-space: normal; }
 #log tr.mon b { color: var(--ink); font-weight: 600; margin-right: 8px; }
+#log tr.mon button { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 6px 12px; cursor: pointer; }
+#log tr.mon button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#log tr.mon button::before { content: "▾"; display: inline-block; width: 1.2em; color: var(--muted); transition: transform .15s; }
+#log tr.mon.shut button::before { transform: rotate(-90deg); }
 #log .meta { display: none; }
 #fixed { min-width: 940px; }
 .mixbox { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px 24px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
@@ -1729,6 +1733,8 @@ TAL|好未来|TAL Education
 
   // ---------- trade log ----------
   const logView = { side: "all", sym: "" };
+  const logShut = new Set();   // months folded shut; the first time the log is drawn every month but the latest is folded
+  let logSeeded = false;
   const sideName = (t) => ({ buy: "买入", sell: "卖出", dividend: "分红" })[t.side] || (LedgerCalc.ratio(t) < 1 ? "合股" : "拆股");
   // One record in words, e.g. "买入 QQQM 2 股 @ $280.000", "分红 VOO $8.00（扣税 $0.80）", "拆股 NVDA 1 → 10".
   function recordText(t) {
@@ -1756,15 +1762,17 @@ TAL|好未来|TAL Education
       tb.innerHTML = '<tr><td colspan="9" class="empty">' + (!state.ready ? "正在读取交易记录…" : list.length ? "没有符合筛选条件的记录。" : "还没有交易记录。点页面顶部的“＋ 记一笔”录入第一笔。") + "</td></tr>";
       return;
     }
+    if (!logSeeded && state.ready) { logSeeded = true; list.forEach((t) => { if (t.date.slice(0, 7) !== list[list.length - 1].date.slice(0, 7)) logShut.add(t.date.slice(0, 7)); }); }
     let html = "", month = "";
     for (const t of rows) {
       const m = t.date.slice(0, 7);
       if (m !== month) {
         month = m;
-        const inM = rows.filter((x) => x.date.slice(0, 7) === m), b = sumOf(inM, "buy"), s = sumOf(inM, "sell"), dv = divOf(inM);
-        html += '<tr class="mon"><td colspan="9"><b>' + m.slice(0, 4) + " 年 " + Number(m.slice(5)) + " 月</b>" + inM.length + " 笔" +
-          (b ? " · 买入 " + money(b) : "") + (s ? " · 卖出 " + money(s) : "") + (dv ? " · 分红 " + money(dv) : "") + "</td></tr>";
+        const inM = rows.filter((x) => x.date.slice(0, 7) === m), b = sumOf(inM, "buy"), s = sumOf(inM, "sell"), dv = divOf(inM), shut = logShut.has(m);
+        html += '<tr class="mon' + (shut ? " shut" : "") + '"><td colspan="9"><button type="button" data-month="' + m + '" aria-expanded="' + !shut + '"><b>' + m.slice(0, 4) + " 年 " + Number(m.slice(5)) + " 月</b>" + inM.length + " 笔" +
+          (b ? " · 买入 " + money(b) : "") + (s ? " · 卖出 " + money(s) : "") + (dv ? " · 分红 " + money(dv) : "") + "</button></td></tr>";
       }
+      if (logShut.has(m)) continue;
       const ccy = tradeCcy(t), q = Number(t.shares) || 0, pr = Number(t.price) || 0, f = Number(t.fees) || 0, id = esc(t.id);
       const chip = '<span class="chip ' + esc(t.side) + '">' + sideName(t) + "</span>";
       let acts = "";
@@ -1797,6 +1805,15 @@ TAL|好未来|TAL Education
   }
   document.querySelectorAll('input[name="lside"]').forEach((r) => r.addEventListener("change", () => { logView.side = r.value; renderLog(sortedTrades()); }));
   $("#logSym").addEventListener("change", (e) => { logView.sym = e.target.value; renderLog(sortedTrades()); });
+  $("#log").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-month]");
+    if (!b) return;
+    const m = b.dataset.month;
+    if (logShut.has(m)) logShut.delete(m); else logShut.add(m);
+    renderLog(sortedTrades());
+    const again = document.querySelector('#log button[data-month="' + m + '"]');
+    if (again) again.focus();
+  });
 
   let mySyms = [];
   function renderSymList(c) { mySyms = c.syms.map((s) => s.symbol); }
