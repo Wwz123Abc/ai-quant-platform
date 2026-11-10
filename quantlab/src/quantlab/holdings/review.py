@@ -36,16 +36,17 @@ def now_iso():
 
 
 def valuation(snapshot, prices, day=None):
-    """Positions at the latest prices, with weights of the investable money (stocks + cash). Treasuries and deposits
+    """Positions at the latest prices, with weights of the investable money (every stock, SGOV included). "cash" is the value of
+    the SGOV position: the ledger keeps no cash, SGOV plays it. Treasuries and deposits
     are valued as the ledger values them on day (default today in New York)."""
     pos = ledger.positions(snapshot)
-    cash = ledger.cash_usd(snapshot)
     for p in pos:
         px = prices.get(p["symbol"])
         p["price"] = px
         p["value"] = ledger.usd(p["shares"] * px, p["currency"]) if px else None
         p["gain"] = (px / p["avg_cost"] - 1) if px and p["avg_cost"] else None
-    stocks = sum(p["value"] or 0 for p in pos)
+    cash = sum(p["value"] or 0 for p in pos if p["symbol"] == policy.RESERVE)
+    stocks = sum(p["value"] or 0 for p in pos if p["symbol"] != policy.RESERVE)
     investable = stocks + cash
     for p in pos:
         p["weight"] = (p["value"] / investable) if p["value"] and investable > 0 else None
@@ -121,7 +122,7 @@ def proposals(val, pol, prices, info=None, tp_done=None):
     scale = 1.0
     if need > 0 and available < need:
         scale = max(0.0, available / need)
-        notes.append("现金（扣除 %.0f%% 储备后）不够，买入按 %.0f%% 比例缩减" % (pol["cash_reserve"] * 100, scale * 100))
+        notes.append("SGOV（扣除 %.0f%% 储备后）不够，买入按 %.0f%% 比例缩减" % (pol["cash_reserve"] * 100, scale * 100))
     out = []
     for sym, (delta, why, cur, desired) in sorted(sells.items()) + sorted(buys.items()):
         px = prices.get(sym)
@@ -144,11 +145,11 @@ def proposals(val, pol, prices, info=None, tp_done=None):
             notes.append("%s 需要调整约 $%.0f，不到最小下单金额 $%.0f，暂不建议" % (sym, shares * px, pol["min_trade_usd"]))
             continue
         synced = "（%s 同步）" % info["synced"] if info and info.get("synced") else ""
-        cut = "，现金不足，按 %.0f%% 缩减" % (scale * 100) if delta > 0 and scale < 1 else ""
+        cut = "，SGOV 不够，按 %.0f%% 缩减" % (scale * 100) if delta > 0 and scale < 1 else ""
         rule = ("规则：止盈（涨到平均成本的 %.0f%% 以上分两档卖出，每档每次买入只提议一次）。" % (pol["tp_gain_1"] * 100)
-                if why.startswith("止盈") else "规则：你设定的持仓规则（目标占比和偏离带、单只上限、现金储备）。")
+                if why.startswith("止盈") else "规则：你设定的持仓规则（目标占比和偏离带、单只上限、SGOV 储备）。")
         basis = (rule + "数据：%s；持仓来自账本%s；"
-                 "可投资资金 $%.2f（股票 $%.2f + 现金 $%.2f），%s 现值 $%.2f。计算：应持有 $%.2f，差 $%.2f%s，"
+                 "可投资资金 $%.2f（股票 $%.2f + SGOV $%.2f），%s 现值 $%.2f。计算：应持有 $%.2f，差 $%.2f%s，"
                  "按 $%.2f 折合 %s 股%s。"
                  % (price_basis(sym, px, info), synced, inv, val["stocks"], val["cash"], sym, cur, desired,
                     abs(delta), cut, px, "%.4g" % shares, "（整股）" if pol["whole_shares"] else ""))
@@ -165,18 +166,20 @@ def reminders(val, pol, load=None, with_fundamentals=True, info=None):
     add = lambda sym, level, kind, text, basis="": out.append(
         {"symbol": sym, "level": level, "kind": kind, "text": text, "basis": basis})
     if val["cash_weight"] is not None and val["cash_weight"] < pol["cash_reserve"] - 1e-9:
-        add("现金", "warn", "规则", "现金只占 %.1f%%，低于储备 %.0f%%" % (val["cash_weight"] * 100, pol["cash_reserve"] * 100),
-            "规则：现金占可投资资金不低于 %.0f%%。数据：现金 $%.2f ÷ 可投资资金 $%.2f（账本%s）。"
+        add(policy.RESERVE, "warn", "规则", "SGOV 只占 %.1f%%，低于储备 %.0f%%" % (val["cash_weight"] * 100, pol["cash_reserve"] * 100),
+            "规则：SGOV（当作现金）占可投资资金不低于 %.0f%%。数据：SGOV $%.2f ÷ 可投资资金 $%.2f（账本%s）。"
             % (pol["cash_reserve"] * 100, val["cash"], val["investable"], synced))
     for f in val.get("fixed_items", []):
         if f["matured"] and f["days_left"] >= -MATURED_DAYS:
-            add(f["name"], "info", "到期", "%s 已到期，本息回到储蓄账户，不再算在国债定存里；在账本里更新现金后，可投资资金才会算上这笔钱" % f["maturity"],
+            add(f["name"], "info", "到期", "%s 已到期，不再算在国债定存里；把这笔钱买成 SGOV 记进账本，可投资资金才会算上它" % f["maturity"],
                 "数据：账本里这笔的到期日 %s；到期后 %d 天内提醒。" % (f["maturity"], MATURED_DAYS))
         elif f["started"] and not f["matured"] and f["days_left"] <= DUE_DAYS:
             add(f["name"], "info", "到期", "%s 到期（还有 %d 天）" % (f["maturity"], f["days_left"]),
                 "数据：账本里这笔的到期日 %s；到期前 %d 天内提醒。" % (f["maturity"], DUE_DAYS))
     for p in val["positions"]:
         sym = p["symbol"]
+        if sym == policy.RESERVE:  # SGOV is the cash: no trend, rating or loss reminders for it
+            continue
         if p["gain"] is not None and p["gain"] <= -pol["alert_drawdown_from_cost"]:
             add(sym, "warn", "亏损", "比平均成本 %.2f 低 %.0f%%" % (p["avg_cost"], -p["gain"] * 100),
                 "规则：比平均成本低 %.0f%% 提醒。数据：平均成本 $%.2f（账本移动平均法），%s。"

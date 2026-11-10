@@ -98,7 +98,7 @@ def holding_line(mine):
     if not mine:
         return "**你的持仓**：这份报告**不知道**你有没有这只股票、买了多少（没读到账本），评级和仓位说法只能当通用参考。"
     cap = "宽基 ETF，不设单只上限" if mine["uncapped"] else "单只上限 %.0f%%" % (mine["cap"] * 100)
-    room = "按你的规则，现在最多还能买入约 $%.0f（%s；现金扣掉 %.0f%% 储备后可用 $%.0f）。" % (
+    room = "按你的规则，现在最多还能买入约 $%.0f（%s；SGOV 扣掉 %.0f%% 储备后可用 $%.0f）。" % (
         mine["max_buy"], cap, mine["reserve"] * 100, mine["room_cash"])
     warn = "（注意：%s 没取到价格，没算进总额，下面的占比会偏高）" % "、".join(mine["unpriced"]) if mine.get("unpriced") else ""
     room += warn

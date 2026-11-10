@@ -1,7 +1,7 @@
 """Your real holdings, read from the stock ledger (wwz.hk.cn) with its read-only key.
 
 The key (LEDGER_TOKEN) is read from the environment or .env, like the other provider keys; it can only read
-trades, Treasuries and deposits, and cash. Each sync is saved, so analysis also works when the ledger cannot
+trades and Treasuries and deposits (the ledger keeps no cash any more). Each sync is saved, so analysis also works when the ledger cannot
 be reached."""
 import calendar
 import datetime as dt
@@ -63,13 +63,13 @@ def sync():
 
 
 def fingerprint(snapshot):
-    """A digest of what the holdings are made of (trades, cash, Treasuries and deposits), not of when they were read."""
-    body = {k: snapshot.get(k, []) for k in ("trades", "cash", "fixed")}
+    """A digest of what the holdings are made of (trades, Treasuries and deposits), not of when they were read."""
+    body = {k: snapshot.get(k, []) for k in ("trades", "fixed")}
     return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()[:16]
 
 
 def changed():
-    """Reads the ledger and, when its trades, cash or Treasuries and deposits differ from the saved copy (or there is none),
+    """Reads the ledger and, when its trades or Treasuries and deposits differ from the saved copy (or there is none),
     saves the new copy as a sync. Returns whether it did."""
     data = fetch()
     p = snapshot_path()
@@ -116,10 +116,6 @@ def positions(snapshot):
 
 def usd(amount, currency):
     return amount if currency == "USD" else amount / get_settings().hkd_per_usd
-
-
-def cash_usd(snapshot):
-    return sum(usd(float(c.get("amount") or 0), c.get("currency") or "USD") for c in snapshot.get("cash", []))
 
 
 # ---- Treasuries and deposits, valued by the ledger's rules (ledger/static/calc.js; both are checked against

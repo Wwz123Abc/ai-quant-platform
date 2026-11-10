@@ -14,12 +14,23 @@ SNAP = {
         {"date": "2026-09-20", "side": "buy", "symbol": "AAA", "shares": 10, "price": 120, "fees": 0, "currency": "USD"},
         {"date": "2026-10-01", "side": "sell", "symbol": "AAA", "shares": 5, "price": 130, "fees": 0, "currency": "USD"},
         {"date": "2026-09-15", "side": "buy", "symbol": "BBB", "shares": 4, "price": 50, "fees": 0, "currency": "USD"},
+        {"date": "2026-09-01", "side": "buy", "symbol": "SGOV", "shares": 10, "price": 100, "fees": 0, "currency": "USD"},   # the cash: 1000
     ],
-    "cash": [{"name": "储蓄", "currency": "USD", "amount": 1000}],
     "fixed": [{"kind": "deposit", "principal": 2000, "interest": 40, "start": "2026-07-01", "maturity": "2027-07-01", "currency": "USD"},
               {"kind": "bond", "face": 1000, "price": 98, "coupon": 4, "freq": 2, "settle": "2026-01-01", "maturity": "2027-01-01",
                "accruedPaid": 0, "currency": "USD"}],
 }
+def with_cash(snap, amount):
+    """The ledger keeps no cash: the owner's cash is SGOV (100 a share). A copy of snap holding exactly `amount` of it."""
+    trades = [t for t in snap["trades"] if t["symbol"] != "SGOV"]
+    if amount:
+        trades.append({"date": "2026-09-01", "side": "buy", "symbol": "SGOV", "shares": amount / 100, "price": 100, "currency": "USD"})
+    return {**{k: v for k, v in snap.items() if k != "cash"}, "trades": trades}
+
+
+SG = {"SGOV": 100.0}
+
+
 DAY = "2026-07-01"   # the deposit starts; the bond is on a coupon date, its clean price halfway to par
 FIXED = 2000 + 980 + 20 * 181 / 365
 
@@ -32,7 +43,8 @@ def bars(level, n=300, seed=0, end="2026-10-16"):
     return pd.DataFrame({"open": c, "high": c, "low": c, "close": c, "volume": 1.0}, index=idx)
 
 
-MARKET = {"AAA": bars(150, seed=1), "BBB": bars(25, seed=2), "CCC": bars(40, seed=3), "QQQ": bars(400, seed=4), "DDD": bars(700, seed=5)}
+MARKET = {"AAA": bars(150, seed=1), "BBB": bars(25, seed=2), "CCC": bars(40, seed=3), "QQQ": bars(400, seed=4), "DDD": bars(700, seed=5),
+          "SGOV": bars(100, seed=6)}
 load = lambda s, refresh=False: MARKET[s]
 
 
@@ -41,11 +53,11 @@ def test_positions_average_cost():
     a = pos["AAA"]
     assert a["shares"] == 15 and a["avg_cost"] == pytest.approx((1000 + 1 + 1200) / 20)  # selling keeps the average cost
     assert pos["BBB"]["shares"] == 4
-    assert ledger.cash_usd(SNAP) == 1000 and ledger.fixed_usd(SNAP, DAY) == pytest.approx(FIXED)
+    assert pos["SGOV"]["shares"] == 10 and ledger.fixed_usd(SNAP, DAY) == pytest.approx(FIXED)
 
 
 def test_valuation():
-    v = review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0}, DAY)
+    v = review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0, **SG}, DAY)
     assert v["stocks"] == 15 * 150 + 4 * 25 and v["investable"] == 2350 + 1000
     w = {p["symbol"]: p["weight"] for p in v["positions"]}
     assert w["AAA"] == pytest.approx(2250 / 3350) and v["total"] == pytest.approx(3350 + FIXED)
@@ -62,7 +74,7 @@ def test_policy_validation():
 
 
 def test_cap_trims_and_target_buys_within_the_cash_reserve():
-    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
+    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0, **SG}
     v = review.valuation(SNAP, prices)                       # investable 3350; AAA is 67%
     pol = policy.validate({"targets": {"CCC": 0.2}, "cash_reserve": 0.1, "min_trade_usd": 10})
     props, notes = review.proposals(v, pol, prices)
@@ -75,33 +87,32 @@ def test_cap_trims_and_target_buys_within_the_cash_reserve():
 
 def test_selling_rounds_to_the_nearest_whole_share():
     pol = policy.validate({"uncapped": [], "min_trade_usd": 10})
-    snap = {**SNAP, "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 3, "price": 700, "currency": "USD"}],
-            "cash": [{"currency": "USD", "amount": 6280}]}
-    prices = {"AAA": 702.0}
+    snap = with_cash({**SNAP, "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 3, "price": 700, "currency": "USD"}]}, 6280)
+    prices = {"AAA": 702.0, **SG}
     v = review.valuation(snap, prices)                       # investable 8386; AAA 2106 = 25.1%, $9.5 over the 25% cap
     props, notes = review.proposals(v, pol, prices)
     assert props == [] and any("不到半股" in n for n in notes)
-    prices = {"AAA": 850.0}
+    prices = {"AAA": 850.0, **SG}
     v = review.valuation(snap, prices)                       # investable 8830; AAA 2550 = 28.9%, $342 over: 0.40 share
     assert review.proposals(v, pol, prices)[0] == []
-    prices = {"AAA": 1000.0}
+    prices = {"AAA": 1000.0, **SG}
     v = review.valuation(snap, prices)                       # investable 9280; AAA 3000 = 32.3%, $680 over: 0.68 share
     props, _ = review.proposals(v, pol, prices)
     assert [(p["symbol"], p["side"], p["shares"]) for p in props] == [("AAA", "sell", 1)]
 
 
 def test_broad_etfs_are_not_capped():
-    prices = {"AAA": 150.0, "BBB": 25.0}
+    prices = {"AAA": 150.0, "BBB": 25.0, **SG}
     v = review.valuation(SNAP, prices)                       # AAA is 67%
     pol = policy.validate({"uncapped": ["aaa"]})
-    assert pol["uncapped"] == ["AAA"] and review.proposals(v, pol, prices)[0] == []
+    assert pol["uncapped"] == ["AAA", "SGOV"] and review.proposals(v, pol, prices)[0] == []
     assert policy.validate({"targets": {"AAA": 0.6}, "uncapped": ["AAA"], "cash_reserve": 0.1})["targets"] == {"AAA": 0.6}
     assert "QQQM" in policy.load()["uncapped"] and "VOO" in policy.load()["uncapped"]   # the defaults
 
 
 def test_buys_scaled_to_cash_after_reserve():
-    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
-    snap = {**SNAP, "cash": [{"currency": "USD", "amount": 500}]}
+    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0, **SG}
+    snap = with_cash(SNAP, 500)
     v = review.valuation(snap, prices)                       # investable 2850; reserve 285; available 215
     pol = policy.validate({"targets": {"CCC": 0.25}, "uncapped": ["AAA"], "cash_reserve": 0.1, "min_trade_usd": 10})
     props, notes = review.proposals(v, pol, prices)
@@ -111,8 +122,8 @@ def test_buys_scaled_to_cash_after_reserve():
 
 
 def test_every_order_and_reminder_says_what_it_rests_on(monkeypatch):
-    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0}
-    snap = {**SNAP, "cash": [{"currency": "USD", "amount": 500}]}
+    prices = {"AAA": 150.0, "BBB": 25.0, "CCC": 40.0, **SG}
+    snap = with_cash(SNAP, 500)
     v = review.valuation(snap, prices)
     pol = policy.validate({"targets": {"CCC": 0.25}, "uncapped": ["AAA"], "cash_reserve": 0.1, "min_trade_usd": 10})
     info = {"dates": {"CCC": "2026-11-03"}, "source": "腾讯日线", "synced": "2026-11-04T03:00:00+00:00",
@@ -123,14 +134,14 @@ def test_every_order_and_reminder_says_what_it_rests_on(monkeypatch):
                  "可投资资金 $2850.00", "应持有 $712.50", "缩减", "折合 5 股"):
         assert part in basis, part
     monkeypatch.setattr(signals, "ai_rating", lambda s: {"id": 3, "rating": "Sell", "trade_date": "2026-10-16"} if s == "BBB" else None)
-    v = review.valuation({**SNAP, "cash": []}, {"AAA": 150.0, "BBB": 25.0})
+    v = review.valuation(with_cash(SNAP, 0), {"AAA": 150.0, "BBB": 25.0})
     rem = review.reminders(v, policy.validate({"cash_reserve": 0.1}), load, with_fundamentals=False, info=info)
     assert rem and all(x["basis"] for x in rem if x["kind"] in ("规则", "亏损", "AI", "回撤", "趋势"))
     assert "#3" in next(x["basis"] for x in rem if x["kind"] == "AI")
 
 
 def test_no_order_inside_the_band_or_below_minimum():
-    prices = {"AAA": 150.0, "BBB": 25.0}
+    prices = {"AAA": 150.0, "BBB": 25.0, **SG}
     v = review.valuation(SNAP, prices)
     w = v["positions"][0]["weight"]
     pol = policy.validate({"targets": {"AAA": min(1.0, round(w, 2))}, "uncapped": ["AAA", "BBB"], "cash_reserve": 0.0, "band": 0.05})
@@ -142,11 +153,11 @@ def test_no_order_inside_the_band_or_below_minimum():
 
 def test_reminders(monkeypatch):
     monkeypatch.setattr(signals, "ai_rating", lambda s: {"id": 3, "rating": "Sell", "trade_date": "2026-10-16"} if s == "BBB" else None)
-    v = review.valuation({**SNAP, "cash": []}, {"AAA": 150.0, "BBB": 25.0})
+    v = review.valuation(with_cash(SNAP, 0), {"AAA": 150.0, "BBB": 25.0})
     pol = policy.validate({"cash_reserve": 0.1})
     r = review.reminders(v, pol, load, with_fundamentals=False)
     kinds = {(x["symbol"], x["kind"]) for x in r}
-    assert ("现金", "规则") in kinds          # no cash at all
+    assert ("SGOV", "规则") in kinds          # no SGOV (cash) at all
     assert ("BBB", "亏损") in kinds           # 25 vs average cost 50
     assert ("BBB", "AI") in kinds and all(x["level"] == "warn" for x in r if x["kind"] == "AI")
 
@@ -250,9 +261,9 @@ def test_fixed_income_by_the_ledgers_rules():
 
 def test_maturity_reminders():
     pol = policy.validate({})
-    due = review.reminders(review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0}, "2026-12-25"), pol, load, with_fundamentals=False)
+    due = review.reminders(review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0, **SG}, "2026-12-25"), pol, load, with_fundamentals=False)
     assert any(r["kind"] == "到期" and "还有 7 天" in r["text"] for r in due)
-    gone = review.reminders(review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0}, "2027-01-05"), pol, load, with_fundamentals=False)
+    gone = review.reminders(review.valuation(SNAP, {"AAA": 150.0, "BBB": 25.0, **SG}, "2027-01-05"), pol, load, with_fundamentals=False)
     assert any(r["kind"] == "到期" and "已到期" in r["text"] for r in gone)
 
 
@@ -268,7 +279,7 @@ def test_price_checks_become_reminders(monkeypatch):
     monkeypatch.setenv("QUANTLAB_PRICE_SOURCE", "cn")
     get_settings.cache_clear()
     r = review.run(refresh=False, load=load, with_fundamentals=False)
-    assert [c["symbol"] for c in r["price_check"]] == ["AAA", "BBB"]
+    assert [c["symbol"] for c in r["price_check"]] == ["AAA", "BBB", "SGOV"]
     assert [(m["symbol"], m["level"]) for m in r["reminders"] if m["kind"] == "核对"] == [("BBB", "warn")]
     a = analysis.analyze("CCC", load=load, with_fundamentals=False)
     assert {"kind": "核对", "text": "CCC 核对结果"} in a["notes"]
@@ -276,13 +287,14 @@ def test_price_checks_become_reminders(monkeypatch):
 
 # ---- take profit: two steps, once per purchase, never for the broad ETFs
 TP_SNAP = {"account": "me", "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 10, "price": 100, "currency": "USD"}],
-           "cash": [{"currency": "USD", "amount": 9000}], "fixed": []}
+           "fixed": []}
+TP_SNAP = with_cash(TP_SNAP, 9000)
 
 
 def tp_props(price, done=None, **rules):
     pol = policy.validate({"min_trade_usd": 10, **rules})
-    v = review.valuation(TP_SNAP, {"AAA": price})
-    return review.proposals(v, pol, {"AAA": price}, None, done)[0]
+    v = review.valuation(TP_SNAP, {"AAA": price, **SG})
+    return review.proposals(v, pol, {"AAA": price, **SG}, None, done)[0]
 
 
 def test_the_position_cap_is_fixed_at_25_percent():
@@ -334,3 +346,28 @@ def test_steps_taken_are_remembered_until_the_stock_is_bought_again():
     assert review.take_profit_done(TP_SNAP, pol) == {"AAA": {1}}                # only the approved one counts
     later = {**TP_SNAP, "trades": TP_SNAP["trades"] + [{"date": "2026-10-20", "side": "buy", "symbol": "AAA", "shares": 5, "price": 150}]}
     assert review.take_profit_done(later, pol) == {}                            # bought again after: the steps start over
+
+
+# ---- the ledger keeps no cash: SGOV is the cash
+def test_cash_is_the_sgov_position_and_cash_records_are_ignored():
+    snap = {**with_cash(SNAP, 2000), "cash": [{"currency": "USD", "amount": 99999}]}    # an old cash record is not read
+    v = review.valuation(snap, {"AAA": 150.0, "BBB": 25.0, **SG})
+    assert v["cash"] == 2000 and v["stocks"] == 15 * 150 + 4 * 25                       # stocks leave SGOV out
+    assert v["investable"] == pytest.approx(2350 + 2000) and v["cash_weight"] == pytest.approx(2000 / 4350)
+    assert [p["symbol"] for p in v["positions"]].count("SGOV") == 1                       # and SGOV is still a listed holding
+
+
+def test_sgov_is_never_capped_trimmed_or_taken_profit_on_and_is_always_in_the_uncapped_list():
+    assert "SGOV" in policy.load()["uncapped"] and "SGOV" in policy.validate({"uncapped": ["VOO"]})["uncapped"]
+    snap = with_cash({**SNAP, "trades": [{"date": "2026-09-10", "side": "buy", "symbol": "AAA", "shares": 1, "price": 100, "currency": "USD"}]}, 9000)
+    prices = {"AAA": 100.0, "SGOV": 300.0}                                               # SGOV is 99% of the money and up 200%
+    v = review.valuation(snap, prices)
+    assert review.proposals(v, policy.validate({"min_trade_usd": 1}), prices)[0] == []
+    rem = review.reminders(v, policy.validate({}), load, with_fundamentals=False)
+    assert not [r for r in rem if r["symbol"] == "SGOV"]                                  # no trend, rating or loss reminders for it
+
+
+def test_a_thin_sgov_reserve_is_flagged_by_the_cash_rule():
+    v = review.valuation(with_cash(SNAP, 100), {"AAA": 150.0, "BBB": 25.0, **SG})        # 100 of ~2450
+    rem = review.reminders(v, policy.validate({"cash_reserve": 0.1}), load, with_fundamentals=False)
+    assert any(r["symbol"] == "SGOV" and r["kind"] == "规则" and "SGOV 只占" in r["text"] for r in rem)

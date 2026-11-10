@@ -1,7 +1,7 @@
 """Analysis of a stock you are considering: price trend and risk, point-in-time fundamentals, the latest AI
 rating, how it moves with what you already hold, and what your rules allow you to buy.
 
-The verdict comes only from your rules (cap per stock, cash reserve): whether a purchase fits and at most how
+The verdict comes only from your rules (cap per stock, SGOV reserve): whether a purchase fits and at most how
 much. Trend, fundamentals, AI rating and the model's ranking are information for you to weigh; none of them
 is turned into a recommendation to buy or sell."""
 import json
@@ -72,6 +72,7 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True, check=True):
     portfolio, checks = None, []
     if snap:
         held_syms = [p["symbol"] for p in ledger.positions(snap)]
+        held_for_corr = [s for s in held_syms if s != policy.RESERVE]  # SGOV is the cash: not a stock to compare with
         prices = review.prices_for(set(held_syms) | {sym}, load)
         val = review.valuation(snap, prices)
         inv = val["investable"]
@@ -80,7 +81,7 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True, check=True):
         room_cap = max(0.0, cap * inv - current)
         room_cash = max(0.0, val["cash"] - pol["cash_reserve"] * inv)
         max_buy = min(room_cap, room_cash)
-        corr = correlations(sym, held_syms, load)
+        corr = correlations(sym, held_for_corr, load)
         weights = {p["symbol"]: p["weight"] for p in val["positions"] if p["weight"]}
         weight_sum = sum(weights.get(s, 0) for s in corr)
         avg_corr = sum(corr[s] * weights.get(s, 0) for s in corr) / weight_sum if weight_sum > 0 else None  # weighted by holding size
@@ -97,14 +98,14 @@ def analyze(sym, amount=None, load=None, with_fundamentals=True, check=True):
             checks.append({"rule": "单只上限", "ok": after is not None and after <= cap + 1e-9,
                            "text": "买入后占可投资资金 %.1f%%（%s）" % ((after or 0) * 100, "宽基 ETF，不设上限" if uncapped
                                                                     else "上限 %.0f%%" % (pol["max_position"] * 100))})
-            checks.append({"rule": "现金储备", "ok": amt <= room_cash + 1e-6,
-                           "text": "要用 $%.0f，可用现金（扣除 %.0f%% 储备后）$%.0f" % (amt, pol["cash_reserve"] * 100, room_cash)})
+            checks.append({"rule": "SGOV 储备", "ok": amt <= room_cash + 1e-6,
+                           "text": "要用 $%.0f，SGOV 里可用的（扣除 %.0f%% 储备后）$%.0f" % (amt, pol["cash_reserve"] * 100, room_cash)})
         else:
             checks.append({"rule": "单只上限", "ok": uncapped or room_cap > 0,
                            "text": "宽基 ETF，不设上限" if uncapped else "现在占 %.1f%%，上限 %.0f%%，还能买 $%.0f" % (
                                current / inv * 100 if inv > 0 else 0, pol["max_position"] * 100, room_cap)})
-            checks.append({"rule": "现金储备", "ok": room_cash > 0,
-                           "text": "可用现金（扣除 %.0f%% 储备后）$%.0f" % (pol["cash_reserve"] * 100, room_cash)})
+            checks.append({"rule": "SGOV 储备", "ok": room_cash > 0,
+                           "text": "SGOV 里可用的（扣除 %.0f%% 储备后）$%.0f" % (pol["cash_reserve"] * 100, room_cash)})
         if whole and shares is not None and shares < 1 and all(c["ok"] for c in checks):
             checks.append({"rule": "整股", "ok": False, "text": "$%.0f 按收盘价 %.2f 买不到 1 股" % (float(amount) if given else max_buy, px)})
         portfolio = {"investable": inv, "cash": val["cash"], "held_value": current, "current_weight": current / inv if inv > 0 else None,

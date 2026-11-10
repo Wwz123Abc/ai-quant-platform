@@ -15,7 +15,7 @@ def test_the_fingerprint_follows_the_records_not_the_time_they_were_read():
     a = ledger.fingerprint(SNAP)
     assert a == ledger.fingerprint({**SNAP, "generated": "2030-01-01T00:00:00Z", "synced": "x", "account": "other"})
     assert a != ledger.fingerprint({**SNAP, "trades": [TRADE, {**TRADE, "symbol": "KO"}]})
-    assert a != ledger.fingerprint({**SNAP, "cash": [{"currency": "USD", "amount": 5}]})
+    assert a == ledger.fingerprint({**SNAP, "cash": [{"currency": "USD", "amount": 5}]})   # the ledger keeps no cash any more: it does not count
 
 
 def test_changed_saves_a_new_copy_only_when_the_ledger_differs(monkeypatch):

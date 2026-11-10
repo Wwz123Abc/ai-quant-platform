@@ -30,7 +30,7 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
     }
   }
   if (v.cash_weight != null && v.cash_weight < pol.cash_reserve - 1e-9) {
-    out.push({ level: "error", group: "现金", title: `现金只占 ${pctPlain(v.cash_weight)}，低于储备 ${pctPlain(pol.cash_reserve, 0)}`, detail: `至少要有 ${money(pol.cash_reserve * v.investable)}，现在 ${money(v.cash)}。买入会被暂停，直到现金回到储备以上。` });
+    out.push({ level: "error", group: "SGOV", title: `SGOV（现金）只占 ${pctPlain(v.cash_weight)}，低于储备 ${pctPlain(pol.cash_reserve, 0)}`, detail: `至少要有 ${money(pol.cash_reserve * v.investable)}，现在 ${money(v.cash)}。买入会被暂停，直到 SGOV 回到储备以上。` });
   }
   for (const [sym, t] of Object.entries(targets)) {
     const w = v.positions.find((p) => p.symbol === sym)?.weight ?? 0;
@@ -43,7 +43,7 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
   }
   const tsum = Object.values(targets).reduce((a, b) => a + b, 0);
   if (tsum + pol.cash_reserve > 1 + 1e-9) {
-    out.push({ level: "error", group: "规则冲突", title: `目标合计 ${pctPlain(tsum, 0)} 加现金储备 ${pctPlain(pol.cash_reserve, 0)} 超过 100%`, detail: "目标不可能同时满足：减少目标或降低现金储备。" });
+    out.push({ level: "error", group: "规则冲突", title: `目标合计 ${pctPlain(tsum, 0)} 加 SGOV 储备 ${pctPlain(pol.cash_reserve, 0)} 超过 100%`, detail: "目标不可能同时满足：减少目标或降低 SGOV 储备。" });
   }
   for (const o of r.proposals.filter((x) => x.status === "pending" && x.reason.startsWith("止盈"))) {
     out.push({ level: "warn", group: "止盈", title: `${o.symbol} 到了止盈档：${o.reason.split("：")[0]}`, detail: `${o.reason.split("：").slice(1).join("：")}。建议卖出 ${o.shares} 股（约 ${money(o.value)}），到“我的持仓”确认。`, basis: o.basis });
@@ -64,7 +64,7 @@ export function anomalies(r: HoldingsReview): Anomaly[] {
     else if (m.kind === "基本面" && m.level === "warn") out.push({ level: "info", group: "信号", title: `${m.symbol} ${m.text}`, detail: "财报信号偏弱，只是提醒。", basis: m.basis });
   }
   for (const n of r.notes) {
-    out.push({ level: "warn", group: "规则和数据冲突", title: n, detail: "规则要求调整，但价格、现金或下单限制让它没法照做。" });
+    out.push({ level: "warn", group: "规则和数据冲突", title: n, detail: "规则要求调整，但价格、SGOV 或下单限制让它没法照做。" });
   }
   return out;
 }
@@ -174,7 +174,7 @@ export function PolicyForm({ initial, investable }: { initial: HoldingsPolicy; i
   return (
     <div className="card">
       <h2>规则设置</h2>
-      <p className="hint">占比都按“可投资资金”（股票 + 现金；国债和定存持有到期，不参与）算。保存后点“我的持仓”的“同步账本并检查”，上面的异常就按新规则重算。</p>
+      <p className="hint">占比都按“可投资资金”（所有股票，含 SGOV；国债和定存持有到期，不参与）算。账本不记现金，SGOV 就是你的现金。保存后点“我的持仓”的“同步账本并检查”，上面的异常就按新规则重算。</p>
       <h3 className="rule-group">固定规则（不能改）</h3>
       <div className="rule">
         <div className="rule-in"><div className="rule-name">单只上限<small>position cap</small></div><b className="fixed">{pctPlain(MAX_POSITION, 0)}</b></div>
@@ -189,13 +189,13 @@ export function PolicyForm({ initial, investable }: { initial: HoldingsPolicy; i
         {row("第二档", "step 2", <div className="two">{input("tp_gain_2", "% 涨幅")}{input("tp_sell_2", "% 股数")}</div>,
           <>涨到成本的 +{n("tp_gain_2") || 0}% 时，再卖掉当时股数的 {n("tp_sell_2") || 0}%（必须比第一档高）。例：10 股、成本 $100，涨到 ${p1.toFixed(0)} 卖 {s1} 股，涨到 ${p2.toFixed(0)} 再卖 {s2} 股，剩 {10 - s1 - s2} 股继续持有。</>)}
         <p className="hint">为什么这样设计：不预测顶部，只在大幅盈利后分批落袋，和 25% 上限互补（上限管“太集中”，止盈管“赚了不落袋”）。我们测过的均线卖出规则没有一条胜过一直持有，所以没有用“跌破某条线就清仓”这类规则。分批止盈会在大涨的股票上少赚一些，换的是把一部分利润锁住；不想要就把开关关掉。</p>
-        <h3 className="rule-group">仓位和现金</h3>
+        <h3 className="rule-group">仓位和 SGOV 储备</h3>
         {row("目标仓位", "target weight", <input className="wide" value={form.targets ?? ""} onChange={set("targets")} placeholder="例如 QQQM:40, VOO:30" />,
           <>可不填。格式“代码:百分比”，逗号隔开；不填的股票只受上限约束。{Object.keys(parsed).length ? <> 现在合计 {(Object.values(parsed).reduce((a, b) => a + b, 0) * 100).toFixed(0)}%{Object.entries(parsed).map(([s, w]) => `，${s} ≈ ${inv > 0 ? money(w * inv) : "—"}`)}。</> : null}</>)}
         {row("再平衡区间", "rebalancing band", input("band", "个百分点"), <>只对设了目标的股票：偏离目标超过这个距离才买卖回目标，免得为小偏差反复下单。</>)}
         {row("不设上限的代码", "uncapped", <input className="wide" value={form.uncapped ?? ""} onChange={set("uncapped")} placeholder="例如 VOO, QQQM" />,
           <>宽基指数 ETF，不受 25% 上限限制，也不止盈（逗号隔开）。个股、行业或杠杆 ETF 不要放进来。</>)}
-        {row("现金储备", "cash reserve", input("cash_reserve", "%"), <>现金至少占这么多，买入不会把现金花到这条线以下。{inv > 0 ? <> 现在至少留 <b>{money(pct("cash_reserve") * inv)}</b>。</> : null}</>)}
+        {row("SGOV 储备", "cash reserve", input("cash_reserve", "%"), <>SGOV（你的现金）至少占这么多，买入不会把 SGOV 用到这条线以下；买入要先卖出相应的 SGOV。{inv > 0 ? <> 现在至少留 <b>{money(pct("cash_reserve") * inv)}</b>。</> : null}</>)}
         {row("最小下单金额", "minimum trade", input("min_trade_usd", "美元"), <>算出来的调整不到这个金额就不提议。</>)}
         {row("按整股", "whole shares", <select value={form.whole_shares} onChange={set("whole_shares")}><option value="1">是</option><option value="0">否（碎股）</option></select>,
           <>买入向下取整，卖出取最接近规则的整数股。</>)}

@@ -46,7 +46,7 @@ describe("异常与冲突", () => {
     r.policy = { ...POLICY, targets: { TSLA: 0.3, QQQM: 0.7 }, uncapped: ["QQQM"] };
     const titles = anomalies(r).map((a) => a.title);
     expect(titles).toContain("TSLA 的目标 30% 高于单只上限 25%");
-    expect(titles.some((t) => t.startsWith("目标合计 100% 加现金储备 10% 超过 100%"))).toBe(true);
+    expect(titles.some((t) => t.startsWith("目标合计 100% 加 SGOV 储备 10% 超过 100%"))).toBe(true);
   });
 
   it("shows a take-profit order, and data that disagrees or is missing", () => {

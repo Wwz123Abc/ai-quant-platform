@@ -1,6 +1,8 @@
 """Your portfolio rules. Only these rules propose orders; signals (trend, AI ratings, fundamentals) only remind.
 
-Weights are shares of the investable money: stocks plus cash. Treasuries and deposits are held to maturity,
+Weights are shares of the investable money: every stock held, SGOV included. The ledger keeps no cash (2026-11-10): the owner
+holds SGOV, a short-term Treasury ETF, as the cash reserve, so "cash" in these rules is the value of the SGOV position, which is
+never capped and never trimmed for profit. Treasuries and deposits are held to maturity,
 count in total assets, and are never traded."""
 import json
 import math
@@ -9,6 +11,7 @@ from ..config import get_settings
 from ..core.data import normalize
 from ..errors import InvalidInput
 
+RESERVE = "SGOV"  # the holding that plays cash
 MAX_POSITION = 0.25  # fixed by the owner (2026-11-09): no single stock above a quarter of the investable money; not a setting
 
 DEFAULT = {
@@ -17,7 +20,7 @@ DEFAULT = {
     "max_position": MAX_POSITION,     # no stock above this share (fixed: load and validate always set it)
     # broad index ETFs already spread over hundreds of companies: no cap for these (the owner's choice, 2026-10-23)
     "uncapped": ["DIA", "IVV", "ITOT", "QQQ", "QQQM", "SPLG", "SPY", "VOO", "VT", "VTI"],
-    "cash_reserve": 0.10,             # buys never take cash below this share
+    "cash_reserve": 0.10,             # buys never take the SGOV position below this share
     "min_trade_usd": 50.0,            # smaller orders are not proposed
     "whole_shares": True,             # round orders to whole shares (most brokers without fractional trading)
     "alert_drawdown_from_cost": 0.20,  # remind when a holding is this far below its average cost
@@ -38,7 +41,7 @@ def path():
 def load():
     p = path()
     stored = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
-    return {**DEFAULT, **stored, "max_position": MAX_POSITION}
+    return {**DEFAULT, **stored, "max_position": MAX_POSITION, "uncapped": sorted({*(stored.get("uncapped") or DEFAULT["uncapped"]), RESERVE})}
 
 
 def validate(policy):
@@ -63,7 +66,7 @@ def validate(policy):
         raise InvalidInput("第二档止盈的涨幅要比第一档高")
     p["min_trade_usd"] = max(0.0, float(p["min_trade_usd"]))
     p["whole_shares"] = bool(p["whole_shares"])
-    p["uncapped"] = sorted({normalize(s) for s in (p.get("uncapped") or []) if str(s).strip()})
+    p["uncapped"] = sorted({normalize(s) for s in (p.get("uncapped") or []) if str(s).strip()} | {RESERVE})
     targets = {}
     for sym, w in (p.get("targets") or {}).items():
         w, sym = float(w), normalize(sym)
@@ -73,7 +76,7 @@ def validate(policy):
         if w > 0:
             targets[sym] = w
     if sum(targets.values()) > 1 - p["cash_reserve"] + 1e-9:
-        raise InvalidInput("目标仓位合计 %.0f%% 超过了 1 减去现金储备（%.0f%%）" % (sum(targets.values()) * 100, (1 - p["cash_reserve"]) * 100))
+        raise InvalidInput("目标仓位合计 %.0f%% 超过了 1 减去 SGOV 储备（%.0f%%）" % (sum(targets.values()) * 100, (1 - p["cash_reserve"]) * 100))
     p["targets"] = targets
     return {k: p[k] for k in DEFAULT}
 

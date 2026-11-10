@@ -1198,7 +1198,7 @@ export interface components {
         Policy: {
             /**
              * Targets
-             * @description 股票 -> 目标仓位（占股票加现金的比例）
+             * @description 股票 -> 目标仓位（占股票加 SGOV 的比例）
              */
             targets?: {
                 [key: string]: number;
@@ -1222,7 +1222,7 @@ export interface components {
             uncapped?: string[];
             /**
              * Cash Reserve
-             * @description 现金储备下限
+             * @description SGOV 储备下限：SGOV 占可投资资金的比例（账本不记现金，SGOV 当现金）
              * @default 0.1
              */
             cash_reserve: number;

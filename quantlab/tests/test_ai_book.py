@@ -13,11 +13,11 @@ SNAP = {
         {"date": "2026-09-20", "side": "buy", "symbol": "AAA", "shares": 10, "price": 120, "fees": 0, "currency": "USD"},
         {"date": "2026-10-01", "side": "sell", "symbol": "AAA", "shares": 5, "price": 130, "fees": 0, "currency": "USD"},
         {"date": "2026-09-15", "side": "buy", "symbol": "BBB", "shares": 4, "price": 50, "fees": 0, "currency": "USD"},
+        {"date": "2026-09-01", "side": "buy", "symbol": "SGOV", "shares": 10, "price": 100, "fees": 0, "currency": "USD"},   # the cash: 1000
     ],
-    "cash": [{"name": "储蓄", "currency": "USD", "amount": 1000}],
     "fixed": [],
 }
-PRICES = {"AAA": 150.0, "BBB": 60.0}
+PRICES = {"AAA": 150.0, "BBB": 60.0, "SGOV": 100.0}
 POL = policy.validate({"targets": {"AAA": 0.25}, "uncapped": ["BBB"], "cash_reserve": 0.10})
 
 
@@ -40,7 +40,7 @@ def test_facts_describe_the_position_and_what_the_rules_still_allow(val):
 
 
 def test_holdings_without_a_price_are_called_out_not_silently_dropped():
-    v = review.valuation(SNAP, {"AAA": 150.0}, "2026-10-20")          # BBB has no price
+    v = review.valuation(SNAP, {"AAA": 150.0, "SGOV": 100.0}, "2026-10-20")          # BBB has no price
     f = acct.facts("AAA", v, POL)
     assert f["unpriced"] == ["BBB"]
     assert "no price could be found for BBB" in acct.render(f) and "overstated" in acct.render(f)
@@ -50,7 +50,7 @@ def test_holdings_without_a_price_are_called_out_not_silently_dropped():
 
 def test_the_block_for_the_agents_says_what_is_held_and_the_rules(val):
     text = acct.render(acct.facts("AAA", val, POL))
-    for part in ("holds 15 shares", "average cost", "of investable funds", "at most 25%", "cash must stay at or above 10%",
+    for part in ("holds 15 shares", "average cost", "of investable funds", "at most 25%", "must stay at or above 10%",
                  "AAA 25%", "whole shares only", "by hand at a retail broker", "no options"):
         assert part in text, part
     etf = acct.render(acct.facts("BBB", val, POL))

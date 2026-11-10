@@ -34,7 +34,7 @@ def facts(symbol, val, pol):
 
 def render(f):
     """The account block written for the AI agents (English: their prompts are)."""
-    lines = ["Account facts for the owner of this book (all USD): investable funds $%s (stocks $%s + cash $%s). Treasuries and "
+    lines = ["Account facts for the owner of this book (all USD): investable funds $%s (stocks $%s + SGOV $%s; SGOV is their cash). Treasuries and "
              "deposits ($%s) are held separately and are not part of this decision." % (
                  format(f["investable"], ",.2f"), format(f["stocks"], ",.2f"), format(f["cash"], ",.2f"), format(f["fixed"], ",.2f"))]
     if f["unpriced"]:
@@ -50,9 +50,9 @@ def render(f):
     cap = "no single-holding cap applies to %s (a broad index ETF)" % f["symbol"] if f["uncapped"] else \
         "one stock may be at most %.0f%% of investable funds" % (f["cap"] * 100)
     targets = ", ".join("%s %.0f%%" % (k, v * 100) for k, v in sorted(f["targets"].items())) or "none set"
-    lines.append("The owner's own rules: %s; cash must stay at or above %.0f%% of investable funds (now %.1f%%); targets: %s with a "
+    lines.append("The owner's own rules: %s; the SGOV position (their cash) must stay at or above %.0f%% of investable funds (now %.1f%%); targets: %s with a "
                  "rebalancing band of %.0f points; %s; minimum order $%.0f. Under these rules the most that could be added to %s "
-                 "now is about $%.0f (room under the cap $%.0f, free cash above the reserve $%.0f)." % (
+                 "now is about $%.0f (room under the cap $%.0f, free SGOV above the reserve $%.0f)." % (
                      cap, f["reserve"] * 100, (f["cash_weight"] or 0) * 100, targets, f["band"] * 100,
                      "whole shares only" if f["whole"] else "fractional shares allowed", f["min_trade"], f["symbol"], f["max_buy"],
                      f["room_cap"], f["room_cash"]))
@@ -79,7 +79,7 @@ def _book_class():
 def describe(book, symbol):
     """What the report page shows of what the AI was told (Chinese heading, the exact text it received)."""
     if book is None:
-        return ("没有读到你的持仓（账本没连上或还没同步）。这次分析是在**不知道你有没有这只股票、买了多少、有多少现金**的情况下做的，"
+        return ("没有读到你的持仓（账本没连上或还没同步）。这次分析是在**不知道你有没有这只股票、买了多少、有多少 SGOV（现金）**的情况下做的，"
                 "评级和仓位说法只能当通用参考。")
     return "下面是交给 AI 的原文（它据此判断你有没有这只股票、买了多少、规则允许多少）：\n\n" + book.render(symbol)
 

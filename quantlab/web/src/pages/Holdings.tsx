@@ -23,7 +23,7 @@ export default function Holdings() {
   return (
     <>
       <PageHead title="我的持仓">
-        从账本同步你的真实持仓，按你设定的规则检查（目标仓位、单只上限、现金储备），给出建议订单。你逐条确认后，自己去券商下单，成交后在账本记一笔。
+        从账本同步你的真实持仓，按你设定的规则检查（目标仓位、单只上限、SGOV 储备），给出建议订单。你逐条确认后，自己去券商下单，成交后在账本记一笔。
         趋势、基本面、AI 评级只出现在“提醒”里，不会生成订单。
       </PageHead>
       {status.data && !status.data.configured ? (
@@ -47,8 +47,8 @@ export default function Holdings() {
           <div className="card">
             <div className="stats">
               <Stat k="总资产" v={money(v.total)} s={`其中国债定存 ${money(v.fixed)}（持有到期，不参与调整）`} />
-              <Stat k="可投资资金" v={money(v.investable)} s={`股票 ${money(v.stocks)} + 现金 ${money(v.cash)}`} />
-              <Stat k="现金占比" v={pctPlain(v.cash_weight)} s={`储备下限 ${pctPlain(r.policy.cash_reserve, 0)}`} />
+              <Stat k="可投资资金" v={money(v.investable)} s={`股票 ${money(v.stocks)} + SGOV ${money(v.cash)}`} />
+              <Stat k="SGOV 占比（现金）" v={pctPlain(v.cash_weight)} s={`储备下限 ${pctPlain(r.policy.cash_reserve, 0)}`} />
             </div>
           </div>
           <div className="card">

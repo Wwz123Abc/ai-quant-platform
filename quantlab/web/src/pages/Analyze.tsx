@@ -36,7 +36,7 @@ export default function Analyze() {
   return (
     <>
       <PageHead title="个股分析">
-        想买一只股票时，先看它的趋势和风险、基本面、AI 评级，以及和你现有持仓的关系。结论只来自你在“我的持仓”里设定的规则（单只上限、现金储备）：
+        想买一只股票时，先看它的趋势和风险、基本面、AI 评级，以及和你现有持仓的关系。结论只来自你在“我的持仓”里设定的规则（单只上限、SGOV 储备）：
         能不能买、最多买多少。其余信息供你参考，不是买卖建议。
       </PageHead>
       <div className="card">
@@ -133,7 +133,7 @@ export default function Analyze() {
                 <>
                   <div className="stats">
                     <Stat k="规则允许最多买" v={money(r.portfolio.max_buy)}
-                      s={`${r.portfolio.max_buy > 0 ? lots(r.portfolio, r.portfolio.max_shares) + " · " : ""}可投资资金 ${money(r.portfolio.investable)}，现金 ${money(r.portfolio.cash)}`} />
+                      s={`${r.portfolio.max_buy > 0 ? lots(r.portfolio, r.portfolio.max_shares) + " · " : ""}可投资资金 ${money(r.portfolio.investable)}，SGOV ${money(r.portfolio.cash)}`} />
                     <AfterBuy p={r.portfolio} />
                     <Stat k="和你持仓的相似度（平均相关系数）" v={num(r.portfolio.avg_correlation)} s="按持仓市值加权；1 表示涨跌几乎同步，买了也不分散风险；0.3 以下才算分散" />
                   </div>
