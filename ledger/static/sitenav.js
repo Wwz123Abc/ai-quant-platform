@@ -42,7 +42,7 @@
     var brand = document.createElement("a");
     brand.className = "sn-brand";
     brand.href = "/";
-    brand.textContent = "测试";
+    brand.textContent = "投资";
     nav.appendChild(brand);
     ITEMS.forEach(function (it) {
       if (it.lab && !showLab) return;
