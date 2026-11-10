@@ -103,8 +103,8 @@ def market_date():
     from .core import cn_data
     try:
         fields = cn_data.tencent_quote(PROBE)
-    except QuantLabError:
-        return None
+    except QuantLabError:  # Tencent's quote is down: Eastmoney's says which session is the latest
+        return cn_data.eastmoney_session_date(PROBE)
     stamp = fields[30] if len(fields) > 30 else ""
     return stamp.replace("/", "-")[:10] or None
 

@@ -8,10 +8,13 @@ adjustment instead: prices are split-adjusted with f, and every dividend multipl
 ex-date by (1 - dividend / previous close). Returns then match a total-return series."""
 import datetime as dt
 import json
+import logging
 import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -86,6 +89,103 @@ def tencent_bars(sym, pause=0.1):
         raise NotFound("腾讯行情没有 %s 的日线" % sym)
     df = pd.DataFrame(rows, columns=["date", "open", "high", "low", "close", "volume"]).drop_duplicates("date", keep="last")
     return df.set_index(pd.to_datetime(df.pop("date"))).sort_index()
+
+
+def _frame(rows):
+    """Unadjusted bars [(date, open, high, low, close, volume)] as a date-indexed frame, oldest first."""
+    df = pd.DataFrame(rows, columns=["date", "open", "high", "low", "close", "volume"]).drop_duplicates("date", keep="last")
+    return df.set_index(pd.to_datetime(df.pop("date"))).sort_index()
+
+
+def sina_raw_bars(sym):
+    """Unadjusted daily bars from Sina (its whole history, from about 2010) when Tencent will not answer."""
+    url = "https://stock.finance.sina.com.cn/usstock/api/jsonp.php/var%%20_%s=/US_MinKService.getDailyK?symbol=%s&type=daily" % (
+        re.sub(r"[^A-Za-z0-9]", "_", sym), urllib.parse.quote(sym))
+    text = _get(url, "https://finance.sina.com.cn/")
+    start, end = text.find("("), text.rfind(")")
+    try:
+        data = json.loads(text[start + 1:end]) if 0 <= start < end else None
+    except ValueError as e:
+        raise DataSourceError("新浪行情返回的数据格式不对：%s" % sym) from e
+    rows = []
+    for r in data or []:
+        try:
+            o, h, lo, c, v = (float(r[k]) for k in ("o", "h", "l", "c", "v"))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", str(r.get("d", ""))) and min(o, h, lo, c) > 0:
+            rows.append((r["d"], o, h, lo, c, v))
+    if not rows:
+        raise NotFound("新浪行情没有 %s 的日线" % sym)
+    return _frame(rows)
+
+
+def eastmoney_raw_bars(sym):
+    """Unadjusted daily bars from Eastmoney (up to 10,000 days back) when Tencent and Sina will not answer."""
+    for market in ("105", "106", "107"):  # Nasdaq, NYSE, NYSE Arca: the symbol is on one of them
+        url = ("https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s.%s&fields1=f1,f2,f3"
+               "&fields2=f51,f52,f53,f54,f55,f56&klt=101&fqt=0&lmt=10000&end=20500101") % (market, urllib.parse.quote(sym))
+        try:
+            rows = (json.loads(_get(url, "https://quote.eastmoney.com/")).get("data") or {}).get("klines") or []
+        except ValueError as e:
+            raise DataSourceError("东方财富行情返回的数据格式不对：%s" % sym) from e
+        out = []
+        for r in rows:
+            day, o, c, h, lo, v = r.split(",")[:6]  # Eastmoney order: date, open, close, high, low, volume
+            if min(float(o), float(c), float(h), float(lo)) > 0:
+                out.append((day, float(o), float(h), float(lo), float(c), float(v)))
+        if out:
+            return _frame(out)
+    raise NotFound("东方财富没有 %s 的日线" % sym)
+
+
+def last_session(now=None):
+    """The date of the latest US session that should be complete: today after the close (16:30 New York), else the weekday
+    before. Holidays are not known, so on one a source seems a day behind and the others are looked at too."""
+    now = (now or dt.datetime.now(ZoneInfo("America/New_York"))).astimezone(ZoneInfo("America/New_York"))
+    day = now.date()
+    if now.weekday() >= 5 or now.hour * 60 + now.minute < 16 * 60 + 30:
+        day -= dt.timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= dt.timedelta(days=1)
+    return day
+
+
+def raw_bars(sym):
+    """Unadjusted daily bars from the first source that has the latest session: Tencent, then Sina, then Eastmoney. A source
+    that fails, or that is behind, does not stop the others; when none is current the one with the newest bar wins.
+    (Tencent answers 501 now and then, and some days its bars lag; 2026-11-10 it left the weekly job without prices.)"""
+    log = logging.getLogger(__name__)
+    want = last_session()
+    best, errors = None, []
+    for name, get in (("腾讯", tencent_bars), ("新浪", sina_raw_bars), ("东方财富", eastmoney_raw_bars)):
+        try:
+            df = get(sym)
+        except (DataSourceError, NotFound, ValueError, KeyError) as e:
+            errors.append("%s：%s" % (name, e))
+            continue
+        if best is None or df.index[-1] > best[1].index[-1]:
+            best = (name, df)
+        if df.index[-1].date() >= want:
+            break
+    if best is None:
+        raise DataSourceError("所有行情来源都取不到 %s（%s）" % (sym, "；".join(errors)))
+    if best[0] != "腾讯":
+        log.warning("%s: bars from %s (%s)", sym, best[0], "；".join(errors) or "腾讯的最新一根更旧")
+    return best[1]
+
+
+def eastmoney_session_date(sym):
+    """The date of the latest US session per Eastmoney's quote, or None: a second opinion when Tencent's quote is down."""
+    for market in ("105", "106", "107"):
+        url = "https://push2.eastmoney.com/api/qt/stock/get?secid=%s.%s&fltt=2&fields=f43,f60,f86" % (market, urllib.parse.quote(sym))
+        try:
+            d = json.loads(_get(url, "https://quote.eastmoney.com/")).get("data") or {}
+        except (DataSourceError, NotFound, ValueError):
+            continue
+        if isinstance(d.get("f43"), (int, float)) and d["f43"] > 0 and d.get("f86"):
+            return dt.datetime.fromtimestamp(d["f86"], ZoneInfo("America/New_York")).date().isoformat()
+    return None
 
 
 def sina_factors(sym):
@@ -177,10 +277,8 @@ def after_long_halt(raw, days=365):
 
 
 def fetch(sym):
-    import logging
-
     factors = sina_factors(sym)
-    raw = tencent_bars(sym)
+    raw = raw_bars(sym)
     kept = after_long_halt(raw)
     if len(kept) < len(raw):
         logging.getLogger(__name__).warning("%s: no trading for over a year before %s; the %d bars before it are left out",
