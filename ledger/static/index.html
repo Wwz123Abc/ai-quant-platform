@@ -221,6 +221,17 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .pnl-mode button { font: inherit; font-size: 13px; padding: 5px 14px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer; }
 .pnl-mode button + button { border-left: 1px solid var(--line); }
 .pnl-mode button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.pnl-bar { gap: 8px; flex-wrap: wrap; }
+.contrib { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px 14px; }
+.contrib h3 { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.cb-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 96px; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.cb-n { font-family: var(--f-num); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-track { position: relative; height: 14px; }
+.cb-track::before { content: ""; position: absolute; top: -3px; bottom: -3px; left: var(--zero); border-left: 1px solid var(--muted); opacity: .5; }
+.cb-bar { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; opacity: .85; }
+.cb-bar.up { background: var(--up); }
+.cb-bar.down { background: var(--down); }
+.cb-v { font-family: var(--f-num); text-align: right; }
 .pnl-chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 .pnl-mark { font-size: 9px; font-weight: 600; fill: var(--surface); font-family: var(--f-num); }
 .pnl-note { font-size: 10.5px; font-family: var(--f-num); }
@@ -440,6 +451,7 @@ footer p { margin: 0 0 6px; }
         </table>
       </div>
     </div>
+    <div class="contrib" id="stkPnl" hidden></div>
     <p class="warn" id="warn" hidden></p>
     <p class="check" id="checkLine" hidden></p>
     <div class="hints" id="actHints" hidden></div>
@@ -452,6 +464,7 @@ footer p { margin: 0 0 6px; }
       <p class="hint" id="pnlParts"></p>
     </div>
     <div class="pnl-bar">
+      <div class="pnl-mode" id="pnlRange" role="group" aria-label="时间范围"><button type="button" data-range="22" aria-pressed="false">近 1 个月</button><button type="button" data-range="66" aria-pressed="false">近 3 个月</button><button type="button" data-range="0" aria-pressed="true">全部</button></div>
       <div class="pnl-mode" role="group" aria-label="纵轴显示"><button type="button" data-mode="usd" aria-pressed="true">金额</button><button type="button" data-mode="pct" aria-pressed="false">收益率</button></div>
     </div>
     <div class="pnl-chart" id="pnlChart">
@@ -1212,6 +1225,25 @@ TAL|好未来|TAL Education
       stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized) + (Math.abs(c.dividends) >= 0.005 ? " · 分红利息 " + signed(c.dividends) : ""));
     STK.lay = drawDonut($("#stkChart"), items, total, "股票占比", (it) => it.name);
     STK.items = items;   // the holdings table beside the donut links its rows to these
+    renderContrib(c);
+  }
+  // Each stock's own total profit (floating + realized + dividends), sold-out stocks included, as bars either side of zero.
+  function renderContrib(c) {
+    const box = $("#stkPnl"), list = [];
+    for (const s of c.syms) {
+      if (s.shares > 0 && !(Number(state.prices[s.symbol]) > 0)) continue;   // no price yet: its floating profit is unknown
+      const v = toUSD((s.shares > 0 ? s.unreal : 0) + s.realized + s.dividends, s.ccy);
+      if (Math.abs(v) >= 0.005) list.push({ sym: s.symbol, v, held: s.shares > 0 });
+    }
+    box.hidden = list.length < 2;
+    if (box.hidden) return;
+    list.sort((a, b) => b.v - a.v);
+    const pos = Math.max(0, ...list.map((it) => it.v)), neg = Math.max(0, ...list.map((it) => -it.v)), span = pos + neg, zero = (neg / span) * 100;
+    box.innerHTML = "<h3>各股票的盈亏（浮动 + 已实现 + 分红，含已清仓）</h3>" + list.map((it) => {
+      const w = Math.max(0.6, (Math.abs(it.v) / span) * 100), left = it.v >= 0 ? zero : zero - w;
+      return '<div class="cb-row" title="' + esc(it.sym) + (it.held ? "" : "（已清仓）") + " " + signed(it.v) + '"><span class="cb-n">' + esc(it.sym) + '</span><div class="cb-track" style="--zero:' + zero.toFixed(2) +
+        '%"><i class="cb-bar ' + tone(it.v) + '" style="left:' + left.toFixed(2) + "%;width:" + w.toFixed(2) + '%"></i></div><span class="cb-v ' + tone(it.v) + '">' + signed(it.v) + "</span></div>";
+    }).join("");
   }
 
   function renderFixed() {
@@ -1440,7 +1472,7 @@ TAL|好未来|TAL Education
     return out;
   }
   const WD = "日一二三四五六";
-  let pnlLay = null, pnlMode = "usd";
+  let pnlLay = null, pnlMode = "usd", pnlRange = 0;   // pnlRange: how many trading days the chart shows, 0 = all
   const pnlVal = (r) => (pnlMode === "pct" ? (r.pct == null ? 0 : r.pct * 100) : r.total);
   const pnlFmt = (v) => (pnlMode === "pct" ? pct(v) : signed(v));
 
@@ -1458,7 +1490,8 @@ TAL|好未来|TAL Education
     box.querySelectorAll("svg").forEach((n) => n.remove());
     $("#pnlTip").hidden = true;
     pnlLay = null;
-    const rows = pnlSeries(list);
+    const allRows = pnlSeries(list);
+    let rows = allRows;   // the figures above and the stats below cover all days; the drawing covers the chosen range
     if (!rows.length) {
       empty.hidden = false;
       empty.textContent = !state.ready || !state.histReady ? "正在读取收盘价…"
@@ -1490,6 +1523,9 @@ TAL|好未来|TAL Education
       stat("盈利天数", upDays + " / " + rows.length, "", "当日盈亏为正的天数");
     stats.hidden = false;
 
+    if (pnlRange && rows.length > pnlRange) rows = rows.slice(-pnlRange);
+    document.querySelectorAll("#pnlRange button").forEach((b) => { b.disabled = Number(b.dataset.range) !== 0 && allRows.length <= 5; });
+
     // Geometry: main plot, then the daily P/L bars, then date labels.
     const W = Math.max(280, box.clientWidth - 16), narrow = W < 560;
     const PH = narrow ? 180 : 230, GAP = 24, BH = narrow ? 44 : 58, XH = 22, BT = PH + GAP, HT = BT + BH + XH;
@@ -1499,6 +1535,9 @@ TAL|好未来|TAL Education
     if (hi - lo < minSpan) { hi += minSpan / 2; lo -= minSpan / 2; }
     const ticks = niceTicks(lo, hi, narrow ? 4 : 6);
     lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+    // Axis labels need no cents when the steps are whole dollars; the hover badge and the tip keep the exact figure.
+    const whole = pnlMode === "usd" && ticks.length > 1 && ticks[1] - ticks[0] >= 1;
+    const tickFmt = (v) => (whole ? (v === 0 ? "$0" : (v > 0 ? "+" : "−") + "$" + Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 })) : pnlFmt(v));
     const y = (v) => 14 + ((hi - v) / (hi - lo)) * (PH - 24);
     const NS = "http://www.w3.org/2000/svg";
     const el = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.append(n); return n; };
@@ -1516,7 +1555,7 @@ TAL|好未来|TAL Education
     for (const v of ticks) {
       el("line", { x1: L, x2: R, y1: y(v), y2: y(v), style: "stroke: var(--line)" + (v === 0 ? "; stroke-width: 1.5; stroke: var(--muted); opacity: .55" : "") }, svg);
       const t = el("text", { class: "pnl-tick", x: R + 8, y: y(v), dy: "0.32em" }, svg);
-      t.textContent = pnlFmt(v);
+      t.textContent = tickFmt(v);
     }
     // Week starts: faint vertical lines and date labels; the last point is always labelled.
     const lastLab = md(last.date) + (last.live ? " 最新" : "");
@@ -1541,9 +1580,15 @@ TAL|好未来|TAL Education
     const pts = rows.map((r, i) => x(i).toFixed(1) + "," + y(vs[i]).toFixed(1));
     const lineD = "M" + pts.join("L");
     const areaD = "M" + x(0).toFixed(1) + "," + y0.toFixed(1) + "L" + pts.join("L") + "L" + x(rows.length - 1).toFixed(1) + "," + y0.toFixed(1) + "Z";
-    for (const [clip, color] of [["pnlUp", "var(--up)"], ["pnlDn", "var(--down)"]]) {
+    // The fill fades out towards the zero line, so it is strongest where the profit is furthest from zero.
+    for (const [id, color, ya, yb] of [["pnlGU", "var(--up)", y(hi), y0], ["pnlGD", "var(--down)", y(lo), y0]]) {
+      const gr = el("linearGradient", { id, gradientUnits: "userSpaceOnUse", x1: 0, x2: 0, y1: ya, y2: yb }, defs);
+      el("stop", { offset: "0", style: "stop-color: " + color + "; stop-opacity: .34" }, gr);
+      el("stop", { offset: "1", style: "stop-color: " + color + "; stop-opacity: .03" }, gr);
+    }
+    for (const [clip, color, grad] of [["pnlUp", "var(--up)", "pnlGU"], ["pnlDn", "var(--down)", "pnlGD"]]) {
       const g = el("g", { "clip-path": "url(#" + clip + ")" }, svg);
-      el("path", { d: areaD, style: "fill: " + color + "; opacity: .13" }, g);
+      el("path", { d: areaD, style: "fill: url(#" + grad + ")" }, g);
       el("path", { d: lineD, style: "fill: none; stroke: " + color + "; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round" }, g);
     }
     // Each trading day gets a small point when there is room for it
@@ -1559,8 +1604,8 @@ TAL|好未来|TAL Education
     let vHi = 0, vLo = 0;
     vs.forEach((v, i) => { if (v > vs[vHi]) vHi = i; if (v < vs[vLo]) vLo = i; });
     if (rows.length > 2 && vHi !== vLo) {
-      if (vHi !== rows.length - 1) note(vHi, true);
-      if (vLo !== rows.length - 1) note(vLo, false);
+      if (vHi !== rows.length - 1 && vs[vHi] > 0.004) note(vHi, true);
+      if (vLo !== rows.length - 1 && vs[vLo] < -0.004) note(vLo, false);
     }
     el("circle", { cx: x(rows.length - 1), cy: y(vs[vs.length - 1]), r: 4, style: last.live
       ? "fill: var(--surface); stroke-width: 2; stroke: " + (vs[vs.length - 1] >= 0 ? "var(--up)" : "var(--down)")
@@ -1665,9 +1710,14 @@ TAL|好未来|TAL Education
     else return;
     e.preventDefault();
   });
-  document.querySelectorAll(".pnl-mode button").forEach((btn) => btn.addEventListener("click", () => {
+  document.querySelectorAll(".pnl-mode button[data-mode]").forEach((btn) => btn.addEventListener("click", () => {
     pnlMode = btn.dataset.mode;
-    document.querySelectorAll(".pnl-mode button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    document.querySelectorAll(".pnl-mode button[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+    renderPnl(sortedTrades());
+  }));
+  document.querySelectorAll("#pnlRange button").forEach((btn) => btn.addEventListener("click", () => {
+    pnlRange = Number(btn.dataset.range);
+    document.querySelectorAll("#pnlRange button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
     renderPnl(sortedTrades());
   }));
   let resizeT = null;
