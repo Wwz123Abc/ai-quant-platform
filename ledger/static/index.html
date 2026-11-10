@@ -26,6 +26,7 @@
   --c-stk: #2B5784;
   --c-bond: #7A5CA8;
   --c-dep: #A8742A;
+  --c-cash: #2F8F83;
   --f-display: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --f-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --f-num: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
@@ -35,7 +36,7 @@
     --bg: #11161C; --surface: #19212A; --ink: #E5EAF0; --muted: #95A2AF; --line: #2B3540;
     --accent: #82ABDA; --accent-soft: #1E2D3F; --on-accent: #0E1620;
     --up: #4DC28A; --down: #F0695D; --warn: #E0A84A;
-    --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062;
+    --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062; --c-cash: #6CC3B5;
     color-scheme: dark;
   }
 }
@@ -43,7 +44,7 @@
   --bg: #11161C; --surface: #19212A; --ink: #E5EAF0; --muted: #95A2AF; --line: #2B3540;
   --accent: #82ABDA; --accent-soft: #1E2D3F; --on-accent: #0E1620;
   --up: #4DC28A; --down: #F0695D; --warn: #E0A84A;
-  --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062;
+  --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062; --c-cash: #6CC3B5;
   color-scheme: dark;
 }
 
@@ -161,6 +162,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .sw.stk { background: var(--c-stk); }
 .sw.bond { background: var(--c-bond); }
 .sw.dep { background: var(--c-dep); }
+.sw.cash { background: var(--c-cash); }
 /* class rules below set display; this keeps the hidden attribute meaning hidden for all of them */
 [hidden] { display: none !important; }
 td.fname { white-space: normal; min-width: 170px; font-weight: 500; }
@@ -1063,13 +1065,13 @@ TAL|好未来|TAL Education
   }
 
   // ---------- asset mix (share of total assets) ----------
-  const CLASS_NAME = { stk: "股票", bond: "国债", dep: "定期存款" };
+  const CLASS_NAME = { stk: "股票", cash: "现金（SGOV）", bond: "国债", dep: "定期存款" };
   const SHADES = [1, 0.7, 0.5, 0.36, 0.26];
   function mixItems(c) {
     const d = todayUS(), items = [];
-    for (const s of c.syms) if (s.shares > 0 && Number(state.prices[s.symbol]) > 0) items.push({ k: "stk", name: s.symbol, sub: nameOf(s.symbol), v: toUSD(s.mv, s.ccy) });
+    for (const s of c.syms) if (s.shares > 0 && Number(state.prices[s.symbol]) > 0) items.push({ k: s.symbol === "SGOV" ? "cash" : "stk", name: s.symbol, sub: nameOf(s.symbol), v: toUSD(s.mv, s.ccy) });
     for (const f of state.fixed) { const r = fixedAt(f, d); if (r && r.value > 0) items.push({ k: f.kind === "bond" ? "bond" : "dep", name: f.name, sub: f.note || "", v: r.value }); }
-    const order = { stk: 0, bond: 1, dep: 2 };
+    const order = { stk: 0, cash: 1, bond: 2, dep: 3 };
     items.sort((a, b) => order[a.k] - order[b.k] || b.v - a.v);
     const seen = {};
     for (const it of items) { const n = seen[it.k] = (seen[it.k] || 0) + 1; it.op = SHADES[Math.min(n - 1, SHADES.length - 1)]; }
@@ -1185,7 +1187,7 @@ TAL|好未来|TAL Education
     as.hidden = !(total > 0);
     as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金") +
       stat("盈亏", signed(profit), tone(profit), original > 0 ? pct((profit / original) * 100) : "") : "";
-    MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存")));
+    MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" || it.k === "cash" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存")));
     if (!MIX.lay) {
       $("#mix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有持仓。" : "正在读取…") + "</td></tr>";
       $("#mix tfoot").innerHTML = "";
@@ -1428,7 +1430,9 @@ TAL|好未来|TAL Education
     $("#calTitle").textContent = y + " 年 " + m + " 月";
     const sum = inMonth.reduce((t, r) => t + r.day, 0), up = inMonth.filter((r) => r.day > 0.004).length, down = inMonth.filter((r) => r.day < -0.004).length;
     const sumEl = $("#calSum");
-    sumEl.textContent = "当月 " + signed(sum) + " · 赚 " + up + " 天 · 亏 " + down + " 天";
+    const best = inMonth.reduce((b, r) => (!b || r.day > b.day ? r : b), null), worst = inMonth.reduce((b, r) => (!b || r.day < b.day ? r : b), null);
+    sumEl.textContent = "当月 " + signed(sum) + " · 赚 " + up + " 天 · 亏 " + down + " 天" +
+      (best && best.day > 0.004 && up + down > 1 ? " · 最好 " + md(best.date) + " " + signed(best.day) : "") + (worst && worst.day < -0.004 && up + down > 1 ? " · 最差 " + md(worst.date) + " " + signed(worst.day) : "");
     sumEl.className = "hint " + tone(sum);
     $("#calPrev").disabled = ym <= firstMonth;
     $("#calNext").disabled = ym >= lastMonth;
@@ -1917,17 +1921,44 @@ TAL|好未来|TAL Education
     const add = (name, attrs, text) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; svg.appendChild(n); return n; };
     const fmt = (v) => (d.money ? money(v) : cur(d.ccy) + nf2.format(v));
     const pts = d.t.map((t, i) => X(t).toFixed(1) + "," + Y(d.v[i]).toFixed(1));
-    add("polygon", { points: X(d.t[0]).toFixed(1) + "," + Y(d.base).toFixed(1) + " " + pts.join(" ") + " " + X(d.t[d.t.length - 1]).toFixed(1) + "," + Y(d.base).toFixed(1), fill: color, "fill-opacity": "0.10" });
-    add("line", { x1: L, x2: L + w, y1: Y(d.base), y2: Y(d.base), stroke: "var(--muted)", "stroke-dasharray": "4 4", "stroke-width": "1", opacity: "0.7" });
-    add("polyline", { points: pts.join(" "), fill: "none", stroke: color, "stroke-width": "1.6", "stroke-linejoin": "round" });
+    // The line is green above the previous close and red below it, however the day ends; the fill fades towards that line.
+    const yb = Y(d.base), poly = X(d.t[0]).toFixed(1) + "," + yb.toFixed(1) + " " + pts.join(" ") + " " + X(d.t[d.t.length - 1]).toFixed(1) + "," + yb.toFixed(1);
+    const defs = add("defs", {});
+    const part = (parent, name, attrs) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); parent.appendChild(n); return n; };
+    for (const [id, col, ya] of [["tlGU", "var(--up)", T], ["tlGD", "var(--down)", T + h]]) {
+      const g = part(defs, "linearGradient", { id, gradientUnits: "userSpaceOnUse", x1: 0, x2: 0, y1: ya, y2: yb });
+      part(g, "stop", { offset: "0", style: "stop-color: " + col + "; stop-opacity: .30" });
+      part(g, "stop", { offset: "1", style: "stop-color: " + col + "; stop-opacity: .03" });
+    }
+    part(part(defs, "clipPath", { id: "tlCU" }), "rect", { x: 0, y: 0, width: W, height: yb });
+    part(part(defs, "clipPath", { id: "tlCD" }), "rect", { x: 0, y: yb, width: W, height: Math.max(0, H - yb) });
+    for (const [clip, col, grad] of [["tlCU", "var(--up)", "tlGU"], ["tlCD", "var(--down)", "tlGD"]]) {
+      const g = add("g", { "clip-path": "url(#" + clip + ")" });
+      part(g, "polygon", { points: poly, style: "fill: url(#" + grad + ")" });
+      part(g, "polyline", { points: pts.join(" "), fill: "none", stroke: col, "stroke-width": "1.6", "stroke-linejoin": "round" });
+    }
+    add("line", { x1: L, x2: L + w, y1: yb, y2: yb, stroke: "var(--muted)", "stroke-dasharray": "4 4", "stroke-width": "1", opacity: "0.7" });
+    // The day's high and low (labelled when the day moved enough and they are not simply the last point).
+    let iHi = 0, iLo = 0;
+    d.v.forEach((x, i) => { if (x > d.v[iHi]) iHi = i; if (x < d.v[iLo]) iLo = i; });
+    if (d.v.length > 8 && d.v[iHi] - d.v[iLo] > d.base * 0.002) {
+      for (const [i, word, above] of [[iHi, "高 ", true], [iLo, "低 ", false]]) {
+        if (i === d.v.length - 1 || i === 0) continue;
+        const xi = X(d.t[i]);
+        add("circle", { cx: xi, cy: Y(d.v[i]), r: "2.6", fill: "var(--surface)", stroke: d.v[i] >= d.base ? "var(--up)" : "var(--down)", "stroke-width": "1.4" });
+        add("text", { x: xi, y: Y(d.v[i]) + (above ? -6 : 13), "font-size": "10", fill: "var(--muted)", "text-anchor": xi < L + 36 ? "start" : xi > L + w - 36 ? "end" : "middle" }, word + fmt(d.v[i]));
+      }
+    }
     const lab = (y, text, anchor) => add("text", { x: L + w + 6, y: y, "font-size": "10.5", fill: "var(--muted)", "dominant-baseline": anchor || "middle" }, text);
     lab(T + 4, fmt(d.base + dev));
     lab(Y(d.base), fmt(d.base));
     lab(T + h - 4, fmt(d.base - dev));
     const tick = (t, anchor) => add("text", { x: X(t), y: H - 6, "font-size": "10.5", fill: "var(--muted)", "text-anchor": anchor }, bjTime(t));
     tick(d.x0, "start");
+    if (W >= 520) { tick(d.x0 + (d.x1 - d.x0) / 4, "middle"); tick(d.x0 + (d.x1 - d.x0) * 3 / 4, "middle"); }
     tick((d.x0 + d.x1) / 2, "middle");
     tick(d.x1, "end");
+    svg.style.touchAction = "pan-y";
     const cross = add("line", { x1: 0, x2: 0, y1: T, y2: T + h, stroke: "var(--ink)", "stroke-width": "1", opacity: "0", "pointer-events": "none" });
     const dot = add("circle", { r: "3.5", fill: color, opacity: "0", "pointer-events": "none" });
     add("circle", { cx: X(d.t[d.t.length - 1]), cy: Y(last), r: "3", fill: color });
