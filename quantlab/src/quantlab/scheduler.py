@@ -64,6 +64,7 @@ def queue_holdings(ai_con, load, now=None):
     if not (engine.available() and engine.configured()):
         return queued, ["AI 没有安装或没有配置密钥，跳过持仓股票的 AI 研报"]
     from .holdings import ledger as hledger
+    from .holdings import policy
     if not hledger.configured():
         return queued, ["没有配置账本的只读密钥，不知道你持有什么，跳过持仓股票的 AI 研报"]
     try:
@@ -72,6 +73,8 @@ def queue_holdings(ai_con, load, now=None):
         return queued, ["读不到账本，跳过持仓股票的 AI 研报：%s" % e]
     for p in held:
         sym = p["symbol"]
+        if sym == policy.RESERVE:  # SGOV is the cash: no research report for it
+            continue
         if not re.fullmatch(r"[A-Z][A-Z.\-]*", sym):
             notes.append("%s 不是美股代码，AI 研报暂不支持，跳过" % sym)
             continue
@@ -192,8 +195,12 @@ class Scheduler:
         want = self.market()
         try:
             have = self.load(PROBE, refresh=True).index[-1].date().isoformat()
-        except QuantLabError:
-            return True  # no way to tell: run as before
+        except QuantLabError as e:
+            # the data source is down, so there is no telling whether the latest close is in: wait like for an old bar (2026-11-10 the job
+            # ran blind at 10:25 while Tencent answered 501, and made no AI report); from the give-up time on it runs anyway
+            self._next_check = now + RETRY
+            log.warning("daily job waits: cannot read %s bars (%s)", PROBE, e)
+            return False
         self._probe = (have, want)
         if not want or have >= want:
             return True

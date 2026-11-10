@@ -487,3 +487,25 @@ def test_held_stock_analyses_have_their_own_switch_and_survive_a_broken_ledger(m
     get_settings.cache_clear()
     q, notes = queue_holdings(ac, load, NOW)
     assert q == [] and "已关闭" in notes[0]
+
+
+def test_the_job_does_not_run_blind_when_the_data_source_is_down_and_runs_anyway_from_the_give_up_time():
+    """2026-11-10: Tencent answered 501 at 10:25, the probe could not be read, the job ran at once and every symbol failed."""
+    beijing = lambda hm: dt.datetime.fromisoformat("2026-11-10 %s" % hm).replace(tzinfo=dt.timezone(dt.timedelta(hours=8)))
+
+    def down(sym, refresh=False):
+        raise QuantLabError("行情接口返回错误 501")
+    sched = Scheduler(Worker(analyze=fake_analyze()), load=down, market=lambda: "2026-11-09")
+    assert sched.data_ready(beijing("10:25")) is False                  # waits, as for an old bar
+    assert sched.data_ready(beijing("10:40")) is False                  # and does not hammer the source: the next look is 30 minutes on
+    assert sched.data_ready(beijing("12:00")) is True                   # the give-up time: run anyway
+
+
+def test_the_cash_stock_gets_no_weekly_research_report(monkeypatch):
+    monkeypatch.setattr(engine, "available", lambda: True)
+    monkeypatch.setattr(engine, "configured", lambda: True)
+    FakeHeld(monkeypatch, ["QQQM", "SGOV"])
+    from quantlab.scheduler import queue_holdings
+    ac = ledger.connect()
+    q, notes = queue_holdings(ac, lambda sym, refresh=False: bars(300, seed=1), NOW)
+    assert len(q) == 1 and not any("SGOV" in n for n in notes)
