@@ -242,7 +242,7 @@ input.px { width: 104px; text-align: right; font-family: var(--f-num); font-vari
 .pnl-chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 .pnl-mark { font-size: 9px; font-weight: 600; fill: var(--surface); font-family: var(--f-num); }
 .pnl-note { font-size: 10.5px; font-family: var(--f-num); }
-#assetStats, #stkStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#assetStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .quote { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; gap: 2px; }
 .q-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .q-top b { color: var(--ink); font-weight: 600; font-size: 14px; }
@@ -426,7 +426,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="mix-h">
     <div class="head-row">
-      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。银行活期余额（人民币、港元、美元）记在“活期存款”里，按现在的汇率折成美元计入；要留现金赚利息，也可以买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
+      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。银行活期余额（人民币、港元、美元）记在“活期存款”里，按现在的汇率折成美元计入；要留现金赚利息，也可以买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是总盈亏，和收益走势的累计收益一致。</p><p>总盈亏 = 浮动盈亏 + 已实现盈亏 + 分红利息 + 国债和定存利息。某只股票赚了钱卖掉、又把钱拿去买新股票时：卖出赚的部分记在“已实现”里，留在总盈亏中；拿去再买的钱，在原始资产里按“买入花的钱减去卖出拿回的钱”冲抵，不会算成新投入，也不会让盈亏重复或丢失。</p></div></details></div>
       <p class="hint" id="mixSum"></p>
     </div>
     <dl class="pnl-stats" id="assetStats" hidden></dl>
@@ -445,10 +445,9 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="stk-h">
     <div class="head-row">
-      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>只看股票：每只股票的持有股数、成本、现价和盈亏（“占股票”是它占全部股票现值的多少），以及股票部分自己的盈亏，不含国债和定期存款。港股按当前汇率折成美元。每只股票占总资产的比例看上面的“资产占比”圆盘，鼠标移上去可以看到。</p><p>股票现值 = 持有的股票按现价值多少钱。原始投入 = 买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息。盈亏 = 股票现值 − 原始投入，也就是浮动盈亏加已实现盈亏再加分红利息（都已扣费用）。SGOV 每月分红的利息按新浪的分红数据自动计入，不用手动记。</p><p>已经全部卖出的股票没有现值，不在表格里，但它们的已实现盈亏算进上面的盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。</p></div></details></div>
+      <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>每只股票的持有股数、成本、现价和盈亏（“占股票”是它占全部股票现值的多少）。港股按当前汇率折成美元。每只股票占总资产的比例看上面的“资产占比”圆盘，鼠标移上去可以看到。</p><p>浮动盈亏是相对剩余股数的平均成本；这只股票以前卖出赚的钱显示为“已实现”，收到的分红显示为“分红利息”，三者相加才是这只股票的总盈亏（都已扣费用），下面的柱状图画的就是每只股票的总盈亏。整个账户的总盈亏看上面“资产占比”里的“总盈亏”。SGOV 每月分红的利息按新浪的分红数据自动计入，不用手动记。</p><p>已经全部卖出的股票没有现值，不在表格里，但它们的已实现盈亏算进上面的盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。</p></div></details></div>
       <p class="hint" id="stkSum"></p>
     </div>
-    <dl class="pnl-stats" id="stkStats" hidden></dl>
     <div class="hold-scroll">
       <table id="holdings">
         <thead><tr><th>代码</th><th class="num">持有股数</th><th class="num">平均成本</th><th class="num">现价</th><th class="num">当日涨跌</th><th class="num">浮动盈亏</th></tr></thead>
@@ -1244,7 +1243,8 @@ TAL|好未来|TAL Education
     const as = $("#assetStats"), profit = c.unreal + c.realized + c.dividends + fixedNow().income, original = total - profit;
     as.hidden = !(total > 0);
     as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金") +
-      stat("盈亏", signed(profit), tone(profit), original > 0 ? pct((profit / original) * 100) : "") : "";
+      stat("总盈亏", signed(profit), tone(profit), [original > 0 ? pct((profit / original) * 100) : "", "浮动 " + signed(c.unreal), "已实现 " + signed(c.realized),
+        Math.abs(c.dividends) >= 0.005 ? "分红利息 " + signed(c.dividends) : "", Math.abs(fixedNow().income) >= 0.005 ? "国债定存 " + signed(fixedNow().income) : ""].filter(Boolean).join(" · ")) : "";
     MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" || it.k === "cash" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存").replace("活期存款", "活期")));
     if (!MIX.lay) {
       $("#mix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有持仓。" : "正在读取…") + "</td></tr>";
@@ -1265,18 +1265,8 @@ TAL|好未来|TAL Education
 
   // ---------- stocks alone: each stock's share of the stocks, and the stocks' own profit ----------
   function renderStocks(c) {
-    const items = [], sold = [];
-    for (const s of c.syms) {
-      const realized = toUSD(s.realized, s.ccy);
-      if (s.shares > 0 && Number(state.prices[s.symbol]) > 0) items.push({ k: "stk", name: s.symbol, sub: nameOf(s.symbol), v: toUSD(s.mv, s.ccy), unreal: toUSD(s.unreal, s.ccy), realized });
-      else if (!(s.shares > 0) && Math.abs(realized) >= 0.005) sold.push({ name: s.symbol, sub: nameOf(s.symbol), realized });
-    }
-    const total = items.reduce((t, it) => t + it.v, 0), profit = c.unreal + c.realized + c.dividends, original = total - profit;
+    const items = c.syms.filter((s) => s.shares > 0 && Number(state.prices[s.symbol]) > 0);
     $("#stkSum").textContent = !c.priced && c.held ? "有股票还没有价格，暂不计入；点“刷新数据”取价格。" : [items.length ? "共 " + items.length + " 只" : "", c.fees ? "累计费用 " + money(c.fees) : ""].filter(Boolean).join(" · ");
-    const st = $("#stkStats");
-    st.hidden = !(total > 0 || sold.length);
-    st.innerHTML = st.hidden ? "" : stat("股票现值", money(total), "", "持有的股票按现价") + stat("原始投入", money(original), "", "买入花的钱减去卖出拿回的钱和分红利息") +
-      stat("盈亏", signed(profit), tone(profit), (original > 0 ? pct((profit / original) * 100) + " · " : "") + "浮动 " + signed(c.unreal) + " · 已实现 " + signed(c.realized) + (Math.abs(c.dividends) >= 0.005 ? " · 分红利息 " + signed(c.dividends) : ""));
     renderContrib(c);
   }
   // Each stock's own total profit (floating + realized + dividends), sold-out stocks included, as bars either side of zero.
