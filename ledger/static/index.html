@@ -26,7 +26,7 @@
   --c-stk: #2B5784;
   --c-bond: #7A5CA8;
   --c-dep: #A8742A;
-  --c-cash: #2F8F83;
+  --c-cash: #2F8F83; --c-dem: #7A8794;
   --f-display: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --f-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --f-num: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
@@ -36,7 +36,7 @@
     --bg: #11161C; --surface: #19212A; --ink: #E5EAF0; --muted: #95A2AF; --line: #2B3540;
     --accent: #82ABDA; --accent-soft: #1E2D3F; --on-accent: #0E1620;
     --up: #4DC28A; --down: #F0695D; --warn: #E0A84A;
-    --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062; --c-cash: #6CC3B5;
+    --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062; --c-cash: #6CC3B5; --c-dem: #A3AFBD;
     color-scheme: dark;
   }
 }
@@ -44,7 +44,7 @@
   --bg: #11161C; --surface: #19212A; --ink: #E5EAF0; --muted: #95A2AF; --line: #2B3540;
   --accent: #82ABDA; --accent-soft: #1E2D3F; --on-accent: #0E1620;
   --up: #4DC28A; --down: #F0695D; --warn: #E0A84A;
-  --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062; --c-cash: #6CC3B5;
+  --c-stk: #82ABDA; --c-bond: #B59BE0; --c-dep: #E0B062; --c-cash: #6CC3B5; --c-dem: #A3AFBD;
   color-scheme: dark;
 }
 
@@ -167,6 +167,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .sw.bond { background: var(--c-bond); }
 .sw.dep { background: var(--c-dep); }
 .sw.cash { background: var(--c-cash); }
+.sw.dem { background: var(--c-dem); }
 /* class rules below set display; this keeps the hidden attribute meaning hidden for all of them */
 [hidden] { display: none !important; }
 td.fname { white-space: normal; min-width: 170px; font-weight: 500; }
@@ -176,6 +177,8 @@ td.fname .nm { display: block; font-weight: 400; font-size: 12px; color: var(--m
 .seg input:checked + label:not(.b):not(.s) { background: var(--accent-soft); color: var(--accent); }
 #fixMsg[data-kind="ok"] { color: var(--accent); }
 #fixMsg[data-kind="err"] { color: var(--warn); }
+#cashMsg[data-kind="ok"], #inMsg[data-kind="ok"] { color: var(--accent); }
+#cashMsg[data-kind="err"], #inMsg[data-kind="err"] { color: var(--warn); }
 th { font-weight: 500; font-size: 12px; letter-spacing: .04em; color: var(--muted); text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
 tbody tr:last-child td { border-bottom: 0; }
@@ -325,6 +328,9 @@ footer p { margin: 0 0 6px; }
   .cal-grid { gap: 3px; }
   .cal-grid .c { min-height: 46px; padding: 3px 4px; }
   .cal-grid .c .v { font-size: 11px; }
+  /* Demand deposits on phones: narrower balance boxes, so the three currencies fit with little scrolling */
+  #cash th, #cash td, #inflow th, #inflow td { padding: 10px 8px; }
+  #cash input.px { width: 84px; padding: 8px 8px; }
   /* Cash on phones: name, amount and actions; the update date is dropped */
   #log { min-width: 0; }
   #log thead { display: none; }
@@ -422,7 +428,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="mix-h">
     <div class="head-row">
-      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。账本里不记现金，要留现金就买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
+      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。银行活期余额（人民币、港元、美元）记在“活期存款”里，按现在的汇率折成美元计入；要留现金赚利息，也可以买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是盈亏，和收益走势的累计收益一致。</p></div></details></div>
       <p class="hint" id="mixSum"></p>
     </div>
     <dl class="pnl-stats" id="assetStats" hidden></dl>
@@ -510,6 +516,32 @@ footer p { margin: 0 0 6px; }
     </div>
   </section>
 
+  <section aria-labelledby="cash-h">
+    <div class="head-row">
+      <div class="title"><h2 id="cash-h">活期存款</h2><details class="help"><summary aria-label="活期存款怎么算">?</summary><div class="help-body"><p>银行账户里的活期余额。一个账户可以同时有人民币、港元、美元（比如汇丰 One），各填各的余额，合计按现在的汇率折成美元。</p><p>计入资产占比、现资产，也同时计入原始资产，所以不影响盈亏和收益率。余额变了，直接在表里改数字。</p></div></details></div>
+      <p class="hint" id="cashSum"></p>
+    </div>
+    <div class="table-wrap">
+      <table id="cash">
+        <thead><tr><th>账户</th><th class="num">人民币</th><th class="num">港元</th><th class="num">美元</th><th class="num">折合美元</th><th>更新于</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7" class="empty">正在读取…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="in-h">
+    <div class="head-row">
+      <div class="title"><h2 id="in-h">入金记录</h2><details class="help"><summary aria-label="入金记录怎么算">?</summary><div class="help-body"><p>每次从国内银行转到券商或海外账户记一笔：国内转出多少人民币，到账是哪个币种、多少钱。转出金额填国内银行实际扣的总额（含手续费）；汇率 = 转出 ÷ 到账。</p><p>汇总行把到账的钱按现在的汇率折回人民币，和转出总额比：差额就是换汇价差、手续费和汇率变动合在一起的结果。这里只是台账，不影响资产占比和盈亏。</p></div></details></div>
+      <p class="hint" id="inSum"></p>
+    </div>
+    <div class="table-wrap">
+      <table id="inflow">
+        <thead><tr><th>日期</th><th class="num">转出（人民币）</th><th class="num">到账</th><th class="num">汇率（人民币／1 外币）</th><th class="num">手续费（人民币）</th><th>备注</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7" class="empty">正在读取…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <dialog id="entry" aria-labelledby="entry-h">
     <div class="dlg-head">
       <h2 id="entry-h">记一笔</h2>
@@ -521,6 +553,8 @@ footer p { margin: 0 0 6px; }
         <input type="radio" name="ekind" id="ek-stk" value="stk" checked><label for="ek-stk">股票</label>
         <input type="radio" name="ekind" id="ek-bond" value="bond"><label for="ek-bond">国债</label>
         <input type="radio" name="ekind" id="ek-dep" value="deposit"><label for="ek-dep">定期存款</label>
+        <input type="radio" name="ekind" id="ek-cash" value="cash"><label for="ek-cash">活期存款</label>
+        <input type="radio" name="ekind" id="ek-in" value="inflow"><label for="ek-in">入金</label>
       </div>
     </div>
     <form id="tradeForm" novalidate>
@@ -601,6 +635,32 @@ footer p { margin: 0 0 6px; }
       <div class="form-foot">
         <button class="btn" type="submit" id="fixSave">保存</button>
         <p id="fixMsg" class="hint"></p>
+      </div>
+    </form>
+    <form id="cashForm" novalidate hidden>
+      <div class="fields">
+        <div class="field wide"><label for="c-name">账户名称</label><input id="c-name" type="text" maxlength="60" placeholder="例如：汇丰 One"><span class="sub">已有同名账户时，会更新它的余额，不会重复添加。</span></div>
+        <div class="field"><label for="c-cny">人民币余额</label><input id="c-cny" type="number" inputmode="decimal" step="any" min="0" placeholder="没有就空着"></div>
+        <div class="field"><label for="c-hkd">港元余额</label><input id="c-hkd" type="number" inputmode="decimal" step="any" min="0" placeholder="没有就空着"></div>
+        <div class="field"><label for="c-usd">美元余额</label><input id="c-usd" type="number" inputmode="decimal" step="any" min="0" placeholder="没有就空着"></div>
+      </div>
+      <div class="form-foot">
+        <button class="btn" type="submit" id="cashSave">保存</button>
+        <p id="cashMsg" class="hint">银行活期账户里的钱，可以同时有几个币种。余额变了，在首页“活期存款”表里直接改。</p>
+      </div>
+    </form>
+    <form id="inForm" novalidate hidden>
+      <div class="fields">
+        <div class="field"><label for="i-date">转出日期</label><input id="i-date" type="date"></div>
+        <div class="field"><label for="i-out">转出人民币</label><input id="i-out" type="number" inputmode="decimal" step="any" min="0"><span class="sub">国内银行实际扣的总额，含手续费。</span></div>
+        <div class="field"><label for="i-ccy">到账币种</label><select id="i-ccy"><option value="USD">美元</option><option value="HKD">港元</option></select></div>
+        <div class="field"><label for="i-amt">到账金额</label><input id="i-amt" type="number" inputmode="decimal" step="any" min="0"></div>
+        <div class="field"><label for="i-fee">手续费（人民币，可不填）</label><input id="i-fee" type="number" inputmode="decimal" step="any" min="0"></div>
+        <div class="field wide"><label for="i-note">备注（可不填）</label><input id="i-note" type="text" maxlength="120" placeholder="例如：汇款编号、转到哪个账户"></div>
+      </div>
+      <div class="form-foot">
+        <button class="btn" type="submit" id="inSave">保存</button>
+        <p id="inMsg" class="hint"></p>
       </div>
     </form>
   </dialog>
@@ -934,7 +994,7 @@ TAL|好未来|TAL Education
   const EN = Object.fromEntries(LIST.map((x) => [x.c, x.en]));
   const DEFAULT_PICKS = ["QQQM", "VOO", "AAPL", "NVDA", "TSLA", "0700", "9988", "NIO"];
 
-  const state = { checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], pendingFix: null, fx: 7.8, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
+  const state = { checks: {}, actions: {}, dismissed: new Set(), history: {}, histReady: false, trades: [], fixed: [], cash: [], inflow: [], pendingFix: null, pendingCash: null, pendingIn: null, fx: 7.8, cny: 0, prices: {}, quotes: {}, updatedAt: "", source: "", ready: false, canWrite: null, pendingDelete: null };
   let db = null;
   const $ = (s) => document.querySelector(s);
 
@@ -948,7 +1008,8 @@ TAL|好未来|TAL Education
   const isHK = (sym) => /^\d{4,5}$/.test(sym);
   const ccyOf = (sym) => (isHK(sym) ? "HKD" : "USD");
   const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
-  const toUSD = (n, ccy) => (ccy === "HKD" ? n / state.fx : n);
+  const CNY_FALLBACK = 6.8; // until the first data refresh brings the real rate
+  const toUSD = (n, ccy) => (ccy === "HKD" ? n / state.fx : ccy === "CNY" ? n / (state.cny || CNY_FALLBACK) : n);
   const nameOf = (sym) => ZH[sym] || (state.quotes[sym] && state.quotes[sym].name) || "";
 
   // ---------- dates (all YYYY-MM-DD, Hong Kong calendar) ----------
@@ -973,14 +1034,14 @@ TAL|好未来|TAL Education
   const nf2 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const nf3 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 3 });
   const nfQ = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
-  const cur = (c) => (c === "HKD" ? "HK$" : "$");
+  const cur = (c) => (c === "HKD" ? "HK$" : c === "CNY" ? "¥" : "$");
   const money = (n, c) => (n < -0.004 ? "−" : "") + cur(c) + nf2.format(Math.abs(n));
   const price = (n, c) => cur(c) + nf3.format(n);
   const signed = (n, c) => (Math.abs(n) < 0.005 ? cur(c) + "0.00" : (n > 0 ? "+" : "−") + cur(c) + nf2.format(Math.abs(n)));
   const pct = (n) => (n > 0.004 ? "+" : n < -0.004 ? "−" : "") + nf2.format(Math.abs(n)) + "%";
   const tone = (n) => (n > 0.004 ? "up" : n < -0.004 ? "down" : "");
   // A small second line under an amount: its RMB value (HK stocks also get the USD value first).
-  const usdCap = (n, ccy, sgn) => (ccy === "HKD" && n != null ? '<span class="cap">≈ ' + (sgn ? signed : money)(toUSD(n, ccy)) + "</span>" : "");
+  const usdCap = (n, ccy, sgn) => ((ccy === "HKD" || ccy === "CNY") && n != null ? '<span class="cap">≈ ' + (sgn ? signed : money)(toUSD(n, ccy)) + "</span>" : "");
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   function setStatus(text, kind) { const el = $("#status"); el.textContent = text; el.dataset.kind = kind || ""; }
@@ -1069,13 +1130,14 @@ TAL|好未来|TAL Education
   }
 
   // ---------- asset mix (share of total assets) ----------
-  const CLASS_NAME = { stk: "股票", cash: "现金（SGOV）", bond: "国债", dep: "定期存款" };
+  const CLASS_NAME = { stk: "股票", cash: "现金（SGOV）", bond: "国债", dep: "定期存款", dem: "活期存款" };
   const SHADES = [1, 0.7, 0.5, 0.36, 0.26];
   function mixItems(c) {
     const d = todayUS(), items = [];
     for (const s of c.syms) if (s.shares > 0 && Number(state.prices[s.symbol]) > 0) items.push({ k: s.symbol === "SGOV" ? "cash" : "stk", name: s.symbol, sub: nameOf(s.symbol), v: toUSD(s.mv, s.ccy) });
     for (const f of state.fixed) { const r = fixedAt(f, d); if (r && r.value > 0) items.push({ k: f.kind === "bond" ? "bond" : "dep", name: f.name, sub: f.note || "", v: r.value }); }
-    const order = { stk: 0, cash: 1, bond: 2, dep: 3 };
+    for (const a of state.cash) { const v = cashUSD(a); if (v > 0) items.push({ k: "dem", name: a.name, sub: cashText(a), v }); }
+    const order = { stk: 0, cash: 1, bond: 2, dep: 3, dem: 4 };
     items.sort((a, b) => order[a.k] - order[b.k] || b.v - a.v);
     const seen = {};
     for (const it of items) { const n = seen[it.k] = (seen[it.k] || 0) + 1; it.op = SHADES[Math.min(n - 1, SHADES.length - 1)]; }
@@ -1191,7 +1253,7 @@ TAL|好未来|TAL Education
     as.hidden = !(total > 0);
     as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金") +
       stat("盈亏", signed(profit), tone(profit), original > 0 ? pct((profit / original) * 100) : "") : "";
-    MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" || it.k === "cash" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存")));
+    MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" || it.k === "cash" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存").replace("活期存款", "活期")));
     if (!MIX.lay) {
       $("#mix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有持仓。" : "正在读取…") + "</td></tr>";
       $("#mix tfoot").innerHTML = "";
@@ -2009,6 +2071,154 @@ TAL|好未来|TAL Education
       d.cost > 0 ? (costShown ? "蓝色点线是平均成本 " : "平均成本 ") + fmt(d.cost) + (costShown ? "" : "（现价" + (last >= d.cost ? "高" : "低") + " " + pct(Math.abs(last / d.cost - 1) * 100) + "，不在图内）") : "", d.skipped ? d.skipped + " 只没有分时数据或上一收盘价，未计入" : ""].filter(Boolean).join(" · ");
   }
 
+  // ---------- demand deposits (活期存款): one account, several currencies ----------
+  const CASH_CCY = ["CNY", "HKD", "USD"], CCY_NAME = { CNY: "人民币", HKD: "港元", USD: "美元" };
+  const cashUSD = (a) => CASH_CCY.reduce((t, k) => t + (a.bal[k] > 0 ? toUSD(a.bal[k], k) : 0), 0);
+  const cashText = (a) => CASH_CCY.filter((k) => a.bal[k] > 0).map((k) => money(a.bal[k], k)).join(" · ");
+  const cnyNote = () => " · 人民币汇率还没取到，暂按 " + CNY_FALLBACK + " 折算，点“刷新数据”更新";
+  function applyCash(snap) {
+    state.cash = snap.docs.map((doc) => {
+      const x = doc.data() || {}, bal = {};
+      if (x.balances && typeof x.balances === "object") { for (const k of CASH_CCY) if (Number(x.balances[k]) > 0) bal[k] = Number(x.balances[k]); }
+      else if (Number(x.amount) > 0) bal[x.currency === "HKD" ? "HKD" : x.currency === "CNY" ? "CNY" : "USD"] = Number(x.amount); // the single-currency records of the old cash table
+      return { id: doc.id, name: String(x.name || "活期账户"), bal, date: /^\d{4}-\d{2}-\d{2}$/.test(x.date || "") ? x.date : "" };
+    }).sort((a, b) => cashUSD(b) - cashUSD(a) || a.name.localeCompare(b.name));
+    if (state.pendingCash && !state.cash.some((a) => a.id === state.pendingCash)) state.pendingCash = null;
+    render();
+  }
+  function renderCash() {
+    const tb = $("#cash tbody"), ro = !db || state.canWrite === false;
+    const total = state.cash.reduce((t, a) => t + cashUSD(a), 0), needCny = !state.cny && state.cash.some((a) => a.bal.CNY > 0);
+    $("#cashSum").textContent = state.cash.length ? "合计 " + money(total) + (needCny ? cnyNote() : "") : "";
+    if (!state.cash.length) {
+      tb.innerHTML = '<tr><td colspan="7" class="empty">' + (state.ready ? "还没有记录活期存款。在“＋ 记一笔”里选“活期存款”添加。" : "正在读取…") + "</td></tr>";
+      return;
+    }
+    tb.innerHTML = state.cash.map((a) => {
+      const id = esc(a.id);
+      const cell = (k) => '<td class="num"><input class="px cash-amt" type="number" inputmode="decimal" step="any" min="0" placeholder="0" data-id="' + id + '" data-ccy="' + k +
+        '" value="' + (a.bal[k] > 0 ? a.bal[k] : "") + '" aria-label="' + esc(a.name) + " " + CCY_NAME[k] + '余额"' + (ro ? " disabled" : "") + "></td>";
+      const acts = ro ? "" : state.pendingCash === a.id
+        ? '<button class="mini danger" type="button" data-cact="confirm" data-id="' + id + '">确认删除</button><button class="mini" type="button" data-cact="cancel">取消</button>'
+        : '<button class="mini" type="button" data-cact="del" data-id="' + id + '">删除</button>';
+      return '<tr><td class="fname">' + esc(a.name) + "</td>" + cell("CNY") + cell("HKD") + cell("USD") + '<td class="num">' + money(cashUSD(a)) + "</td><td>" +
+        (a.date ? md(a.date) : "") + '</td><td><div class="acts">' + acts + "</div></td></tr>";
+    }).join("");
+  }
+  $("#cash").addEventListener("change", async (e) => {
+    const el = e.target;
+    if (!el.classList || !el.classList.contains("cash-amt") || !db) return;
+    const a = state.cash.find((x) => x.id === el.dataset.id), raw = el.value.trim(), v = raw === "" ? 0 : parseFloat(raw);
+    if (!a) return;
+    if (!(v >= 0)) { setStatus("余额不能是负数，没有就填 0 或留空。", "err"); render(); return; }
+    try {
+      await db.doc("cash/" + a.id).update({ balances: Object.assign({}, a.bal, { [el.dataset.ccy]: v }), date: todayUS() });
+      setStatus("已更新「" + a.name + "」的" + CCY_NAME[el.dataset.ccy] + "余额。", "ok");
+    } catch (err) { setStatus(errText(err), "err"); render(); }
+  });
+  $("#cash").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-cact]");
+    if (!b) return;
+    const act = b.dataset.cact;
+    if (act === "del") { state.pendingCash = b.dataset.id; render(); return; }
+    if (act === "cancel") { state.pendingCash = null; render(); return; }
+    if (act === "confirm" && db) {
+      b.disabled = true;
+      try {
+        await db.doc("cash/" + b.dataset.id).delete();
+        state.pendingCash = null;
+        setStatus("已删除一个活期账户。", "ok");
+      } catch (err) { setStatus(errText(err), "err"); render(); }
+    }
+  });
+  $("#cashForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const say = (t, k) => { const el = $("#cashMsg"); el.textContent = t; el.dataset.kind = k || ""; };
+    if (!db) { say("还连不上数据库，暂时不能保存。", "err"); return; }
+    const name = $("#c-name").value.trim().slice(0, 60) || "活期账户", bal = {};
+    for (const [k, id] of [["CNY", "#c-cny"], ["HKD", "#c-hkd"], ["USD", "#c-usd"]]) {
+      const raw = $(id).value.trim();
+      if (raw === "") continue;
+      const v = parseFloat(raw);
+      if (!(v >= 0)) { say("余额不能是负数。", "err"); return; }
+      bal[k] = v;
+    }
+    if (!Object.keys(bal).length) { say("至少填一个币种的余额。", "err"); return; }
+    const btn = $("#cashSave");
+    btn.disabled = true;
+    try {
+      const ex = state.cash.find((a) => a.name === name);
+      if (ex) await db.doc("cash/" + ex.id).update({ balances: Object.assign({}, ex.bal, bal), date: todayUS() });
+      else await db.collection("cash").add({ name, balances: bal, date: todayUS(), createdAt: new Date().toISOString() });
+      say(ex ? "已更新“" + name + "”的余额。" : "已保存：" + name + "。", "ok");
+      $("#cashForm").reset();
+    } catch (err) { say(errText(err), "err"); } finally { btn.disabled = false; }
+  });
+
+  // ---------- transfers in (入金记录): RMB out of the domestic bank, USD or HKD arriving abroad ----------
+  function applyInflow(snap) {
+    state.inflow = snap.docs.map((doc) => {
+      const x = doc.data() || {};
+      return { id: doc.id, date: x.date, out: Number(x.cnyOut), ccy: x.currency === "HKD" ? "HKD" : "USD", amt: Number(x.amount), fee: Number(x.fee) || 0, note: x.note || "" };
+    }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") && r.out > 0 && r.amt > 0).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    if (state.pendingIn && !state.inflow.some((r) => r.id === state.pendingIn)) state.pendingIn = null;
+    render();
+  }
+  function renderInflow() {
+    const tb = $("#inflow tbody"), ro = !db || state.canWrite === false, list = state.inflow;
+    if (!list.length) {
+      $("#inSum").textContent = "";
+      tb.innerHTML = '<tr><td colspan="7" class="empty">' + (state.ready ? "还没有入金记录。在“＋ 记一笔”里选“入金”添加。" : "正在读取…") + "</td></tr>";
+      return;
+    }
+    const sum = (f) => list.reduce((t, r) => t + f(r), 0), rate = state.cny || CNY_FALLBACK;
+    const out = sum((r) => r.out), usd = sum((r) => (r.ccy === "USD" ? r.amt : 0)), hkd = sum((r) => (r.ccy === "HKD" ? r.amt : 0)), fee = sum((r) => r.fee);
+    const back = usd * rate + (hkd / state.fx) * rate, diff = back - out;
+    $("#inSum").textContent = ["共 " + list.length + " 笔", "转出 " + money(out, "CNY"), "到账 " + [usd > 0 ? money(usd) : "", hkd > 0 ? money(hkd, "HKD") : ""].filter(Boolean).join(" + "),
+      "按现在的汇率折回 " + money(back, "CNY") + "，比转出" + (diff >= 0 ? "多 " : "少 ") + money(Math.abs(diff), "CNY"), fee > 0 ? "手续费共 " + money(fee, "CNY") : ""].filter(Boolean).join(" · ") + (state.cny ? "" : cnyNote());
+    tb.innerHTML = list.map((r) => {
+      const id = esc(r.id);
+      const acts = ro ? "" : state.pendingIn === r.id
+        ? '<button class="mini danger" type="button" data-iact="confirm" data-id="' + id + '">确认删除</button><button class="mini" type="button" data-iact="cancel">取消</button>'
+        : '<button class="mini" type="button" data-iact="del" data-id="' + id + '">删除</button>';
+      return "<tr><td>" + md(r.date) + '</td><td class="num">' + money(r.out, "CNY") + '</td><td class="num">' + money(r.amt, r.ccy) + '</td><td class="num">' + (r.out / r.amt).toFixed(4) + '</td><td class="num">' +
+        (r.fee > 0 ? money(r.fee, "CNY") : "") + "</td><td>" + esc(r.note) + '</td><td><div class="acts">' + acts + "</div></td></tr>";
+    }).join("");
+  }
+  $("#inflow").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-iact]");
+    if (!b) return;
+    const act = b.dataset.iact;
+    if (act === "del") { state.pendingIn = b.dataset.id; render(); return; }
+    if (act === "cancel") { state.pendingIn = null; render(); return; }
+    if (act === "confirm" && db) {
+      b.disabled = true;
+      try {
+        await db.doc("inflow/" + b.dataset.id).delete();
+        state.pendingIn = null;
+        setStatus("已删除一笔入金记录。", "ok");
+      } catch (err) { setStatus(errText(err), "err"); render(); }
+    }
+  });
+  $("#inForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const say = (t, k) => { const el = $("#inMsg"); el.textContent = t; el.dataset.kind = k || ""; };
+    if (!db) { say("还连不上数据库，暂时不能保存。", "err"); return; }
+    const date = $("#i-date").value, out = parseFloat($("#i-out").value), amount = parseFloat($("#i-amt").value), currency = $("#i-ccy").value, feeRaw = $("#i-fee").value.trim(), fee = feeRaw === "" ? 0 : parseFloat(feeRaw);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { say("请填转出日期。", "err"); return; }
+    if (!(out > 0) || !(amount > 0)) { say("转出的人民币和到账金额都要填，要大于 0。", "err"); return; }
+    if (!(fee >= 0) || fee > out) { say("手续费不能是负数，也不能比转出还多。", "err"); return; }
+    const btn = $("#inSave");
+    btn.disabled = true;
+    try {
+      await db.collection("inflow").add({ date, cnyOut: out, currency, amount, fee, note: $("#i-note").value.trim().slice(0, 120), createdAt: new Date().toISOString() });
+      say("已保存：" + md(date) + " 转出 " + money(out, "CNY") + "，到账 " + money(amount, currency) + "，汇率 " + (out / amount).toFixed(4) + "。", "ok");
+      const keep = $("#i-date").value;
+      $("#inForm").reset();
+      $("#i-date").value = keep;
+    } catch (err) { say(errText(err), "err"); } finally { btn.disabled = false; }
+  });
+
   function render() {
     const list = sortedTrades();
     const c = compute(list);
@@ -2019,6 +2229,8 @@ TAL|好未来|TAL Education
     renderPlan(list);
     renderHoldings(c);
     renderFixed();
+    renderCash();
+    renderInflow();
     renderLog(list);
     renderSymList(c);
     renderHints();
@@ -2326,7 +2538,9 @@ TAL|好未来|TAL Education
   // Treasuries and deposits: kind switch, save, reference price, delete.
   document.querySelectorAll('input[name="ekind"]').forEach((r) => r.addEventListener("change", () => {
     const kind = document.querySelector('input[name="ekind"]:checked').value, bond = kind === "bond";
-    $("#tradeForm").hidden = kind !== "stk"; $("#fixForm").hidden = kind === "stk";
+    $("#tradeForm").hidden = kind !== "stk"; $("#fixForm").hidden = kind !== "bond" && kind !== "deposit";
+    $("#cashForm").hidden = kind !== "cash"; $("#inForm").hidden = kind !== "inflow";
+    if (kind === "inflow" && !$("#i-date").value) $("#i-date").value = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()); // the transfer is made on a Beijing day
     $("#fs-bond").hidden = !bond; $("#fs-dep").hidden = bond;
     $("#x-name").placeholder = bond ? "例如：美国国债 4.25% 2029/6/30" : "例如：美元定期 12 个月";
   }));
@@ -2642,6 +2856,8 @@ TAL|好未来|TAL Education
     db.doc("config/actions").onSnapshot(applyDismissed, () => {});
     db.doc("config/main").onSnapshot(applyConfig, () => {});
     db.collection("fixed").onSnapshot(applyFixed, () => {});
+    db.collection("cash").onSnapshot(applyCash, () => {});
+    db.collection("inflow").onSnapshot(applyInflow, () => {});
   }
 
   function applyFixed(snap) {
@@ -2681,6 +2897,8 @@ TAL|好未来|TAL Education
     const c = snap.data() || {};
     const fx = Number(c.fx);
     if (fx >= 5 && fx <= 10) state.fx = r2(fx);
+    const cny = Number(c.cny);
+    if (cny >= 5 && cny <= 9) state.cny = cny;
     state.prices = Object.assign({}, c.prices || {});
     state.quotes = JSON.parse(JSON.stringify(c.quotes || {}));
     state.updatedAt = typeof c.updatedAt === "string" ? c.updatedAt : "";

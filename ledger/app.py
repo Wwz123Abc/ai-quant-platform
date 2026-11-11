@@ -42,7 +42,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(ROOT, "data")
 DB_PATH = os.path.join(DATA, "ledger.db")
 STATIC = os.path.join(ROOT, "static")
-USER_COLLS = {"trades", "fixed", "cash", "config", "reading", "plan"}
+USER_COLLS = {"trades", "fixed", "cash", "inflow", "config", "reading", "plan"}
 SHARED_COLLS = {"history", "candles", "watch", "actions", "checks"}  # market data: written only by the server, uid 0
 PAGES = {"/": "index.html", "/index.html": "index.html", "/reading": "reading.html", "/account": "account.html"}
 PUBLIC_PAGES = {"/privacy": "privacy.html"}
@@ -815,6 +815,8 @@ def refresh_market(uid):
         if fxb:
             put_doc(0, "watch", "USDCNY", {"name": "美元兑人民币（在岸）", "unit": "人民币/美元", "bars": fxb, "updatedAt": now_iso()})
             report["usdcny"] = {"rate": fxb[-1][4], "date": fxb[-1][0]}
+            if 5 <= fxb[-1][4] <= 9:  # the page turns RMB balances and transfers into USD with this
+                put_doc(uid, "config", "main", {"cny": round(fxb[-1][4], 4)}, merge=True)
     except Exception as e:
         report["errors"]["人民币汇率"] = str(e)
     for s in traded:
