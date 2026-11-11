@@ -454,6 +454,19 @@ footer p { margin: 0 0 6px; }
     </div>
   </section>
 
+  <section aria-labelledby="cash-h">
+    <div class="head-row">
+      <div class="title"><h2 id="cash-h">活期存款</h2><details class="help"><summary aria-label="活期存款怎么算">?</summary><div class="help-body"><p>银行账户里的活期余额。一个账户可以同时有人民币、港元、美元（比如汇丰 One），各填各的余额，合计按现在的汇率折成美元。</p><p>计入资产占比、现资产，也同时计入原始资产，所以不影响盈亏和收益率。余额变了，直接在表里改数字。</p></div></details></div>
+      <p class="hint" id="cashSum"></p>
+    </div>
+    <div class="table-wrap">
+      <table id="cash">
+        <thead><tr><th>账户</th><th class="num">人民币</th><th class="num">港元</th><th class="num">美元</th><th class="num">折合美元</th><th>更新于</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7" class="empty">正在读取…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <section aria-labelledby="stk-h">
     <div class="head-row">
       <div class="title"><h2 id="stk-h">股票</h2><details class="help"><summary aria-label="股票占比和盈亏怎么算">?</summary><div class="help-body"><p>每只股票的持有股数、成本、现价和盈亏（“占股票”是它占全部股票现值的多少）。港股按当前汇率折成美元。每只股票占总资产的比例看上面的“资产占比”圆盘，鼠标移上去可以看到。</p><p>浮动盈亏是相对剩余股数的平均成本；这只股票以前卖出赚的钱显示为“已实现”，收到的分红显示为“分红利息”，三者相加才是这只股票的总盈亏（都已扣费用），下面的柱状图画的就是每只股票的总盈亏。整个账户的总盈亏看上面“资产占比”里的“总盈亏”。SGOV 每月分红的利息按新浪的分红数据自动计入，不用手动记。</p><p>已经全部卖出的股票没有现值，不在表格里，但它们的已实现盈亏算进上面的盈亏。</p><p>点页面顶部的“刷新数据”更新现价和汇率。交易时段取盘中价（可能有几分钟延迟，标“盘中”），其他时间取最近一个交易日的收盘价。</p></div></details></div>
@@ -514,19 +527,6 @@ footer p { margin: 0 0 6px; }
       <table id="fixed">
         <thead><tr><th>名称</th><th class="num">本金或面值</th><th>期限</th><th class="num">利率</th><th class="num">已计收益</th><th class="num">当前价值</th><th class="num">参考卖出价</th><th class="num">到期总收益</th><th></th></tr></thead>
         <tbody><tr><td colspan="9" class="empty">正在读取…</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section aria-labelledby="cash-h">
-    <div class="head-row">
-      <div class="title"><h2 id="cash-h">活期存款</h2><details class="help"><summary aria-label="活期存款怎么算">?</summary><div class="help-body"><p>银行账户里的活期余额。一个账户可以同时有人民币、港元、美元（比如汇丰 One），各填各的余额，合计按现在的汇率折成美元。</p><p>计入资产占比、现资产，也同时计入原始资产，所以不影响盈亏和收益率。余额变了，直接在表里改数字。</p></div></details></div>
-      <p class="hint" id="cashSum"></p>
-    </div>
-    <div class="table-wrap">
-      <table id="cash">
-        <thead><tr><th>账户</th><th class="num">人民币</th><th class="num">港元</th><th class="num">美元</th><th class="num">折合美元</th><th>更新于</th><th></th></tr></thead>
-        <tbody><tr><td colspan="7" class="empty">正在读取…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -1243,9 +1243,11 @@ TAL|好未来|TAL Education
   const MIX = { chart: "#mixChart", tip: "#mixTip", table: "#mix", lay: null,
     tipHtml: (it, total) => '<div class="d">' + esc(it.name) + " · " + CLASS_NAME[it.k] + "</div>" + tipRow("金额", money(it.v)) + tipRow("占总资产", nf2.format((it.v / total) * 100) + "%") };
   wireDonut(MIX);
+  let mixTotalUSD = 0; // the total assets of the last mix render, for the share shown with the demand deposits
 
   function renderMix(c) {
     const items = mixItems(c), total = items.reduce((t, it) => t + it.v, 0);
+    mixTotalUSD = total;
     $("#mixTip").hidden = true;
     const unpriced = c.syms.some((s) => s.shares > 0 && !(Number(state.prices[s.symbol]) > 0));
     $("#mixSum").textContent = unpriced ? "有股票还没有价格，暂不计入；点“刷新数据”取价格。" : items.length ? "共 " + items.length + " 项" : "";
@@ -2076,7 +2078,7 @@ TAL|好未来|TAL Education
   function renderCash() {
     const tb = $("#cash tbody"), ro = !db || state.canWrite === false;
     const total = state.cash.reduce((t, a) => t + cashUSD(a), 0), needCny = !state.cny && state.cash.some((a) => a.bal.CNY > 0);
-    $("#cashSum").textContent = state.cash.length ? "合计 " + money(total) + (needCny ? cnyNote() : "") : "";
+    $("#cashSum").textContent = state.cash.length ? "合计 " + money(total) + (mixTotalUSD > 0 ? "，占总资产 " + nf2.format((total / mixTotalUSD) * 100) + "%" : "") + (needCny ? cnyNote() : "") : "";
     if (!state.cash.length) {
       tb.innerHTML = '<tr><td colspan="7" class="empty">' + (state.ready ? "还没有记录活期存款。在“＋ 记一笔”里选“活期存款”添加。" : "正在读取…") + "</td></tr>";
       return;
