@@ -214,6 +214,39 @@ test("all held stocks as one: value, change against the previous closes, and wha
   assert.equal(C.portfolioQuote([{ shares: 1, ccy: "USD", price: 10, prev: 0 }], toUSD).pct, null);
 });
 
+test("the day's change counts what was bought or sold since the previous close", () => {
+  const buy = (date, shares, price, fees = 0, symbol = "X") => ({ date, side: "buy", symbol, shares, price, fees });
+  const sell = (date, shares, price, fees = 0, symbol = "X") => ({ date, side: "sell", symbol, shares, price, fees });
+  // all bought today (the NVDA case): measured from the buy prices, so it equals the floating result, not 5 x (price - prev)
+  const nv = C.dayChange([buy("2026-11-10", 1, 169.99, 0, "NVDA"), buy("2026-11-10", 1, 173, 0, "NVDA"), buy("2026-11-10", 3, 169.99, 0, "NVDA")], "NVDA", "2026-11-09", 168.89, 178.66);
+  near(nv.amount, 5 * 168.89 - (169.99 + 173 + 3 * 169.99));
+  near(nv.amount, -8.51);
+  near(nv.base, 852.96);
+  assert.deepEqual([nv.held, nv.now, nv.traded], [0, 5, true]);
+  // held from before and untouched: price change on the shares
+  const still = C.dayChange([buy("2026-10-01", 3, 90)], "X", "2026-11-09", 110, 100);
+  near(still.amount, 30);
+  near(still.base, 300);
+  assert.equal(still.traded, false);
+  // held 2, bought 2 more today with a fee: old shares from the close, new shares from the buy price
+  const more = C.dayChange([buy("2026-10-01", 2, 90), buy("2026-11-10", 2, 105, 0.01)], "X", "2026-11-09", 110, 100);
+  near(more.amount, 2 * 10 + 2 * (110 - 105) - 0.01);
+  near(more.base, 200 + 210);
+  // held 5, sold 2 today: the sold shares count at their sale price
+  const less = C.dayChange([buy("2026-10-01", 5, 90), sell("2026-11-10", 2, 108, 0.01)], "X", "2026-11-09", 110, 100);
+  near(less.amount, 3 * 10 + 2 * (108 - 100) - 0.01);
+  // other stocks are ignored; a split or a missing price leaves it undecided
+  near(C.dayChange([buy("2026-11-10", 9, 1, 0, "Y"), buy("2026-10-01", 1, 90)], "X", "2026-11-09", 110, 100).amount, 10);
+  assert.equal(C.dayChange([{ date: "2026-10-05", side: "split", symbol: "X", from: 1, to: 2 }], "X", "2026-11-09", 110, 100), null);
+  assert.equal(C.dayChange([], "X", "2026-11-09", 110, 0), null);
+  assert.equal(C.dayChange([], "X", "", 110, 100), null);
+  // the portfolio card sums these instead of shares x (price - prev)
+  const toUSD = (n) => n;
+  const q = C.portfolioQuote([{ shares: 5, ccy: "USD", price: 168.89, prev: 178.66, day: nv }, { shares: 3, ccy: "USD", price: 110, prev: 100, day: still }], toUSD);
+  near(q.change, -8.51 + 30);
+  near(q.pct, ((-8.51 + 30) / (852.96 + 300)) * 100);
+});
+
 test("the held stocks as one intraday line: forward-filled per minute, the previous close before a stock's first minute", () => {
   const toUSD = (n, ccy) => (ccy === "HKD" ? n / 8 : n);
   const r = C.intradayPortfolio([

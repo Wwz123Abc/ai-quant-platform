@@ -192,10 +192,36 @@
   // money is back in savings.
   const fixedOn = (f, d) => (f.kind === "bond" ? bondAt(f, d, markOn(f, d)) : depositAt(f, d));
 
+  // What one stock gained or lost since its previous close, counting what was bought or sold since then: the shares it is
+  // worth now, minus the shares held at the previous close at that close, minus the money put in (buys and their fees) plus
+  // the money taken out (sells less their fees). A share bought today is measured from its buy price, not from yesterday's
+  // close, and a share sold today from its sale price. records are the ledger records, prevDate the date of the previous
+  // close, price and prev in the stock's own currency. Returns {amount, base, held, now, traded}: base is what the day's
+  // percentage is a share of (the value at the previous close plus the cost of what was bought), traded whether anything
+  // was bought or sold since. null when a split is on record (share counts would not line up) or a price is missing.
+  function dayChange(records, symbol, prevDate, price, prev) {
+    if (!(price > 0) || !(prev > 0) || !prevDate) return null;
+    let held = 0, moved = 0, net = 0, bought = 0, traded = false;
+    for (const r of records) {
+      if (r.symbol !== symbol) continue;
+      if (r.side === "split") return null;
+      if (!isTrade(r)) continue;
+      const n = num(r.shares), gross = n * num(r.price), fee = num(r.fees), buy = r.side === "buy";
+      if (r.date <= prevDate) { held += buy ? n : -n; continue; }
+      traded = true;
+      moved += buy ? n : -n;
+      net += buy ? gross + fee : -(gross - fee);
+      if (buy) bought += gross;
+    }
+    const now = held + moved;
+    return { amount: now * price - held * prev - net, base: held * prev + bought, held, now, traded };
+  }
+
   // All held stocks as one: rows are {shares, ccy, price, prev} with price and the previous close in the stock's own currency;
   // toUSD converts. value is what the stocks are worth at these prices, change what they gained or lost against the previous
   // closes, pct that change as a share of the previous value. A stock without a price is left out (missing); one without a
   // previous close counts in the value but not in the change.
+  // A row may carry day: {amount, base} from dayChange, which counts what was bought or sold since the previous close.
   function portfolioQuote(rows, toUSD) {
     let value = 0, count = 0, missing = 0, change = 0, base = 0, withPrev = 0;
     for (const r of rows) {
@@ -204,8 +230,8 @@
       value += toUSD(r.price * r.shares, r.ccy);
       count++;
       if (r.prev > 0) {
-        change += toUSD((r.price - r.prev) * r.shares, r.ccy);
-        base += toUSD(r.prev * r.shares, r.ccy);
+        change += toUSD(r.day ? r.day.amount : (r.price - r.prev) * r.shares, r.ccy);
+        base += toUSD(r.day ? r.day.base : r.prev * r.shares, r.ccy);
         withPrev++;
       }
     }
@@ -236,6 +262,7 @@
   root.LedgerCalc = {
     intradayPortfolio,
     portfolioQuote,
+    dayChange,
     SIDES, isTrade, ratio, sortRecords, apply, cashFlow, holdings, missingActions, autoDividends, splitList, factorAfter, splitAdjust,
     parseD, fmtD, dayDiff, addMonths, coupons, bondAt, depositAt, markOn, fixedStart, fixedOn,
   };
