@@ -522,13 +522,13 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="in-h">
     <div class="head-row">
-      <div class="title"><h2 id="in-h">入金记录</h2><details class="help"><summary aria-label="入金记录怎么算">?</summary><div class="help-body"><p>每次从国内银行转到券商或海外账户记一笔：国内转出多少人民币，到账是哪个币种、多少钱。转出金额填国内银行实际扣的总额（含手续费）；汇率 = 转出 ÷ 到账。</p><p>汇总行把到账的钱按现在的汇率折回人民币，和转出总额比：差额就是换汇价差、手续费和汇率变动合在一起的结果。这里只是台账，不影响资产占比和盈亏。</p></div></details></div>
+      <div class="title"><h2 id="in-h">出入金明细</h2><details class="help"><summary aria-label="出入金明细怎么算">?</summary><div class="help-body"><p>每次资金进出记一笔。入金：从国内银行转到券商或海外账户，记国内转出多少人民币、到账是哪个币种和金额。出金：从海外账户转回国内，记转出的币种和金额、国内收到多少人民币。人民币一栏填国内银行实际扣（或收）的总额，含手续费；汇率 = 人民币 ÷ 外币。</p><p>汇总行：净入金 = 入金 − 出金；再把净到账的外币按现在的汇率折回人民币，和净入金比，差额就是换汇价差、手续费和汇率变动合在一起的结果。这里只是台账，不影响资产占比和盈亏。</p></div></details></div>
       <p class="hint" id="inSum"></p>
     </div>
     <div class="table-wrap">
       <table id="inflow">
-        <thead><tr><th>日期</th><th class="num">转出（人民币）</th><th class="num">到账</th><th class="num">汇率（人民币／1 外币）</th><th class="num">手续费（人民币）</th><th>备注</th><th></th></tr></thead>
-        <tbody><tr><td colspan="7" class="empty">正在读取…</td></tr></tbody>
+        <thead><tr><th>日期</th><th>方向</th><th class="num">人民币</th><th class="num">外币</th><th class="num">汇率（人民币／1 外币）</th><th class="num">手续费（人民币）</th><th>备注</th><th></th></tr></thead>
+        <tbody><tr><td colspan="8" class="empty">正在读取…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -545,7 +545,7 @@ footer p { margin: 0 0 6px; }
         <input type="radio" name="ekind" id="ek-bond" value="bond"><label for="ek-bond">国债</label>
         <input type="radio" name="ekind" id="ek-dep" value="deposit"><label for="ek-dep">定期存款</label>
         <input type="radio" name="ekind" id="ek-cash" value="cash"><label for="ek-cash">活期存款</label>
-        <input type="radio" name="ekind" id="ek-in" value="inflow"><label for="ek-in">入金</label>
+        <input type="radio" name="ekind" id="ek-in" value="inflow"><label for="ek-in">出入金</label>
       </div>
     </div>
     <form id="tradeForm" novalidate>
@@ -642,10 +642,11 @@ footer p { margin: 0 0 6px; }
     </form>
     <form id="inForm" novalidate hidden>
       <div class="fields">
-        <div class="field"><label for="i-date">转出日期</label><input id="i-date" type="date"></div>
-        <div class="field"><label for="i-out">转出人民币</label><input id="i-out" type="number" inputmode="decimal" step="any" min="0"><span class="sub">国内银行实际扣的总额，含手续费。</span></div>
-        <div class="field"><label for="i-ccy">到账币种</label><select id="i-ccy"><option value="USD">美元</option><option value="HKD">港元</option></select></div>
-        <div class="field"><label for="i-amt">到账金额</label><input id="i-amt" type="number" inputmode="decimal" step="any" min="0"></div>
+        <div class="field"><label for="i-dir">方向</label><select id="i-dir"><option value="in">入金：国内 → 境外</option><option value="out">出金：境外 → 国内</option></select></div>
+        <div class="field"><label for="i-date">日期</label><input id="i-date" type="date"></div>
+        <div class="field"><label for="i-out" id="i-out-lbl">转出人民币</label><input id="i-out" type="number" inputmode="decimal" step="any" min="0"><span class="sub" id="i-out-sub">国内银行实际扣的总额，含手续费。</span></div>
+        <div class="field"><label for="i-ccy" id="i-ccy-lbl">到账币种</label><select id="i-ccy"><option value="USD">美元</option><option value="HKD">港元</option></select></div>
+        <div class="field"><label for="i-amt" id="i-amt-lbl">到账金额</label><input id="i-amt" type="number" inputmode="decimal" step="any" min="0"></div>
         <div class="field"><label for="i-fee">手续费（人民币，可不填）</label><input id="i-fee" type="number" inputmode="decimal" step="any" min="0"></div>
         <div class="field wide"><label for="i-note">备注（可不填）</label><input id="i-note" type="text" maxlength="120" placeholder="例如：汇款编号、转到哪个账户"></div>
       </div>
@@ -2134,8 +2135,8 @@ TAL|好未来|TAL Education
   function applyInflow(snap) {
     state.inflow = snap.docs.map((doc) => {
       const x = doc.data() || {};
-      return { id: doc.id, date: x.date, out: Number(x.cnyOut), ccy: x.currency === "HKD" ? "HKD" : "USD", amt: Number(x.amount), fee: Number(x.fee) || 0, note: x.note || "" };
-    }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") && r.out > 0 && r.amt > 0).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      return { id: doc.id, date: x.date, dir: x.dir === "out" ? "out" : "in", cny: Number(x.cny != null ? x.cny : x.cnyOut), ccy: x.currency === "HKD" ? "HKD" : "USD", amt: Number(x.amount), fee: Number(x.fee) || 0, note: x.note || "" };
+    }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") && r.cny > 0 && r.amt > 0).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     if (state.pendingIn && !state.inflow.some((r) => r.id === state.pendingIn)) state.pendingIn = null;
     render();
   }
@@ -2143,20 +2144,21 @@ TAL|好未来|TAL Education
     const tb = $("#inflow tbody"), ro = !db || state.canWrite === false, list = state.inflow;
     if (!list.length) {
       $("#inSum").textContent = "";
-      tb.innerHTML = '<tr><td colspan="7" class="empty">' + (state.ready ? "还没有入金记录。在“＋ 记一笔”里选“入金”添加。" : "正在读取…") + "</td></tr>";
+      tb.innerHTML = '<tr><td colspan="8" class="empty">' + (state.ready ? "还没有出入金记录。在“＋ 记一笔”里选“出入金”添加。" : "正在读取…") + "</td></tr>";
       return;
     }
-    const sum = (f) => list.reduce((t, r) => t + f(r), 0), rate = state.cny || CNY_FALLBACK;
-    const out = sum((r) => r.out), usd = sum((r) => (r.ccy === "USD" ? r.amt : 0)), hkd = sum((r) => (r.ccy === "HKD" ? r.amt : 0)), fee = sum((r) => r.fee);
-    const back = usd * rate + (hkd / state.fx) * rate, diff = back - out;
-    $("#inSum").textContent = ["共 " + list.length + " 笔", "转出 " + money(out, "CNY"), "到账 " + [usd > 0 ? money(usd) : "", hkd > 0 ? money(hkd, "HKD") : ""].filter(Boolean).join(" + "),
-      "按现在的汇率折回 " + money(back, "CNY") + "，比转出" + (diff >= 0 ? "多 " : "少 ") + money(Math.abs(diff), "CNY"), fee > 0 ? "手续费共 " + money(fee, "CNY") : ""].filter(Boolean).join(" · ") + (state.cny ? "" : cnyNote());
+    const sgn = (r) => (r.dir === "out" ? -1 : 1), sum = (f) => list.reduce((t, r) => t + f(r), 0), rate = state.cny || CNY_FALLBACK;
+    const cin = sum((r) => (r.dir === "in" ? r.cny : 0)), cout = sum((r) => (r.dir === "out" ? r.cny : 0)), net = cin - cout;
+    const usd = sum((r) => (r.ccy === "USD" ? sgn(r) * r.amt : 0)), hkd = sum((r) => (r.ccy === "HKD" ? sgn(r) * r.amt : 0)), fee = sum((r) => r.fee);
+    const back = usd * rate + (hkd / state.fx) * rate, diff = back - net, held = [Math.abs(usd) >= 0.005 ? money(usd) : "", Math.abs(hkd) >= 0.005 ? money(hkd, "HKD") : ""].filter(Boolean).join(" + ") || "0";
+    $("#inSum").textContent = ["共 " + list.length + " 笔", "入金 " + money(cin, "CNY"), cout > 0 ? "出金 " + money(cout, "CNY") : "", "净入金 " + money(net, "CNY"), "净到账 " + held,
+      "按现在的汇率折回 " + money(back, "CNY") + "，比净入金" + (diff >= 0 ? "多 " : "少 ") + money(Math.abs(diff), "CNY"), fee > 0 ? "手续费共 " + money(fee, "CNY") : ""].filter(Boolean).join(" · ") + (state.cny ? "" : cnyNote());
     tb.innerHTML = list.map((r) => {
       const id = esc(r.id);
       const acts = ro ? "" : state.pendingIn === r.id
         ? '<button class="mini danger" type="button" data-iact="confirm" data-id="' + id + '">确认删除</button><button class="mini" type="button" data-iact="cancel">取消</button>'
         : '<button class="mini" type="button" data-iact="del" data-id="' + id + '">删除</button>';
-      return "<tr><td>" + md(r.date) + '</td><td class="num">' + money(r.out, "CNY") + '</td><td class="num">' + money(r.amt, r.ccy) + '</td><td class="num">' + (r.out / r.amt).toFixed(4) + '</td><td class="num">' +
+      return "<tr><td>" + md(r.date) + "</td><td>" + (r.dir === "out" ? "出金" : "入金") + '</td><td class="num">' + money(r.cny, "CNY") + '</td><td class="num">' + money(r.amt, r.ccy) + '</td><td class="num">' + (r.cny / r.amt).toFixed(4) + '</td><td class="num">' +
         (r.fee > 0 ? money(r.fee, "CNY") : "") + "</td><td>" + esc(r.note) + '</td><td><div class="acts">' + acts + "</div></td></tr>";
     }).join("");
   }
@@ -2171,26 +2173,34 @@ TAL|好未来|TAL Education
       try {
         await db.doc("inflow/" + b.dataset.id).delete();
         state.pendingIn = null;
-        setStatus("已删除一笔入金记录。", "ok");
+        setStatus("已删除一笔出入金记录。", "ok");
       } catch (err) { setStatus(errText(err), "err"); render(); }
     }
+  });
+  $("#i-dir").addEventListener("change", () => {
+    const out = $("#i-dir").value === "out";
+    $("#i-out-lbl").textContent = out ? "国内收到人民币" : "转出人民币";
+    $("#i-out-sub").textContent = out ? "国内银行实际收到的金额，已扣手续费的话填扣后的。" : "国内银行实际扣的总额，含手续费。";
+    $("#i-ccy-lbl").textContent = out ? "转出币种" : "到账币种";
+    $("#i-amt-lbl").textContent = out ? "转出金额" : "到账金额";
   });
   $("#inForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const say = (t, k) => { const el = $("#inMsg"); el.textContent = t; el.dataset.kind = k || ""; };
     if (!db) { say("还连不上数据库，暂时不能保存。", "err"); return; }
-    const date = $("#i-date").value, out = parseFloat($("#i-out").value), amount = parseFloat($("#i-amt").value), currency = $("#i-ccy").value, feeRaw = $("#i-fee").value.trim(), fee = feeRaw === "" ? 0 : parseFloat(feeRaw);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { say("请填转出日期。", "err"); return; }
-    if (!(out > 0) || !(amount > 0)) { say("转出的人民币和到账金额都要填，要大于 0。", "err"); return; }
-    if (!(fee >= 0) || fee > out) { say("手续费不能是负数，也不能比转出还多。", "err"); return; }
+    const dir = $("#i-dir").value === "out" ? "out" : "in", date = $("#i-date").value, cny = parseFloat($("#i-out").value), amount = parseFloat($("#i-amt").value), currency = $("#i-ccy").value, feeRaw = $("#i-fee").value.trim(), fee = feeRaw === "" ? 0 : parseFloat(feeRaw);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { say("请填日期。", "err"); return; }
+    if (!(cny > 0) || !(amount > 0)) { say("人民币和外币金额都要填，要大于 0。", "err"); return; }
+    if (!(fee >= 0) || fee > cny) { say("手续费不能是负数，也不能比人民币金额还多。", "err"); return; }
     const btn = $("#inSave");
     btn.disabled = true;
     try {
-      await db.collection("inflow").add({ date, cnyOut: out, currency, amount, fee, note: $("#i-note").value.trim().slice(0, 120), createdAt: new Date().toISOString() });
-      say("已保存：" + md(date) + " 转出 " + money(out, "CNY") + "，到账 " + money(amount, currency) + "，汇率 " + (out / amount).toFixed(4) + "。", "ok");
+      await db.collection("inflow").add({ dir, date, cny, currency, amount, fee, note: $("#i-note").value.trim().slice(0, 120), createdAt: new Date().toISOString() });
+      say("已保存：" + md(date) + (dir === "out" ? " 出金 " + money(amount, currency) + "，国内收到 " + money(cny, "CNY") : " 入金 国内转出 " + money(cny, "CNY") + "，到账 " + money(amount, currency)) + "，汇率 " + (cny / amount).toFixed(4) + "。", "ok");
       const keep = $("#i-date").value;
       $("#inForm").reset();
       $("#i-date").value = keep;
+      $("#i-dir").dispatchEvent(new Event("change"));
     } catch (err) { say(errText(err), "err"); } finally { btn.disabled = false; }
   });
 
