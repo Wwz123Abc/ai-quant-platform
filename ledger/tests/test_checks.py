@@ -87,6 +87,61 @@ class SecondSource(unittest.TestCase):
             app.sina_bars, app.em_bars = real
 
 
+class PickBars(unittest.TestCase):
+    """The first two sources that answer (Tencent, Sina, Eastmoney): one is used and the other checks it."""
+    def setUp(self):
+        self.real = app.daily_bars, app.sina_bars, app.em_bars, app.time.sleep
+        app.time.sleep = lambda s: None
+
+    def tearDown(self):
+        app.daily_bars, app.sina_bars, app.em_bars, app.time.sleep = self.real
+
+    @staticmethod
+    def down(*a, **k):
+        raise OSError("Remote end closed connection")
+
+    def test_all_three_up_uses_tencent_and_checks_with_sina(self):
+        app.daily_bars = lambda sym, code, n=320: bars([1, 2, 3])
+        app.sina_bars = lambda sym, n=320: bars([1, 2, 3])
+        app.em_bars = lambda sym, code, n=320: self.fail("a third source is not needed")
+        got, problems = app.pick_bars("X", "X.N")
+        self.assertEqual(([g[0] for g in got], problems), (["腾讯财经", "新浪财经"], []))
+
+    def test_tencent_down_sina_and_eastmoney_check_each_other(self):
+        app.daily_bars = self.down
+        app.sina_bars = lambda sym, n=320: bars([1, 2, 3])
+        app.em_bars = lambda sym, code, n=320: bars([1, 2, 3])
+        got, problems = app.pick_bars("X", "X.N")
+        self.assertEqual([g[0] for g in got], ["新浪财经", "东方财富"])  # nothing is left unchecked
+        self.assertIn("腾讯财经：Remote end closed connection", problems[0])
+
+    def test_two_down_leaves_one_unchecked_and_all_down_leaves_none(self):
+        app.daily_bars = self.down
+        app.sina_bars = self.down
+        app.em_bars = lambda sym, code, n=320: bars([1, 2, 3])
+        got, problems = app.pick_bars("X", "X.N")
+        self.assertEqual(([g[0] for g in got], len(problems)), (["东方财富"], 2))
+        app.em_bars = lambda sym, code, n=320: []
+        self.assertEqual(app.pick_bars("X", "X.N")[0], [])
+
+    def test_a_short_outage_of_tencent_is_retried(self):
+        calls = []
+
+        def flaky(sym, code, n=320):
+            calls.append(1)
+            if len(calls) < 3:
+                raise OSError("timed out")
+            return bars([1, 2, 3])
+        app.daily_bars = flaky
+        app.sina_bars = lambda sym, n=320: bars([1, 2, 3])
+        got, problems = app.pick_bars("X", "X.N")
+        self.assertEqual(([g[0] for g in got], problems, len(calls)), (["腾讯财经", "新浪财经"], [], 3))
+
+    def test_the_missing_label_names_the_source_in_use(self):
+        r = app.cross_check(bars([1, 2, 3, 5, 6], DAYS[:3] + DAYS[4:]), bars([1, 2, 3, 4, 5, 6]), "2026-10-21", "东方财富", "新浪")
+        self.assertEqual(r["missing"], [["2026-10-16", "新浪"]])
+
+
 class SourceCheck(unittest.TestCase):
     def setUp(self):
         names = ("quotes", "daily_bars", "sina_bars", "us_splits", "fx_rates", "usdcny_bars", "gold_bars", "em_bars", "em_quote")

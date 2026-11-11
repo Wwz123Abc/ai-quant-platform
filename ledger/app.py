@@ -618,6 +618,40 @@ def sina_bars(sym, days=320):
     return parse_sina_daily(fetch(url, referer="https://finance.sina.com.cn/", encoding="utf-8"))[-days:]
 
 
+def retrying(get, tries=3, wait=2):
+    """get() with a few more tries after a short wait: a burst of failures from one source is usually over in seconds."""
+    for i in range(tries):
+        try:
+            return get()
+        except Exception:
+            if i == tries - 1:
+                raise
+            time.sleep(wait * (i + 1))
+
+
+def pick_bars(sym, code):
+    """Daily bars of a US stock from the first two sources that answer, in the order Tencent, Sina, Eastmoney:
+    ([(name, short name, bars), ...], problems). The first is the one used; the second is only there to check it, so
+    when Tencent is down the other two still check each other and nothing is left unchecked."""
+    problems, got = [], []
+    sources = (("腾讯财经", "腾讯", lambda n: daily_bars(sym, code, n)), ("新浪财经", "新浪", lambda n: sina_bars(sym, n)),
+               ("东方财富", "东方财富", lambda n: em_bars(sym, code, n)))
+    for name, short, get in sources:
+        if len(got) == 2:
+            break
+        n = 320 if not got else CHECK_DAYS + 5
+        try:
+            bars = retrying(lambda: get(n), tries=3 if name == "腾讯财经" else 2)
+        except Exception as e:
+            problems.append("%s：%s" % (name, str(e)[:80]))
+            continue
+        if bars:
+            got.append((name, short, bars))
+        else:
+            problems.append("%s：没有数据" % name)
+    return got, problems
+
+
 def second_source(sym, code, days):
     """Daily bars from a source other than Tencent: Sina, else Eastmoney. Returns (name, bars, problems), where
     problems says what failed on the way; bars is [] when neither answered."""
@@ -634,9 +668,9 @@ def second_source(sym, code, days):
     return "", [], problems
 
 
-def cross_check(bars, other, today, other_name="第二来源"):
-    """Tencent's last CHECK_DAYS closes against a second source's: {days, mismatches: [[date, tencent, other]],
-    missing: [[date, "腾讯" or other_name]], latest, stale}. A close differing by more than CHECK_TOLERANCE is a
+def cross_check(bars, other, today, other_name="第二来源", primary="腾讯"):
+    """The used source's last CHECK_DAYS closes (Tencent's unless it was down) against a second source's: {days,
+    mismatches: [[date, used, other]], missing: [[date, primary or other_name]], latest, stale}. A close differing by more than CHECK_TOLERANCE is a
     mismatch; a date one source has and the other lacks is missing, except the newest days the second source has
     not published yet (it can lag Tencent by hours) while it is at most LAG_DAYS behind: those wait for the next
     refresh. The latest close older than STALE_DAYS calendar days is stale."""
@@ -647,7 +681,7 @@ def cross_check(bars, other, today, other_name="第二来源"):
     days, mismatches, missing = [], [], []
     for d in sorted(d for d in set(a) | set(b) if d >= lo):
         if d not in a:
-            missing.append([d, "腾讯"])
+            missing.append([d, primary])
         elif d not in b:
             if behind and d > max(b):
                 continue
@@ -822,21 +856,17 @@ def refresh_market(uid):
     for s in traded:
         try:
             code = (q.get(s) or {}).get("code") or s
-            try:
-                bars, bar_source = daily_bars(s, code), "腾讯财经"
-            except Exception:
-                if is_hk(s):
-                    raise
-                bars, bar_source = [], "腾讯财经"
-            if not is_hk(s):
-                # Tencent failed: the second source stands in for it, and nothing independent is left to compare with
-                other_name, other, problems = second_source(s, code, 320 if not bars else CHECK_DAYS + 5)
-                if not bars and other:
-                    bars, bar_source = other, other_name
+            if is_hk(s):
+                bars, bar_source = retrying(lambda: daily_bars(s, code)), "腾讯财经"
+            else:
+                # the first two sources that answer (Tencent, Sina, Eastmoney): one is used, the other checks it
+                got, problems = pick_bars(s, code)
+                bars, bar_source = (got[0][2], got[0][0]) if got else ([], "腾讯财经")
+                other_name, other = (got[1][0], got[1][2]) if len(got) > 1 else ("", [])
                 today = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
                 base = {"symbol": s, "source": bar_source, "checkedAt": now_iso()}
-                if bars and other and bar_source == "腾讯财经":
-                    put_doc(0, "checks", s, {**base, "against": other_name, **cross_check(bars, other, today, other_name)})
+                if bars and other:
+                    put_doc(0, "checks", s, {**base, "against": other_name, **cross_check(bars, other, today, other_name, got[0][1])})
                 elif bars:  # say why there was no check, never "consistent"
                     put_doc(0, "checks", s, {**base, "against": "", "unchecked": True, "reason": "fallback" if bar_source != "腾讯财经" else "no_second",
                                              "detail": "；".join(problems)[:200], **cross_check(bars, bars, today)})
