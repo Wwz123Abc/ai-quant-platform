@@ -223,6 +223,8 @@ test("the day's change counts what was bought or sold since the previous close",
   near(nv.amount, -8.51);
   near(nv.base, 852.96);
   assert.deepEqual([nv.held, nv.now, nv.traded], [0, 5, true]);
+  near(nv.basis, 852.96);                       // the line breaks even at what the shares cost: now x price - basis = amount
+  near(5 * 168.89 - nv.basis, nv.amount);
   // held from before and untouched: price change on the shares
   const still = C.dayChange([buy("2026-10-01", 3, 90)], "X", "2026-11-09", 110, 100);
   near(still.amount, 30);
@@ -265,6 +267,13 @@ test("the held stocks as one intraday line: forward-filled per minute, the previ
   near(hk.base, 100);
   near(hk.v[0], 120);
   assert.equal(C.intradayPortfolio([], toUSD).t.length, 0);
+  // a stock bought today carries its basis (what it cost) and pbase from dayChange: the line is measured from there
+  const nv = C.dayChange([{ date: "2026-11-10", side: "buy", symbol: "N", shares: 5, price: 170, fees: 0 }], "N", "2026-11-09", 168, 178);
+  const today = C.intradayPortfolio([{ shares: 5, ccy: "USD", prev: 178, basis: nv.basis, pbase: nv.base, points: [[60, 168]] }], toUSD);
+  near(today.base, 850);
+  near(today.pbase, 850);
+  near(today.v[0] - today.base, nv.amount);      // the chart's change is the card's change: -10, not 5 x (168 - 178) = -50
+  near(C.intradayPortfolio([{ shares: 2, ccy: "USD", prev: 100, points: [[60, 101]] }], toUSD).pbase, 200);
 });
 
 test("SGOV's monthly interest is credited from market data, net of nothing, and never twice", () => {

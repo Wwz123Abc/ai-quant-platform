@@ -196,9 +196,10 @@
   // worth now, minus the shares held at the previous close at that close, minus the money put in (buys and their fees) plus
   // the money taken out (sells less their fees). A share bought today is measured from its buy price, not from yesterday's
   // close, and a share sold today from its sale price. records are the ledger records, prevDate the date of the previous
-  // close, price and prev in the stock's own currency. Returns {amount, base, held, now, traded}: base is what the day's
-  // percentage is a share of (the value at the previous close plus the cost of what was bought), traded whether anything
-  // was bought or sold since. null when a split is on record (share counts would not line up) or a price is missing.
+  // close, price and prev in the stock's own currency. Returns {amount, base, basis, held, now, traded}: base is what the
+  // day's percentage is a share of (the value at the previous close plus the cost of what was bought), basis the value the
+  // shares held now must reach to break even for the day (the value at the previous close plus the money put in net of
+  // what was taken out: now x price - basis = amount), traded whether anything was bought or sold since. null when a split is on record (share counts would not line up) or a price is missing.
   function dayChange(records, symbol, prevDate, price, prev) {
     if (!(price > 0) || !(prev > 0) || !prevDate) return null;
     let held = 0, moved = 0, net = 0, bought = 0, traded = false;
@@ -214,7 +215,7 @@
       if (buy) bought += gross;
     }
     const now = held + moved;
-    return { amount: now * price - held * prev - net, base: held * prev + bought, held, now, traded };
+    return { amount: now * price - held * prev - net, base: held * prev + bought, basis: held * prev + net, held, now, traded };
   }
 
   // All held stocks as one: rows are {shares, ccy, price, prev} with price and the previous close in the stock's own currency;
@@ -246,8 +247,13 @@
     const used = stocks.filter((s) => s.shares > 0 && s.prev > 0 && s.points && s.points.length);
     const times = [...new Set(used.flatMap((s) => s.points.map((p) => p[0])))].sort((a, b) => a - b);
     const at = used.map(() => 0), cur = used.map((s) => s.prev), v = [];
-    let base = 0;
-    used.forEach((s) => { base += toUSD(s.shares * s.prev, s.ccy); });
+    // A stock may carry basis and pbase from dayChange (what was bought or sold since the previous close counted): the line
+    // is then measured from that basis, and a percentage is a share of pbase. Without them both are shares x previous close.
+    let base = 0, pbase = 0;
+    used.forEach((s) => {
+      base += toUSD(s.basis != null ? s.basis : s.shares * s.prev, s.ccy);
+      pbase += toUSD(s.pbase != null ? s.pbase : s.shares * s.prev, s.ccy);
+    });
     for (const t of times) {
       let total = 0;
       used.forEach((s, i) => {
@@ -256,7 +262,7 @@
       });
       v.push(total);
     }
-    return { t: times, v, base, used: used.length, skipped: stocks.length - used.length };
+    return { t: times, v, base, pbase, used: used.length, skipped: stocks.length - used.length };
   }
 
   root.LedgerCalc = {

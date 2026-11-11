@@ -1365,7 +1365,7 @@ TAL|好未来|TAL Education
   function dayOf(sym, shares, price, qtDate) {
     const date = qtDate || todayUS(), prev = prevClose(sym, date);
     if (!(price > 0) || !(prev > 0)) return null;
-    return LedgerCalc.dayChange(state.trades, sym, prevCloseDate(sym, date), price, prev) || { amount: (price - prev) * shares, base: prev * shares, traded: false };
+    return LedgerCalc.dayChange(state.trades, sym, prevCloseDate(sym, date), price, prev) || { amount: (price - prev) * shares, base: prev * shares, basis: prev * shares, traded: false };
   }
 
   function renderHoldings(c) {
@@ -1906,7 +1906,8 @@ TAL|好未来|TAL Education
     if (!q.count) return;
     const priced = rows.filter((r) => r.price > 0), live = priced.some((r) => r.kind === "live" || r.kind === "open");
     const date = priced.map((r) => r.date || "").sort().pop();
-    $("#qCount").textContent = "· " + q.count + " 只";
+    const cashLike = priced.filter((r) => isCashLike(r.symbol)).length;
+    $("#qCount").textContent = "· " + (q.count - cashLike) + " 只股票" + (cashLike ? " + SGOV（类现金）" : "");
     const tag = $("#qTag");
     tag.className = "q-tag" + (live ? " live" : "");
     tag.textContent = live ? "盘中 · 自动更新" : date ? md(date) + " 收盘" : "";
@@ -1980,12 +1981,13 @@ TAL|好未来|TAL Education
     }
     const held = new Map(heldRows().map((r) => [r.symbol, r]));
     const stocks = have.map((s) => {
-      const r = held.get(s);
-      return { shares: r.shares, ccy: r.ccy, prev: prevClose(s, TL.series[s].date), points: TL.series[s].points };
+      const r = held.get(s), date = TL.series[s].date, day = dayOf(s, r.shares, r.price, date);
+      // measured from what was bought or sold since the previous close, as the figure at the top of the card is
+      return { shares: r.shares, ccy: r.ccy, prev: prevClose(s, date), basis: day ? day.basis : null, pbase: day ? day.base : null, points: TL.series[s].points };
     });
     const p = LedgerCalc.intradayPortfolio(stocks, toUSD);
     if (!p.used) return null;
-    return { t: p.t, v: p.v, base: p.base, money: true, ccy: "USD", x0, x1, date: sess, skipped: p.skipped + (TL.syms.length - have.length) };
+    return { t: p.t, v: p.v, base: p.base, pbase: p.pbase, money: true, ccy: "USD", x0, x1, date: sess, skipped: p.skipped + (TL.syms.length - have.length) };
   }
   let lastHeld = [];
   const heldRows = () => lastHeld;
@@ -2063,7 +2065,7 @@ TAL|好未来|TAL Education
     box.appendChild(svg);
     const read = (i) => {
       const v = d.v[i], ch = v - d.base;
-      $("#tlRead").innerHTML = bjTime(d.t[i]) + " &nbsp;<b>" + fmt(v) + '</b> &nbsp;<span class="' + tone(ch) + '">' + (d.money ? signed(ch) : signed(ch, d.ccy)) + " " + pct((ch / d.base) * 100) + "</span>";
+      $("#tlRead").innerHTML = bjTime(d.t[i]) + " &nbsp;<b>" + fmt(v) + '</b> &nbsp;<span class="' + tone(ch) + '">' + (d.money ? signed(ch) : signed(ch, d.ccy)) + " " + pct((ch / (d.pbase || d.base)) * 100) + "</span>";
     };
     read(d.v.length - 1);
     TL.plot = { d, X, Y, read, cross, dot, svg, W };
