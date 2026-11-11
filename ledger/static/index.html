@@ -111,6 +111,17 @@ button.navlink:disabled { opacity: .6; cursor: default; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 #holdings { min-width: 540px; }
+/* Holdings on a wide screen: every figure sits on the first line of its cell, so a row reads straight across; the small
+   lines under it (percent, amount, realized, source) are grey, and colour is kept for the figures that matter. */
+#holdings td { vertical-align: top; padding: 14px 12px; }
+#holdings td.num { font-size: 15px; line-height: 1.3; }
+#holdings td.sym { font-size: 15px; line-height: 1.3; }
+#holdings td > small { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); }
+#holdings td .cap { margin-top: 3px; line-height: 1.3; }
+#holdings td span small { display: block; margin-top: 3px; }
+#holdings tbody tr { transition: background-color .12s; }
+#holdings tbody tr:hover { background: var(--accent-soft); }
+#holdings th { padding-bottom: 8px; }
 .hold-scroll { overflow-x: auto; }
 #log { min-width: 760px; }
 .cal { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px; display: grid; gap: 8px; }
@@ -1354,14 +1365,14 @@ TAL|好未来|TAL Education
           ? '<span class="' + tone(s.unreal) + '">' + signed(s.unreal, s.ccy) + "<br><small>" + (s.cost > 0 ? pct(s.unreal / s.cost * 100) : "") + "</small></span>" + usdCap(s.unreal, s.ccy, true) +
             // what this stock has already earned and paid out is kept apart from the floating figure (which is against the average cost of the shares still held)
             (Math.abs(s.realized) >= 0.005 || Math.abs(s.dividends) >= 0.005
-              ? '<br><small class="muted">' + [Math.abs(s.realized) >= 0.005 && "已实现 " + signed(s.realized, s.ccy), Math.abs(s.dividends) >= 0.005 && "分红利息 " + signed(s.dividends, s.ccy)].filter(Boolean).join(" · ") + "</small>" : "")
+              ? '<small class="muted">' + [Math.abs(s.realized) >= 0.005 && "已实现 " + signed(s.realized, s.ccy), Math.abs(s.dividends) >= 0.005 && "分红利息 " + signed(s.dividends, s.ccy)].filter(Boolean).join(" · ") + "</small>" : "")
           : '<span class="muted">—</span>';
         const qt = state.quotes[s.symbol];
         const cap = !(px > 0) ? "等待收盘价" : qt && qt.date ? (qt.source === "手动" ? "手动填写 " + md(qt.date) : md(qt.date) + (qt.kind === "open" ? " 开盘" : qt.kind === "live" ? " 盘中" : " 收盘") +
-          (qt.source && qt.source !== "腾讯财经" ? " · " + esc(qt.source) : "") + (checkBad(s.symbol) ? " · 核对不一致" : "")) : "";
+          (qt.source && qt.source !== "腾讯财经" ? " · " + esc(qt.source) : "") + (checkBad(s.symbol) ? ' · <span class="down">核对不一致</span>' : "")) : "";
         const prev = prevClose(s.symbol, qt && qt.date ? qt.date : todayUS());
         const dayCell = px > 0 && prev > 0
-          ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "<br><small>" + signed((px - prev) * s.shares, s.ccy) + "</small></span>"
+          ? '<span class="' + tone(px - prev) + '">' + pct((px / prev - 1) * 100) + "</span><small>" + signed((px - prev) * s.shares, s.ccy) + "</small>"
           : '<span class="muted">—</span>';
         const share = px > 0 && stockTotal > 0 ? '<span class="cap">占股票 ' + nf2.format((toUSD(px * s.shares, s.ccy) / stockTotal) * 100) + "%</span>" : "";
         return "<tr>" + symCell(s.symbol) + '<td class="num">' + nfQ.format(s.shares) + share + '</td><td class="num">' + price(avg, s.ccy) +
@@ -2223,7 +2234,8 @@ TAL|好未来|TAL Education
   }
 
   // ---------- closes cross-checked with a second source ----------
-  // The server compares Tencent's last five daily closes with Eastmoney's on every refresh (US stocks).
+  // On every refresh the server compares the last five daily closes of two independent sources (US stocks): Tencent and Sina,
+  // or whichever two of Tencent, Sina and Eastmoney answer.
   const checkBad = (sym) => { const k = state.checks[sym]; return !!(k && (k.unchecked || k.mismatches.length || k.missing.length || k.stale)); };
   function renderChecks(c) {
     const el = $("#checkLine"), held = c.syms.filter((x) => x.shares > 0 && state.checks[x.symbol]).map((x) => x.symbol);
@@ -2242,11 +2254,11 @@ TAL|好未来|TAL Education
       const k = state.checks[sym];
       if (k.unchecked) lines.push(esc(sym) + (k.reason === "fallback" ? "：腾讯取不到，已改用" + esc(k.source) + "，这次没有第二个来源可以核对"
         : "：新浪财经和东方财富这次都取不到，没有完成核对（价格仍来自腾讯）"));
-      for (const [d, a, b] of k.mismatches) lines.push(esc(sym) + " " + md(d) + " 收盘：腾讯 " + nf3.format(a) + "，" + esc(k.against) + " " + nf3.format(b) + "，差 " + nf2.format(Math.abs(a / b - 1) * 100) + "%");
+      for (const [d, a, b] of k.mismatches) lines.push(esc(sym) + " " + md(d) + " 收盘：" + esc(k.source || "腾讯财经") + " " + nf3.format(a) + "，" + esc(k.against) + " " + nf3.format(b) + "，差 " + nf2.format(Math.abs(a / b - 1) * 100) + "%");
       if (k.missing.length) lines.push(esc(sym) + " 缺 " + k.missing.map(([d, who]) => md(d) + " 的" + who + "数据").join("、"));
       if (k.stale) lines.push(esc(sym) + " 最新收盘停在 " + (k.latest ? md(k.latest) : "—") + "，数据可能没有更新");
     }
-    el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（腾讯和第二个来源对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
+    el.innerHTML = "收盘价核对：" + bad.length + " 只股票需要留意（两个独立来源对比，以券商为准）：<ul>" + lines.map((x) => "<li>" + x + "</li>").join("") + "</ul>";
   }
   // ---------- system status (the platform owner only) ----------
   // Backups older than 26 hours, a failed off-site copy, or a restore drill older than 90 days are flagged; the
