@@ -533,7 +533,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="in-h">
     <div class="head-row">
-      <div class="title"><h2 id="in-h">出入金明细</h2><details class="help"><summary aria-label="出入金明细怎么算">?</summary><div class="help-body"><p>每次资金进出记一笔。入金：从国内银行转到券商或海外账户，记国内转出多少人民币、到账是哪个币种和金额。出金：从海外账户转回国内，记转出的币种和金额、国内收到多少人民币。人民币一栏填国内银行实际扣（或收）的总额，含手续费；汇率 = 人民币 ÷ 外币。</p><p>汇总行：净入金 = 入金 − 出金；再把净到账的外币按现在的汇率折回人民币，和净入金比，差额就是换汇价差、手续费和汇率变动合在一起的结果。这里只是台账，不影响资产占比和盈亏。</p></div></details></div>
+      <div class="title"><h2 id="in-h">出入金明细</h2><details class="help"><summary aria-label="出入金明细怎么算">?</summary><div class="help-body"><p>每次资金进出记一笔。入金：从国内银行转到券商或海外账户，记国内转出多少人民币、到账是哪个币种和金额。出金：从海外账户转回国内，记转出的币种和金额、国内收到多少人民币。人民币一栏填国内银行实际扣（或收）的总额，含手续费；汇率 = 人民币 ÷ 外币。外币账户之间直接转（比如兴业银行美元账户转到汇丰美元账户）没有人民币，人民币留空，只记外币金额。</p><p>汇总行：净入金 = 入金 − 出金；再把净到账的外币按现在的汇率折回人民币，和净入金比，差额就是换汇价差、手续费和汇率变动合在一起的结果。这里只是台账，不影响资产占比和盈亏。</p></div></details></div>
       <p class="hint" id="inSum"></p>
     </div>
     <div class="table-wrap">
@@ -655,7 +655,7 @@ footer p { margin: 0 0 6px; }
       <div class="fields">
         <div class="field"><label for="i-dir">方向</label><select id="i-dir"><option value="in">入金：国内 → 境外</option><option value="out">出金：境外 → 国内</option></select></div>
         <div class="field"><label for="i-date">日期</label><input id="i-date" type="date"></div>
-        <div class="field"><label for="i-out" id="i-out-lbl">转出人民币</label><input id="i-out" type="number" inputmode="decimal" step="any" min="0"><span class="sub" id="i-out-sub">国内银行实际扣的总额，含手续费。</span></div>
+        <div class="field"><label for="i-out" id="i-out-lbl">转出人民币</label><input id="i-out" type="number" inputmode="decimal" step="any" min="0"><span class="sub" id="i-out-sub">国内银行实际扣的总额，含手续费。外币账户直接转出、没有人民币的，留空。</span></div>
         <div class="field"><label for="i-ccy" id="i-ccy-lbl">到账币种</label><select id="i-ccy"><option value="USD">美元</option><option value="HKD">港元</option></select></div>
         <div class="field"><label for="i-amt" id="i-amt-lbl">到账金额</label><input id="i-amt" type="number" inputmode="decimal" step="any" min="0"></div>
         <div class="field"><label for="i-fee">手续费（人民币，可不填）</label><input id="i-fee" type="number" inputmode="decimal" step="any" min="0"></div>
@@ -2174,8 +2174,8 @@ TAL|好未来|TAL Education
   function applyInflow(snap) {
     state.inflow = snap.docs.map((doc) => {
       const x = doc.data() || {};
-      return { id: doc.id, date: x.date, dir: x.dir === "out" ? "out" : "in", cny: Number(x.cny != null ? x.cny : x.cnyOut), ccy: x.currency === "HKD" ? "HKD" : "USD", amt: Number(x.amount), fee: Number(x.fee) || 0, note: x.note || "" };
-    }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") && r.cny > 0 && r.amt > 0).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      return { id: doc.id, date: x.date, dir: x.dir === "out" ? "out" : "in", cny: Number(x.cny != null ? x.cny : x.cnyOut) || 0, ccy: x.currency === "HKD" ? "HKD" : "USD", amt: Number(x.amount), fee: Number(x.fee) || 0, note: x.note || "" };
+    }).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") && r.amt > 0).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     if (state.pendingIn && !state.inflow.some((r) => r.id === state.pendingIn)) state.pendingIn = null;
     render();
   }
@@ -2186,18 +2186,25 @@ TAL|好未来|TAL Education
       tb.innerHTML = '<tr><td colspan="8" class="empty">' + (state.ready ? "还没有出入金记录。在“＋ 记一笔”里选“出入金”添加。" : "正在读取…") + "</td></tr>";
       return;
     }
-    const sgn = (r) => (r.dir === "out" ? -1 : 1), sum = (f) => list.reduce((t, r) => t + f(r), 0), rate = state.cny || CNY_FALLBACK;
-    const cin = sum((r) => (r.dir === "in" ? r.cny : 0)), cout = sum((r) => (r.dir === "out" ? r.cny : 0)), net = cin - cout;
-    const usd = sum((r) => (r.ccy === "USD" ? sgn(r) * r.amt : 0)), hkd = sum((r) => (r.ccy === "HKD" ? sgn(r) * r.amt : 0)), fee = sum((r) => r.fee);
-    const back = usd * rate + (hkd / state.fx) * rate, diff = back - net, held = [Math.abs(usd) >= 0.005 ? money(usd) : "", Math.abs(hkd) >= 0.005 ? money(hkd, "HKD") : ""].filter(Boolean).join(" + ") || "0";
-    $("#inSum").textContent = ["共 " + list.length + " 笔", "入金 " + money(cin, "CNY"), cout > 0 ? "出金 " + money(cout, "CNY") : "", "净入金 " + money(net, "CNY"), "净到账 " + held,
-      "按现在的汇率折回 " + money(back, "CNY") + "，比净入金" + (diff >= 0 ? "多 " : "少 ") + money(Math.abs(diff), "CNY"), fee > 0 ? "手续费共 " + money(fee, "CNY") : ""].filter(Boolean).join(" · ") + (state.cny ? "" : cnyNote());
+    // A transfer between two foreign-currency accounts has no RMB side (cny 0): it counts in what arrived, but not in the
+    // comparison with the RMB that went out, which only the rows that have both sides can make.
+    const sgn = (r) => (r.dir === "out" ? -1 : 1), sumOf = (rows, f) => rows.reduce((t, r) => t + f(r), 0), rate = state.cny || CNY_FALLBACK;
+    const paired = list.filter((r) => r.cny > 0), direct = list.length - paired.length;
+    const cin = sumOf(paired, (r) => (r.dir === "in" ? r.cny : 0)), cout = sumOf(paired, (r) => (r.dir === "out" ? r.cny : 0)), net = cin - cout;
+    const usdOf = (rows) => sumOf(rows, (r) => (r.ccy === "USD" ? sgn(r) * r.amt : 0)), hkdOf = (rows) => sumOf(rows, (r) => (r.ccy === "HKD" ? sgn(r) * r.amt : 0));
+    const usd = usdOf(paired), hkd = hkdOf(paired), fee = sumOf(list, (r) => r.fee);
+    const back = usd * rate + (hkd / state.fx) * rate, diff = back - net;
+    const arrived = (u, h) => [Math.abs(u) >= 0.005 ? money(u) : "", Math.abs(h) >= 0.005 ? money(h, "HKD") : ""].filter(Boolean).join(" + ") || "0";
+    $("#inSum").textContent = ["共 " + list.length + " 笔", paired.length ? "入金 " + money(cin, "CNY") : "", cout > 0 ? "出金 " + money(cout, "CNY") : "", paired.length ? "净入金 " + money(net, "CNY") : "",
+      "净到账 " + arrived(usdOf(list), hkdOf(list)),
+      paired.length ? (direct ? "有人民币金额的 " + paired.length + " 笔，" : "") + "按现在的汇率折回 " + money(back, "CNY") + "，比净入金" + (diff >= 0 ? "多 " : "少 ") + money(Math.abs(diff), "CNY") : "",
+      direct ? direct + " 笔是外币账户直转（没有人民币金额），不参与汇率比较" : "", fee > 0 ? "手续费共 " + money(fee, "CNY") : ""].filter(Boolean).join(" · ") + (state.cny || !paired.length ? "" : cnyNote());
     tb.innerHTML = list.map((r) => {
       const id = esc(r.id);
       const acts = ro ? "" : state.pendingIn === r.id
         ? '<button class="mini danger" type="button" data-iact="confirm" data-id="' + id + '">确认删除</button><button class="mini" type="button" data-iact="cancel">取消</button>'
         : '<button class="mini" type="button" data-iact="del" data-id="' + id + '">删除</button>';
-      return "<tr><td>" + md(r.date) + "</td><td>" + (r.dir === "out" ? "出金" : "入金") + '</td><td class="num">' + money(r.cny, "CNY") + '</td><td class="num">' + money(r.amt, r.ccy) + '</td><td class="num">' + (r.cny / r.amt).toFixed(4) + '</td><td class="num">' +
+      return "<tr><td>" + md(r.date) + "</td><td>" + (r.dir === "out" ? "出金" : "入金") + '</td><td class="num">' + (r.cny > 0 ? money(r.cny, "CNY") : '<span class="muted">—</span>') + '</td><td class="num">' + money(r.amt, r.ccy) + '</td><td class="num">' + (r.cny > 0 ? (r.cny / r.amt).toFixed(4) : '<span class="muted">—</span>') + '</td><td class="num">' +
         (r.fee > 0 ? money(r.fee, "CNY") : "") + "</td><td>" + esc(r.note) + '</td><td><div class="acts">' + acts + "</div></td></tr>";
     }).join("");
   }
@@ -2219,7 +2226,7 @@ TAL|好未来|TAL Education
   $("#i-dir").addEventListener("change", () => {
     const out = $("#i-dir").value === "out";
     $("#i-out-lbl").textContent = out ? "国内收到人民币" : "转出人民币";
-    $("#i-out-sub").textContent = out ? "国内银行实际收到的金额，已扣手续费的话填扣后的。" : "国内银行实际扣的总额，含手续费。";
+    $("#i-out-sub").textContent = out ? "国内银行实际收到的金额，已扣手续费的话填扣后的。直接收到外币的，留空。" : "国内银行实际扣的总额，含手续费。外币账户直接转出、没有人民币的，留空。";
     $("#i-ccy-lbl").textContent = out ? "转出币种" : "到账币种";
     $("#i-amt-lbl").textContent = out ? "转出金额" : "到账金额";
   });
@@ -2227,15 +2234,17 @@ TAL|好未来|TAL Education
     e.preventDefault();
     const say = (t, k) => { const el = $("#inMsg"); el.textContent = t; el.dataset.kind = k || ""; };
     if (!db) { say("还连不上数据库，暂时不能保存。", "err"); return; }
-    const dir = $("#i-dir").value === "out" ? "out" : "in", date = $("#i-date").value, cny = parseFloat($("#i-out").value), amount = parseFloat($("#i-amt").value), currency = $("#i-ccy").value, feeRaw = $("#i-fee").value.trim(), fee = feeRaw === "" ? 0 : parseFloat(feeRaw);
+    const dir = $("#i-dir").value === "out" ? "out" : "in", date = $("#i-date").value, cnyRaw = $("#i-out").value.trim(), cny = cnyRaw === "" ? 0 : parseFloat(cnyRaw), amount = parseFloat($("#i-amt").value), currency = $("#i-ccy").value, feeRaw = $("#i-fee").value.trim(), fee = feeRaw === "" ? 0 : parseFloat(feeRaw);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { say("请填日期。", "err"); return; }
-    if (!(cny > 0) || !(amount > 0)) { say("人民币和外币金额都要填，要大于 0。", "err"); return; }
-    if (!(fee >= 0) || fee > cny) { say("手续费不能是负数，也不能比人民币金额还多。", "err"); return; }
+    if (!(amount > 0)) { say("外币金额要填，要大于 0。", "err"); return; }
+    if (!(cny >= 0)) { say("人民币金额不能是负数；外币账户直转、没有人民币的，留空。", "err"); return; }
+    if (!(fee >= 0) || fee > cny) { say(cny > 0 ? "手续费不能是负数，也不能比人民币金额还多。" : "手续费是人民币，没有人民币金额时不用填。", "err"); return; }
     const btn = $("#inSave");
     btn.disabled = true;
     try {
-      await db.collection("inflow").add({ dir, date, cny, currency, amount, fee, note: $("#i-note").value.trim().slice(0, 120), createdAt: new Date().toISOString() });
-      say("已保存：" + md(date) + (dir === "out" ? " 出金 " + money(amount, currency) + "，国内收到 " + money(cny, "CNY") : " 入金 国内转出 " + money(cny, "CNY") + "，到账 " + money(amount, currency)) + "，汇率 " + (cny / amount).toFixed(4) + "。", "ok");
+      await db.collection("inflow").add(Object.assign({ dir, date, currency, amount, fee, note: $("#i-note").value.trim().slice(0, 120), createdAt: new Date().toISOString() }, cny > 0 ? { cny } : {}));
+      say("已保存：" + md(date) + (cny > 0 ? (dir === "out" ? " 出金 " + money(amount, currency) + "，国内收到 " + money(cny, "CNY") : " 入金 国内转出 " + money(cny, "CNY") + "，到账 " + money(amount, currency)) + "，汇率 " + (cny / amount).toFixed(4)
+        : (dir === "out" ? " 出金 " : " 入金 ") + money(amount, currency) + "（外币账户直转，没有人民币金额）") + "。", "ok");
       const keep = $("#i-date").value;
       $("#inForm").reset();
       $("#i-date").value = keep;
