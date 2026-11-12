@@ -2067,8 +2067,8 @@ TAL|好未来|TAL Education
       $("#tlRead").innerHTML = bjTime(d.t[i]) + " &nbsp;<b>" + fmt(v) + '</b> &nbsp;<span class="' + tone(ch) + '">' + (d.money ? signed(ch) : signed(ch, d.ccy)) + " " + pct((ch / (d.pbase || d.base)) * 100) + "</span>";
     };
     // At rest the 组合 tab would only repeat the figures of the card above (its last point is that value and change), so it
-    // shows a hint; a single stock shows its own last price and change, which the card does not.
-    const rest = () => { if (d.money) $("#tlRead").textContent = "移到图上，看每一分钟的组合市值和涨跌"; else read(d.v.length - 1); };
+    // says nothing; a single stock shows its own last price and change, which the card does not.
+    const rest = () => { if (d.money) $("#tlRead").textContent = ""; else read(d.v.length - 1); };
     rest();
     TL.plot ={ d, X, Y, read, cross, dot, svg, W };
     const at = (ev) => {
