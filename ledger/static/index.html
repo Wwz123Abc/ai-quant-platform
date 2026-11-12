@@ -2488,7 +2488,7 @@ TAL|好未来|TAL Education
   // The stock form shows the fields of the chosen kind: a trade or a split.
   const SIDE_HINT = {
     buy: "美股佣金为 0 时费用填 0；港股买卖都有印花税等代收费，按成交单填。",
-    sell: "美股佣金为 0 时费用填 0；港股买卖都有印花税等代收费，按成交单填。",
+    sell: "卖出的费用默认 0.01 美元（美股卖出的监管费），按成交单不同可以改；港股有印花税等代收费，按成交单填。",
     split: "拆股、合股后总成本不变，股数和平均成本按比例调整。零碎股换成现金的，另记一笔卖出。",
   };
   function updateSide() {
@@ -2498,6 +2498,9 @@ TAL|好未来|TAL Education
     $("#f-ratio-row").hidden = !split;
     $("#f-price-row").hidden = split;
     $("#f-fee-row").hidden = split;
+    const fee = $("#f-fee"); // a sale's fee starts at 0.01 (the owner's rule); a buy's at 0; anything typed is kept
+    if (side === "sell" && (fee.value === "" || fee.value === "0")) fee.value = "0.01";
+    else if (side === "buy" && fee.value === "0.01") fee.value = "0";
     formMsg(SIDE_HINT[side], "");
     updateSymHint();
   }
@@ -2541,7 +2544,7 @@ TAL|好未来|TAL Education
       formMsg("已保存：" + md(date) + " " + recordText(rec) + "。" +
         (fresh ? "这只股票还没有价格，正在自动取行情……" : ""), "ok");
       if (fresh && !$("#refreshBtn").disabled) $("#refreshBtn").click();   // a stock bought for the first time gets its price at once
-      $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = "0"; $("#f-note").value = ""; $("#f-to").value = "";
+      $("#f-qty").value = ""; $("#f-price").value = ""; $("#f-fee").value = side === "sell" ? "0.01" : "0"; $("#f-note").value = ""; $("#f-to").value = "";
     } catch (err) {
       formMsg(errText(err), "err");
     } finally {
