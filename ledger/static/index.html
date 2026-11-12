@@ -437,7 +437,7 @@ footer p { margin: 0 0 6px; }
 
   <section aria-labelledby="mix-h">
     <div class="head-row">
-      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。银行活期余额（人民币、港元、美元）记在“活期存款”里，按现在的汇率折成美元计入；要留现金赚利息，也可以买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是总盈亏，和收益走势的累计收益一致。</p><p>总盈亏 = 浮动盈亏 + 已实现盈亏 + 分红利息 + 国债和定存利息。旁边的百分比 = 总盈亏 ÷ 在投的钱（股票成本 + 国债买入成本 + 定存本金，不含活期存款），和“收益走势”里的收益率是同一个数。</p><p>SGOV 当现金用，叫“类现金”：在这里单独成一类（青绿色），在下面的持仓表里也标“类现金”，不算在“股票”的只数和占比里。活期存款是灰色。</p><p>某只股票赚了钱卖掉、又把钱拿去买新股票时：卖出赚的部分记在“已实现”里，留在总盈亏中；拿去再买的钱，在原始资产里按“买入花的钱减去卖出拿回的钱”冲抵，不会算成新投入，也不会让盈亏重复或丢失。</p></div></details></div>
+      <div class="title"><h2 id="mix-h">资产占比</h2><details class="help"><summary aria-label="资产占比怎么算">?</summary><div class="help-body"><p>按总资产计算：每只股票、每笔国债和定期存款各占总资产的多少。股票按股票表格里的现价，国债按持有到期的价值（含应计利息），定存按本金加已计利息，港股按当前汇率折成美元。</p><p>已到期的国债和定存不再计入。银行活期余额（人民币、港元、美元）记在“活期存款”里，按现在的汇率折成美元计入；要留现金赚利息，也可以买 SGOV 这类短期国债 ETF，当作股票记。</p><p>同一类用同一种颜色：蓝色是股票，紫色是国债，棕色是定期存款。表格最后一行是各类合计。</p><p>现资产 = 现在所有持仓值多少钱。原始资产 = 你实际投进去、还没拿回来的钱：买股票花的钱（含费用）减去卖出拿回的钱和收到的分红利息，加上国债买入花的钱、定存本金；已到期的国债和定存不再计入。两者之差就是总盈亏，和收益走势的累计收益一致。</p><p>总盈亏 = 现资产 − 原始资产，就是你现在的钱比实际投进去的钱多或少多少（里面已经包含浮动盈亏、已实现盈亏、分红利息和国债定存利息）。旁边的百分比 = 总盈亏 ÷ 在投的钱（股票成本 + 国债买入成本 + 定存本金，不含活期存款），和“收益走势”里的收益率是同一个数。</p><p>SGOV 当现金用，叫“类现金”：在这里单独成一类（青绿色），在下面的持仓表里也标“类现金”，不算在“股票”的只数和占比里。活期存款是灰色。</p><p>某只股票赚了钱卖掉、又把钱拿去买新股票时：卖出赚的部分记在“已实现”里，留在总盈亏中；拿去再买的钱，在原始资产里按“买入花的钱减去卖出拿回的钱”冲抵，不会算成新投入，也不会让盈亏重复或丢失。</p></div></details></div>
       <p class="hint" id="mixSum"></p>
     </div>
     <dl class="pnl-stats" id="assetStats" hidden></dl>
@@ -1261,8 +1261,7 @@ TAL|好未来|TAL Education
     const fx = fixedNow(), as = $("#assetStats"), profit = c.unreal + c.realized + c.dividends + fx.income, original = total - profit, atWork = c.cost + fx.cost;
     as.hidden = !(total > 0);
     as.innerHTML = total > 0 ? stat("现资产", money(total), "", "持仓现在的价值") + stat("原始资产", money(original), "", "投入的本金") +
-      stat("总盈亏", signed(profit), tone(profit), [atWork > 0 ? pct((profit / atWork) * 100) : "", "浮动 " + signed(c.unreal), "已实现 " + signed(c.realized),
-        Math.abs(c.dividends) >= 0.005 ? "分红利息 " + signed(c.dividends) : "", Math.abs(fx.income) >= 0.005 ? "国债定存 " + signed(fx.income) : ""].filter(Boolean).join(" · ")) : "";
+      stat("总盈亏", signed(profit), tone(profit), [atWork > 0 ? pct((profit / atWork) * 100) : "", "现资产 − 原始资产"].filter(Boolean).join(" · ")) : "";
     MIX.lay = drawDonut($("#mixChart"), items, total, "资产占比", (it) => (it.k === "stk" || it.k === "cash" ? it.name : CLASS_NAME[it.k].replace("定期存款", "定存").replace("活期存款", "活期")));
     if (!MIX.lay) {
       $("#mix tbody").innerHTML = '<tr><td colspan="4" class="empty">' + (state.ready ? "还没有持仓。" : "正在读取…") + "</td></tr>";
@@ -2067,8 +2066,11 @@ TAL|好未来|TAL Education
       const v = d.v[i], ch = v - d.base;
       $("#tlRead").innerHTML = bjTime(d.t[i]) + " &nbsp;<b>" + fmt(v) + '</b> &nbsp;<span class="' + tone(ch) + '">' + (d.money ? signed(ch) : signed(ch, d.ccy)) + " " + pct((ch / (d.pbase || d.base)) * 100) + "</span>";
     };
-    read(d.v.length - 1);
-    TL.plot = { d, X, Y, read, cross, dot, svg, W };
+    // At rest the 组合 tab would only repeat the figures of the card above (its last point is that value and change), so it
+    // shows a hint; a single stock shows its own last price and change, which the card does not.
+    const rest = () => { if (d.money) $("#tlRead").textContent = "移到图上，看每一分钟的组合市值和涨跌"; else read(d.v.length - 1); };
+    rest();
+    TL.plot ={ d, X, Y, read, cross, dot, svg, W };
     const at = (ev) => {
       const r = svg.getBoundingClientRect(), x = ((ev.clientX - r.left) / r.width) * W;
       let lo = 0, hi = d.t.length - 1;
@@ -2079,7 +2081,7 @@ TAL|好未来|TAL Education
       read(lo);
     };
     svg.addEventListener("pointermove", at);
-    svg.addEventListener("pointerleave", () => { cross.setAttribute("opacity", "0"); dot.setAttribute("opacity", "0"); read(d.v.length - 1); });
+    svg.addEventListener("pointerleave", () => { cross.setAttribute("opacity", "0"); dot.setAttribute("opacity", "0"); rest(); });
     $("#tlNote").textContent = [d.date + " 这一场", "北京时间", "灰虚线是上一收盘" + (d.money ? "（组合）" : ""),
       d.cost > 0 ? (costShown ? "蓝色点线是平均成本 " : "平均成本 ") + fmt(d.cost) + (costShown ? "" : "（现价" + (last >= d.cost ? "高" : "低") + " " + pct(Math.abs(last / d.cost - 1) * 100) + "，不在图内）") : "", d.skipped ? d.skipped + " 只没有分时数据或上一收盘价，未计入" : ""].filter(Boolean).join(" · ");
   }
